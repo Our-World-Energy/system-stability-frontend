@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "lint": "oxlint",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "mock:ws": "node scripts/mock-ws.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.2",

@@ -1,34 +1,58 @@
-import { Bell, Search, User } from 'lucide-react'
+import { Menu, Search, SlidersHorizontal } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { getSystemSummary } from '@/lib/dashboard-data'
+import { useSidebarStore } from '@/store/sidebar'
+import { useStatusStore } from '@/store/status'
+import { useLiveTiers } from '@/hooks/useLiveTiers'
+import { ConnectionBadge } from './ConnectionBadge'
 
 export function Navbar() {
+  const openMobile = useSidebarStore((s) => s.openMobile)
+  const connection = useStatusStore((s) => s.connection)
+  const summary = getSystemSummary(useLiveTiers())
+  const counters = [
+    { value: summary.total, label: 'systems', dot: 'bg-fg-subtle' },
+    { value: summary.healthy, label: 'healthy', dot: 'bg-healthy' },
+    { value: summary.degraded, label: 'degraded', dot: 'bg-degraded' },
+    { value: summary.critical, label: 'critical', dot: 'bg-critical-bright' },
+    { value: summary.noFeed, label: 'no-feed', dot: 'bg-fg-subtle' },
+  ]
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6">
-      <div className="flex items-center gap-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            placeholder="Search..."
-            className="h-9 w-64 rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-4 text-sm outline-none placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
-          />
+    <header className="sticky top-0 z-10 flex flex-col gap-4 border-b border-line bg-canvas/80 px-4 py-4 backdrop-blur sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-3 lg:flex-1">
+        <button
+          onClick={openMobile}
+          aria-label="Open menu"
+          className="grid size-9 shrink-0 place-items-center rounded-lg border border-line text-fg-muted transition-colors hover:border-line-bright hover:text-fg lg:hidden"
+        >
+          <Menu className="size-5" />
+        </button>
+        <h1 className="text-2xl font-semibold tracking-tight text-fg">System Visibility</h1>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          {counters.map((c) => (
+            <span key={c.label} className="flex items-center gap-1.5 font-mono text-[13px]">
+              <span className={cn('size-1.5 rounded-full', c.dot)} />
+              <span className="font-semibold text-fg">{c.value}</span>
+              <span className="text-fg-muted">{c.label}</span>
+            </span>
+          ))}
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <button className="relative flex size-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 transition-colors">
-          <Bell className="size-5" />
-          <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-red-500" />
-        </button>
-
-        <div className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-slate-100 transition-colors cursor-pointer">
-          <div className="flex size-8 items-center justify-center rounded-full bg-green-500 text-white">
-            <User className="size-4" />
-          </div>
-          <div className="text-sm">
-            <p className="font-medium text-slate-900 leading-tight">Admin</p>
-            <p className="text-xs text-slate-500 leading-tight">OWE Platform</p>
-          </div>
+      <div className="flex items-center gap-2 lg:shrink-0">
+        <ConnectionBadge connection={connection} />
+        <div className="relative flex-1 lg:flex-none">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" />
+          <input
+            type="search"
+            placeholder="Search systems…"
+            className="h-9 w-full rounded-lg border border-line bg-input pl-9 pr-4 text-sm text-fg outline-none transition-colors placeholder:text-fg-subtle focus:border-primary focus:ring-2 focus:ring-primary/20 lg:w-52 xl:w-64"
+          />
         </div>
+        <button className="flex h-9 shrink-0 items-center gap-2 rounded-lg border border-line bg-transparent px-3 text-sm font-medium text-fg-muted transition-colors hover:border-line-bright hover:text-fg">
+          <SlidersHorizontal className="size-4" />
+          <span className="hidden sm:inline">Tier / Phase</span>
+        </button>
       </div>
     </header>
   )

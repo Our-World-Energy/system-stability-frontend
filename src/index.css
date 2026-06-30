@@ -1,45 +1,90 @@
 @import "tailwindcss";
 
+/*
+  Design system: "Solar Infrastructure Intelligence"
+  Dark-mode-first, developer-tooling aesthetic for real-time grid monitoring.
+  Tokens sourced from DESIGN.md (Stitch export).
+*/
 @theme {
-  --color-brand-50: #f0fdf4;
-  --color-brand-100: #dcfce7;
-  --color-brand-200: #bbf7d0;
-  --color-brand-300: #86efac;
-  --color-brand-400: #4ade80;
-  --color-brand-500: #22c55e;
-  --color-brand-600: #16a34a;
-  --color-brand-700: #15803d;
-  --color-brand-800: #166534;
-  --color-brand-900: #14532d;
+  /* Fonts — Inter for UI, JetBrains Mono for quantitative data */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+
+  /* Surfaces / tonal layering */
+  --color-canvas: #111319; /* Level 0 — app shell background */
+  --color-sidebar: #0b0e13; /* darkest rail */
+  --color-surface: #181c23; /* Level 1 — cards */
+  --color-surface-2: #1d2025; /* raised module */
+  --color-surface-3: #272a30; /* hover / inputs lighter */
+  --color-input: #0b0e12; /* input fields, darker than card */
+
+  /* Borders / outlines */
+  --color-line: #262b33; /* default card border */
+  --color-line-bright: #3f444d; /* hover / elevated border */
+
+  /* Text */
+  --color-fg: #f8fafc; /* primary off-white */
+  --color-fg-muted: #8b95a5; /* secondary metadata — muted slate */
+  --color-fg-subtle: #5b6472; /* tertiary / disabled */
+
+  /* Brand — Solar Emerald */
+  --color-primary: #22c55e;
+  --color-primary-bright: #4be277;
+  --color-primary-dim: #16a34a;
+
+  /* Semantic status */
+  --color-healthy: #4be277;
+  --color-degraded: #ffba61;
+  --color-degraded-dim: #ef9900;
+  --color-critical: #ff5449;
+  --color-critical-bright: #ffb4ab;
+
+  /* Radii */
+  --radius-lg: 0.75rem; /* 12px — cards, buttons, inputs */
+  --radius-xl: 1rem;
 }
 
-:root {
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+/*
+  Base layer — kept INSIDE @layer base so Tailwind utilities (which live in
+  @layer utilities) continue to win. Unlayered rules would override every
+  p-*/m-*/space-y-* utility, so never reset margin/padding outside a layer here.
+*/
+@layer base {
+  :root {
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color-scheme: dark;
+  }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+  html,
+  body {
+    min-height: 100vh;
+    background-color: var(--color-canvas);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+  }
 
-body {
-  min-height: 100vh;
-  background-color: #f8fafc;
-  color: #0f172a;
-  font-family: system-ui, -apple-system, sans-serif;
-}
+  #root {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
 
-#root {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+  /* Thin, technical scrollbars */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2b3038;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3f444d;
+  }
 }
-
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
