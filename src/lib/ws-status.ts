@@ -40,7 +40,8 @@ export function payloadLatency(payload: Record<string, unknown>): string | undef
  * `page_status`/`active_incidents`), so pull whichever known field exists.
  */
 export function payloadDescription(payload: Record<string, unknown>): string | undefined {
-  const desc = payload.description ?? payload.page_status
+  // Vendors differ: Aurora=description, Solo=page_status, 20i=detail.
+  const desc = payload.description ?? payload.page_status ?? payload.detail
   if (typeof desc === 'string' && desc.trim()) return desc.trim()
   if (typeof payload.active_incidents === 'number') {
     return payload.active_incidents === 0 ? 'No active incidents' : `${payload.active_incidents} active incidents`

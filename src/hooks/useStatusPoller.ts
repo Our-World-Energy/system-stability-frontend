@@ -10,7 +10,7 @@ import { useStatusStore } from '@/store/status'
  * NOTE: the spec prefers the WebSocket and says not to poll REST for live data;
  * this is an explicit stopgap for environments where :3001 isn't reachable.
  */
-const SYSTEMS = ['aurora', 'solo']
+const SYSTEMS = ['aurora', 'solo', 'twentyi']
 const POLL_MS = Number(import.meta.env.VITE_STATUS_POLL_MS) || 30000
 
 /** Relative API path prefix (e.g. "/api") so requests hit the dev proxy. */
