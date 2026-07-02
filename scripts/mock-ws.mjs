@@ -47,6 +47,7 @@ const snapshot = () => ({
   systems: {
     aurora: { status: 'none', updated_at: now(), payload: { response_time_ms: rt(), description: 'All Systems Operational' } },
     solo: { status: 'none', updated_at: now(), payload: { response_time_ms: rt(), page_status: 'UP', active_incidents: 0 } },
+    twentyi: { status: 'none', updated_at: now(), payload: { response_time_ms: rt(), description: 'All Systems Operational' } },
   },
   sent_at: now(),
 })
@@ -68,15 +69,16 @@ server.on('upgrade', (req, socket) => {
 
 // Mostly healthy, occasionally a blip, so you can watch a card change live.
 const cycle = ['none', 'none', 'minor', 'none', 'major', 'none', 'critical', 'none', 'vendor_silent', 'none']
+const rotation = ['aurora', 'solo', 'twentyi']
 let i = 0
 setInterval(() => {
-  const system = i % 2 === 0 ? 'aurora' : 'solo'
-  const status = cycle[Math.floor(i / 2) % cycle.length]
+  const system = rotation[i % rotation.length]
+  const status = cycle[Math.floor(i / rotation.length) % cycle.length]
   i++
   const payload =
-    system === 'aurora'
-      ? { response_time_ms: rt(), description: status === 'none' ? 'All Systems Operational' : `Status: ${status}` }
-      : { response_time_ms: rt(), page_status: status === 'none' ? 'UP' : 'DEGRADED', active_incidents: status === 'none' ? 0 : 1 }
+    system === 'solo'
+      ? { response_time_ms: rt(), page_status: status === 'none' ? 'UP' : 'DEGRADED', active_incidents: status === 'none' ? 0 : 1 }
+      : { response_time_ms: rt(), description: status === 'none' ? 'All Systems Operational' : `Status: ${status}` }
   for (const c of clients) send(c, { type: 'status_update', system, status, updated_at: now(), payload })
 }, 5000)
 

@@ -76,6 +76,17 @@ export const tiers: Tier[] = [
     label: 'Tier 2 — Infrastructure',
     services: [
       {
+        name: '20i',
+        // WebSocket keys this system as "twentyi" (a JSON key can't start with a digit).
+        systemId: 'twentyi',
+        vendor: 'RSS feed',
+        status: 'healthy',
+        metric: '—',
+        metricLabel: 'Response Time',
+        updated: '—',
+        sparkline: [28, 30, 27, 32, 31, 34, 30, 33, 35, 32],
+      },
+      {
         name: 'Cloudflare',
         vendor: 'Statuspage.io',
         status: 'healthy',
