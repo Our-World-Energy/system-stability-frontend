@@ -10,7 +10,8 @@
     "lint": "oxlint",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "type-check": "tsc --noEmit",
-    "mock:ws": "node scripts/mock-ws.mjs"
+    "mock:ws": "node scripts/mock-ws.mjs",
+    "start": "serve dist --single --listen $PORT"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.2",
@@ -20,6 +21,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.0",
+    "serve": "^14.2.6",
     "tailwind-merge": "^3.6.0",
     "zustand": "^5.0.14"
   },
