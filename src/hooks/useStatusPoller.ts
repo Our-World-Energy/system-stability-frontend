@@ -10,7 +10,15 @@ import { useStatusStore } from '@/store/status'
  * NOTE: the spec prefers the WebSocket and says not to poll REST for live data;
  * this is an explicit stopgap for environments where :3001 isn't reachable.
  */
-const SYSTEMS = ['aurora', 'solo', 'twentyi']
+// `id` = WebSocket/store key; `rest` = REST endpoint path (defaults to id).
+// One Portal is keyed `one_portal` on the WS but `one-portal` on REST.
+const SYSTEMS: { id: string; rest: string }[] = [
+  { id: 'aurora', rest: 'aurora' },
+  { id: 'solo', rest: 'solo' },
+  { id: 'twentyi', rest: 'twentyi' },
+  { id: 'twilio', rest: 'twilio' },
+  { id: 'one_portal', rest: 'one-portal' },
+]
 const POLL_MS = Number(import.meta.env.VITE_STATUS_POLL_MS) || 30000
 
 /** Relative API path prefix (e.g. "/api") so requests hit the dev proxy. */
@@ -33,8 +41,8 @@ export function useStatusPoller(enabled: boolean) {
     let stopped = false
     let timer: ReturnType<typeof setInterval> | undefined
 
-    async function fetchSystem(id: string) {
-      const res = await fetch(`${basePath()}/owe-stability-service/${id}/status`, {
+    async function fetchSystem(sys: { id: string; rest: string }) {
+      const res = await fetch(`${basePath()}/owe-stability-service/${sys.rest}/status`, {
         headers: { Accept: 'application/json' },
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -42,7 +50,7 @@ export function useStatusPoller(enabled: boolean) {
       const data = (body?.data ?? {}) as Record<string, unknown>
       // Status field differs per vendor: Aurora uses `indicator`, Solo `status`.
       return {
-        id,
+        id: sys.id, // store under the WS key so cards resolve consistently
         status: data.indicator ?? data.status,
         updated_at: (data.checked_at as string) ?? null,
         payload: data,

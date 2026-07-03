@@ -50,6 +50,19 @@ export function payloadDescription(payload: Record<string, unknown>): string | u
 }
 
 /**
+ * Compact one-line note for Tier 3/4 cards, e.g. "200 OK · 13ms".
+ * Falls back to the description when there's no http/latency info.
+ */
+export function payloadNote(payload: Record<string, unknown>): string | undefined {
+  const parts: string[] = []
+  const http = payload.http_status
+  if (typeof http === 'number') parts.push(`${http} ${http < 400 ? 'OK' : 'ERR'}`)
+  const rt = payload.response_time_ms
+  if (typeof rt === 'number') parts.push(`${rt}ms`)
+  return parts.length ? parts.join(' · ') : payloadDescription(payload)
+}
+
+/**
  * Resolve the status WebSocket URL.
  * Priority: explicit VITE_WS_URL → derived from VITE_API_BASE_URL host
  * (http→ws, https→wss; port from VITE_WS_PORT, default 3001) → localhost.

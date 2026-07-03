@@ -51,14 +51,14 @@ export const tiers: Tier[] = [
         badge: { type: 'pill', text: 'SIGNAL+' },
       },
       {
-        name: 'Sales Platform',
-        vendor: '/health (internal)',
+        name: 'One Portal',
+        systemId: 'one_portal',
+        vendor: '/health',
         status: 'healthy',
-        metric: '142',
-        metricLabel: 'Deals Submitted',
-        updated: '3s ago',
+        metric: '—',
+        metricLabel: 'Response Time',
+        updated: '—',
         sparkline: [20, 24, 21, 26, 30, 28, 32, 31, 36, 40],
-        badge: { type: 'book' },
       },
       {
         name: 'DocuSign',
@@ -97,6 +97,7 @@ export const tiers: Tier[] = [
       },
       {
         name: 'Twilio',
+        systemId: 'twilio',
         vendor: 'Statuspage.io',
         status: 'healthy',
         metric: '8.2k',
@@ -129,7 +130,6 @@ export const tiers: Tier[] = [
     id: 'tier-3',
     label: 'Tier 3 — Operational',
     services: [
-      { name: 'One Portal', vendor: '/health', status: 'healthy', note: '200 OK · 9ms', updated: '1m ago' },
       { name: 'UKG', vendor: 'Synthetic', status: 'healthy', note: 'Login success', updated: '1m ago' },
       { name: 'Autodesk', vendor: 'Statuspage', status: 'healthy', note: 'All Green', updated: '1m ago' },
       { name: 'Tape', vendor: 'Webhook', status: 'healthy', note: 'Listening…', updated: '1m ago' },

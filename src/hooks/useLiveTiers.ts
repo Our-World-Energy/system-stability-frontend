@@ -1,5 +1,5 @@
 import { tiers, type Service, type Tier } from '@/lib/dashboard-data'
-import { formatRelative, payloadDescription, payloadLatency } from '@/lib/ws-status'
+import { formatRelative, payloadDescription, payloadLatency, payloadNote } from '@/lib/ws-status'
 import { useStatusStore, type ConnectionState, type LiveSystem } from '@/store/status'
 import { useTick } from './useTick'
 
@@ -12,6 +12,7 @@ function mergeService(
   svc: Service,
   systems: Record<string, LiveSystem>,
   connection: ConnectionState,
+  size: 'lg' | 'sm',
 ): Service {
   if (!svc.systemId) return svc
 
@@ -28,6 +29,9 @@ function mergeService(
       metric: latency ?? svc.metric,
       metricLabel: latency ? 'Response Time' : svc.metricLabel,
       detail: payloadDescription(live.payload),
+      // Compact (Tier 3/4) cards render `note`; keep it live. Never touch the
+      // note on large cards (it drives the degraded warn line there).
+      note: size === 'sm' ? (payloadNote(live.payload) ?? svc.note) : svc.note,
     }
   }
 
@@ -39,6 +43,7 @@ function mergeService(
     metric: '—',
     metricLabel: 'Response Time',
     detail: NO_FEED_DETAIL[connection],
+    note: size === 'sm' ? NO_FEED_DETAIL[connection] : svc.note,
     updated: '—',
   }
 }
@@ -56,8 +61,11 @@ export function useLiveTiers(): Tier[] {
   const connection = useStatusStore((s) => s.connection)
   useTick(1000) // refresh "Xs ago" labels
 
-  return tiers.map((tier) => ({
-    ...tier,
-    services: tier.services.map((svc) => mergeService(svc, systems, connection)),
-  }))
+  return tiers.map((tier) => {
+    const size = tier.id === 'tier-1' || tier.id === 'tier-2' ? 'lg' : 'sm'
+    return {
+      ...tier,
+      services: tier.services.map((svc) => mergeService(svc, systems, connection, size)),
+    }
+  })
 }

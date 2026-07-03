@@ -48,6 +48,8 @@ const snapshot = () => ({
     aurora: { status: 'none', updated_at: now(), payload: { response_time_ms: rt(), description: 'All Systems Operational' } },
     solo: { status: 'none', updated_at: now(), payload: { response_time_ms: rt(), page_status: 'UP', active_incidents: 0 } },
     twentyi: { status: 'none', updated_at: now(), payload: { response_time_ms: rt(), description: 'All Systems Operational' } },
+    one_portal: { status: 'none', updated_at: now(), payload: { status: 'none', http_status: 200, response_time_ms: rt(), health_status: 'ok' } },
+    twilio: { status: 'none', updated_at: now(), payload: { indicator: 'none', description: 'All Systems Operational', response_time_ms: rt() } },
   },
   sent_at: now(),
 })
@@ -69,7 +71,7 @@ server.on('upgrade', (req, socket) => {
 
 // Mostly healthy, occasionally a blip, so you can watch a card change live.
 const cycle = ['none', 'none', 'minor', 'none', 'major', 'none', 'critical', 'none', 'vendor_silent', 'none']
-const rotation = ['aurora', 'solo', 'twentyi']
+const rotation = ['aurora', 'solo', 'twentyi', 'one_portal', 'twilio']
 let i = 0
 setInterval(() => {
   const system = rotation[i % rotation.length]
