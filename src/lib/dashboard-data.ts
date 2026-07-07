@@ -9,7 +9,7 @@ export interface Service {
   metricLabel?: string
   note?: string
   sparkline?: number[]
-  /** When set, this card is driven live by the WebSocket (keyed by this id). */
+  /** When set, this card is driven live by the status feed (keyed by this id). */
   systemId?: string
   /** Live, vendor-agnostic detail line (e.g. "16ms · All Systems Operational"). */
   detail?: string
@@ -77,7 +77,7 @@ export const tiers: Tier[] = [
     services: [
       {
         name: '20i',
-        // WebSocket keys this system as "twentyi" (a JSON key can't start with a digit).
+        // The feed keys this system as "twentyi" (a JSON key can't start with a digit).
         systemId: 'twentyi',
         vendor: 'RSS feed',
         status: 'healthy',
@@ -105,6 +105,16 @@ export const tiers: Tier[] = [
         metricLabel: 'SMS Vol',
         updated: '3s ago',
         sparkline: [55, 50, 58, 52, 60, 57, 62, 59, 64, 61],
+      },
+      {
+        name: 'RingCentral',
+        systemId: 'ringcentral',
+        vendor: 'status.json',
+        status: 'healthy',
+        metric: '—',
+        metricLabel: 'Services Up',
+        updated: '—',
+        sparkline: [78, 78, 77, 78, 78, 76, 78, 77, 78, 78],
       },
       {
         name: 'Welcome Call',

@@ -2,15 +2,15 @@ import { useEffect } from 'react'
 import { useStatusStore } from '@/store/status'
 
 /**
- * REST fallback for the live feed, used when the WebSocket is unreachable.
- * Polls the per-system debug endpoints and patches the same store the WS uses,
- * so the cards render identically. Goes through the Vite proxy (relative /api)
- * to avoid CORS in dev.
+ * REST fallback for the live feed, used only for debugging or on hosts that
+ * can't hold a long-lived SSE stream (e.g. Vercel). Polls the per-system debug
+ * endpoints and patches the same store the SSE stream uses, so the cards render
+ * identically. Goes through the Vite proxy (relative /api) to avoid CORS in dev.
  *
- * NOTE: the spec prefers the WebSocket and says not to poll REST for live data;
- * this is an explicit stopgap for environments where :3001 isn't reachable.
+ * NOTE: the live UI uses SSE; this poller is a debug/host-constraint stopgap
+ * (enabled via VITE_STATUS_TRANSPORT=rest).
  */
-// `id` = WebSocket/store key; `rest` = REST endpoint path (defaults to id).
+// `id` = SSE/store key; `rest` = REST endpoint path (defaults to id).
 // One Portal is keyed `one_portal` on the WS but `one-portal` on REST.
 const SYSTEMS: { id: string; rest: string }[] = [
   { id: 'aurora', rest: 'aurora' },

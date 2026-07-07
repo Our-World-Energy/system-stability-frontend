@@ -1,17 +1,22 @@
 # Deploying the dashboard (host: 149.28.112.32)
 
 The frontend is a static SPA. It's served by nginx, which also **reverse-proxies**
-the REST API and the WebSocket so the browser only ever talks to port 80
+the REST API and the SSE stream so the browser only ever talks to port 80
 (no need to expose the backend's internal ports `18964`/`3001`).
 
 ```
 browser ──► 149.28.112.32:80 (nginx) ──┬─► /            static files (dist/)
                                         ├─► /api/        → 127.0.0.1:18964
-                                        └─► /ws/status   → 127.0.0.1:3001  (WebSocket)
+                                        └─► /sse/status  → 127.0.0.1:3001  (SSE stream)
 ```
 
-The production build (`.env.production`) is configured for this:
-`VITE_WS_URL=/ws/status`, `VITE_API_BASE_URL=/api`, `VITE_STATUS_TRANSPORT=ws`.
+The live UI consumes the SSE stream (browser-native `EventSource`). For this
+same-origin deploy set: `VITE_SSE_URL=/sse/status`, `VITE_API_BASE_URL=/api`, and
+leave `VITE_STATUS_TRANSPORT` unset (SSE is the default).
+
+> Vercel note: Vercel can't reliably hold a long-lived SSE stream through its
+> rewrite proxy, so the Vercel build keeps `VITE_STATUS_TRANSPORT=rest` (REST
+> polling). This nginx deploy is the one that uses SSE.
 
 ## 1. Build (on your machine)
 ```bash
@@ -44,13 +49,14 @@ server {
         proxy_set_header Host $host;
     }
 
-    location /ws/ {                               # WebSocket → backend
+    location /sse/ {                              # SSE stream → backend
         proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
+        proxy_set_header Connection "";            # keep the upstream alive
         proxy_set_header Host $host;
-        proxy_read_timeout 3600s;
+        proxy_buffering off;                       # REQUIRED: stream events immediately
+        proxy_cache off;
+        proxy_read_timeout 3600s;                  # long-lived connection
     }
 }
 NGINX
@@ -62,18 +68,16 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## 4. Verify
 - Open `http://149.28.112.32/` → dashboard loads, connection badge turns **Live**.
-- Backend must be running locally on the host: REST on `:18964`, WS on `:3001`.
+- Backend must be running locally on the host: REST on `:18964`, SSE on `:3001`.
 - Quick checks from the server:
   ```bash
   curl -s localhost:18964/api/owe-stability-service/aurora/status   # REST up
-  curl -s -o /dev/null -w '%{http_code}\n' \
-       -H "Connection: Upgrade" -H "Upgrade: websocket" \
-       -H "Sec-WebSocket-Key: x" -H "Sec-WebSocket-Version: 13" \
-       localhost:3001/ws/status                                     # expect 101
+  curl -sN localhost:3001/sse/status | head -c 200                  # expect: event: initial_snapshot
   ```
 
 ## Notes
-- **HTTPS:** if you later serve over TLS, the app auto-uses `wss://` (no rebuild
-  needed) — just add the cert to the nginx server block.
+- **HTTPS:** serving over TLS is required if the page is https — a same-origin
+  `/sse/status` behind nginx avoids mixed-content blocking. Just add the cert to
+  the nginx server block; no rebuild needed.
 - **Re-deploy:** repeat steps 1–2 and `sudo cp -r /tmp/owe-dist/* /var/www/owe/`.
   No nginx change needed.

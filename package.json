@@ -10,7 +10,9 @@
     "lint": "oxlint",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "type-check": "tsc --noEmit",
-    "mock:ws": "node scripts/mock-ws.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "mock:sse": "node scripts/mock-sse.mjs",
     "start": "serve dist --single --listen $PORT"
   },
   "dependencies": {
@@ -37,6 +39,7 @@
     "prettier-plugin-tailwindcss": "^0.8.0",
     "tailwindcss": "^4.3.2",
     "typescript": "~6.0.2",
-    "vite": "^8.1.0"
+    "vite": "^8.1.0",
+    "vitest": "^4.1.10"
   }
 }

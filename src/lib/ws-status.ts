@@ -35,6 +35,21 @@ export function payloadLatency(payload: Record<string, unknown>): string | undef
 }
 
 /**
+ * The headline metric + label for a card from its live payload.
+ * Most systems expose `response_time_ms` (→ "16ms" / "Response Time").
+ * RingCentral has no response time but reports service counts instead
+ * (→ "77/78" / "Services Up"). Falls back to the card's static metric.
+ */
+export function payloadMetric(payload: Record<string, unknown>): { value: string; label: string } | undefined {
+  const rt = payload.response_time_ms
+  if (typeof rt === 'number') return { value: `${rt}ms`, label: 'Response Time' }
+  const good = payload.services_good
+  const total = payload.services_total
+  if (typeof good === 'number' && typeof total === 'number') return { value: `${good}/${total}`, label: 'Services Up' }
+  return undefined
+}
+
+/**
  * Cloudflare summary line from its composite payload.
  * Cloudflare's card status is the worst of platform + cert + domain + dns, but
  * `platform_status` and the countdowns are kept separate (spec) so you can tell
@@ -55,6 +70,23 @@ export function cloudflareSummary(payload: Record<string, unknown>): string | un
 }
 
 /**
+ * RingCentral summary line from its aggregate feed payload.
+ * Gated on `services_total` (a RingCentral-only field) so no other system is
+ * affected. Surfaces the first affected service when there is one.
+ */
+export function ringcentralSummary(payload: Record<string, unknown>): string | undefined {
+  const total = payload.services_total
+  const good = payload.services_good
+  if (typeof total !== 'number' || typeof good !== 'number') return undefined
+  const base = `${good}/${total} services operational`
+  const affected = payload.affected_services
+  if (Array.isArray(affected) && affected.length && typeof affected[0] === 'string') {
+    return `${base} · ${affected[0]}`
+  }
+  return base
+}
+
+/**
  * Short, vendor-agnostic status description from a live payload.
  * Payload shapes differ per system (Aurora uses `description`, Solo uses
  * `page_status`/`active_incidents`), so pull whichever known field exists.
@@ -63,6 +95,9 @@ export function payloadDescription(payload: Record<string, unknown>): string | u
   // Cloudflare is composite: surface platform + the most urgent countdown.
   const cf = cloudflareSummary(payload)
   if (cf) return cf
+  // RingCentral: "77/78 services operational · <first affected>".
+  const rc = ringcentralSummary(payload)
+  if (rc) return rc
   // Vendors differ: Aurora=description, Solo=page_status, 20i=detail.
   const desc = payload.description ?? payload.page_status ?? payload.detail
   if (typeof desc === 'string' && desc.trim()) return desc.trim()
@@ -86,34 +121,29 @@ export function payloadNote(payload: Record<string, unknown>): string | undefine
 }
 
 /**
- * Resolve the status WebSocket URL.
- * Priority: explicit VITE_WS_URL → derived from VITE_API_BASE_URL host
- * (http→ws, https→wss; port from VITE_WS_PORT, default 3001) → localhost.
+ * Resolve the status SSE (EventSource) URL.
+ * Priority: explicit VITE_SSE_URL → derived from VITE_API_BASE_URL host
+ * (port from VITE_SSE_PORT, default 3001, path /sse/status) → localhost.
  */
-export function resolveWsUrl(): string {
-  const explicit = import.meta.env.VITE_WS_URL
+export function resolveSseUrl(): string {
+  const explicit = import.meta.env.VITE_SSE_URL
   if (explicit) {
-    // Relative value (e.g. "/ws/status") → same-origin, behind a reverse proxy.
-    // Uses wss on https pages to avoid mixed-content blocking.
-    if (explicit.startsWith('/')) {
-      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      return `${proto}//${window.location.host}${explicit}`
-    }
+    // Relative value (e.g. "/sse/status") → same-origin, behind a reverse proxy.
+    if (explicit.startsWith('/')) return `${window.location.origin}${explicit}`
     return explicit
   }
 
-  const port = import.meta.env.VITE_WS_PORT || '3001'
+  const port = import.meta.env.VITE_SSE_PORT || '3001'
   const apiBase = import.meta.env.VITE_API_BASE_URL
   if (apiBase) {
     try {
       const u = new URL(apiBase, window.location.origin)
-      const proto = u.protocol === 'https:' ? 'wss:' : 'ws:'
-      return `${proto}//${u.hostname}:${port}/ws/status`
+      return `${u.protocol}//${u.hostname}:${port}/sse/status`
     } catch {
       /* malformed base → fall through to localhost */
     }
   }
-  return `ws://localhost:${port}/ws/status`
+  return `http://localhost:${port}/sse/status`
 }
 
 /** ISO timestamp → "3s ago" / "5m ago" / "2h ago". Null/invalid → "—". */
