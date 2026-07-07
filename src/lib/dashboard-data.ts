@@ -9,6 +9,8 @@ export interface Service {
   metricLabel?: string
   note?: string
   sparkline?: number[]
+  /** Per-point tooltip labels for the sparkline; when set, the sparkline is interactive. */
+  sparkLabels?: string[]
   /** When set, this card is driven live by the status feed (keyed by this id). */
   systemId?: string
   /** Live, vendor-agnostic detail line (e.g. "16ms · All Systems Operational"). */

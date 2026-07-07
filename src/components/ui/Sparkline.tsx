@@ -1,4 +1,5 @@
-import { useId } from 'react'
+import { useId, useState } from 'react'
+import { cn } from '@/lib/utils'
 import type { ServiceStatus } from '@/lib/dashboard-data'
 
 const strokeColor: Record<ServiceStatus, string> = {
@@ -12,53 +13,87 @@ interface SparklineProps {
   points: number[]
   status?: ServiceStatus
   className?: string
+  /** Per-point tooltip text (e.g. "16ms · 3s ago"). When set, the chart is interactive. */
+  labels?: string[]
 }
 
+const W = 100
+const H = 36
+
 /**
- * Non-interactive sparkline. Stroke + a subtle gradient area fade
- * (20% -> 0% opacity), tinted by the current semantic status color.
+ * Sparkline with a subtle status-tinted area fade. When `labels` are supplied
+ * it becomes interactive: hovering shows a crosshair, a marker on the nearest
+ * point, and a small tooltip with that point's value + time.
  */
-export function Sparkline({ points, status = 'healthy', className }: SparklineProps) {
+export function Sparkline({ points, status = 'healthy', className, labels }: SparklineProps) {
   const gid = 'spark-' + useId().replace(/:/g, '')
-  const W = 100
-  const H = 36
+  const [hover, setHover] = useState<number | null>(null)
+  const n = points.length
+  const interactive = !!labels && labels.length === n
+
+  if (n < 2) return <div className={className} aria-hidden="true" />
+
   const max = Math.max(...points)
   const min = Math.min(...points)
   const range = max - min || 1
-  const step = W / (points.length - 1)
+  const step = W / (n - 1)
 
-  const coords = points.map((p, i) => {
-    const x = i * step
-    const y = H - ((p - min) / range) * (H - 4) - 2
-    return `${x.toFixed(2)},${y.toFixed(2)}`
-  })
-  const line = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c}`).join(' ')
+  const pts = points.map((p, i) => ({ x: i * step, y: H - ((p - min) / range) * (H - 4) - 2 }))
+  const line = pts.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(' ')
   const area = `${line} L${W},${H} L0,${H} Z`
   const color = strokeColor[status]
 
+  const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    if (!rect.width) return
+    const rx = (e.clientX - rect.left) / rect.width
+    setHover(Math.max(0, Math.min(n - 1, Math.round(rx * (n - 1)))))
+  }
+
+  const active = interactive && hover != null ? pts[hover] : null
+  // Keep the tooltip inside the card: pin its edge on the first/last point.
+  const shift = hover === 0 ? 'translate-x-0' : hover === n - 1 ? '-translate-x-full' : '-translate-x-1/2'
+
   return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="none"
-      className={className}
-      fill="none"
-      aria-hidden="true"
+    <div
+      className={cn('relative', className)}
+      onMouseMove={interactive ? onMove : undefined}
+      onMouseLeave={interactive ? () => setHover(null) : undefined}
     >
-      <defs>
-        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.2" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#${gid})`} />
-      <path
-        d={line}
-        stroke={color}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-full w-full" fill="none" aria-hidden="true">
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.2" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={area} fill={`url(#${gid})`} />
+        <path
+          d={line}
+          stroke={color}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+        {active && (
+          <>
+            <line x1={active.x} y1={0} x2={active.x} y2={H} stroke={color} strokeOpacity="0.35" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+            <circle cx={active.x} cy={active.y} r="2.5" fill={color} stroke="var(--color-surface)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+          </>
+        )}
+      </svg>
+      {active && labels && (
+        <span
+          className={cn(
+            'pointer-events-none absolute bottom-full z-10 mb-1 whitespace-nowrap rounded border border-line-bright bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] text-fg shadow-md',
+            shift,
+          )}
+          style={{ left: `${(hover! / (n - 1)) * 100}%` }}
+        >
+          {labels[hover!]}
+        </span>
+      )}
+    </div>
   )
 }

@@ -11,7 +11,7 @@ interface ServiceCardProps {
 }
 
 export function ServiceCard({ service, size = 'lg' }: ServiceCardProps) {
-  const { name, vendor, status, updated, metric, metricLabel, note, sparkline, detail, badge } = service
+  const { name, vendor, status, updated, metric, metricLabel, note, sparkline, sparkLabels, detail, badge } = service
   const isCritical = status === 'critical'
   const isDegraded = status === 'degraded'
   const isSilent = status === 'vendor_silent'
@@ -46,7 +46,7 @@ export function ServiceCard({ service, size = 'lg' }: ServiceCardProps) {
           {/* Body: sparkline or a status note */}
           {sparkline ? (
             <div className="mt-3 h-9 w-full">
-              <Sparkline points={sparkline} status={status} className="h-full w-full" />
+              <Sparkline points={sparkline} status={status} labels={sparkLabels} className="h-full w-full" />
             </div>
           ) : note ? (
             <p className="mt-3 flex-1 text-xs leading-relaxed text-fg-muted">{note}</p>

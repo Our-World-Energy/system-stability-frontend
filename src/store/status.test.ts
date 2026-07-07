@@ -18,7 +18,7 @@ describe('applySnapshot', () => {
     expect(sys().twilio.status).toBe('degraded') // minor → degraded (amber)
     expect(sys().ringcentral.status).toBe('critical')
     // null → pending "waiting", never an error/red
-    expect(sys().one_portal).toEqual({ status: 'vendor_silent', updatedAt: null, payload: {}, pending: true })
+    expect(sys().one_portal).toEqual({ status: 'vendor_silent', updatedAt: null, payload: {}, pending: true, samples: [] })
   })
 
   it('preserves richer existing solo state over a webhook-only snapshot value', () => {
@@ -81,6 +81,34 @@ describe('applyUpdate', () => {
   it('ignores updates with an empty system key', () => {
     useStatusStore.getState().applyUpdate('', { status: 'none', payload: {} })
     expect(Object.keys(sys())).toHaveLength(0)
+  })
+})
+
+describe('sparkline history (samples)', () => {
+  it('accumulates response_time_ms samples with timestamps, capped and ordered', () => {
+    const s = useStatusStore.getState()
+    s.applyUpdate('aurora', { status: 'none', updated_at: 't1', payload: { response_time_ms: 10 } })
+    s.applyUpdate('aurora', { status: 'none', updated_at: 't2', payload: { response_time_ms: 20 } })
+    expect(sys().aurora.samples).toEqual([
+      { v: 10, t: 't1' },
+      { v: 20, t: 't2' },
+    ])
+  })
+
+  it('tracks services_good for RingCentral (no response_time_ms)', () => {
+    useStatusStore.getState().applyUpdate('ringcentral', {
+      status: 'major',
+      updated_at: 't',
+      payload: { services_total: 78, services_good: 77 },
+    })
+    expect(sys().ringcentral.samples).toEqual([{ v: 77, t: 't' }])
+  })
+
+  it('does not add a point for a webhook-only update but keeps prior history', () => {
+    const s = useStatusStore.getState()
+    s.applyUpdate('solo', { status: 'none', updated_at: 't1', payload: { status: 'none', http_status: 200, response_time_ms: 30 } })
+    s.applyUpdate('solo', { updated_at: 't2', payload: { event_type: 'x', last_webhook_event_at: 't2' } })
+    expect(sys().solo.samples).toEqual([{ v: 30, t: 't1' }])
   })
 })
 

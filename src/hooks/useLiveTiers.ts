@@ -38,6 +38,10 @@ function mergeService(
     // Live metric (response time, or service count for RingCentral); keep the
     // static metric if the payload carries neither.
     const m = payloadMetric(live.payload)
+    // Real rolling history → interactive sparkline. Until ≥2 points exist we
+    // keep the static decorative line (and no tooltip, so no fake numbers).
+    const unit = typeof live.payload.response_time_ms === 'number' ? 'ms' : ''
+    const hasHistory = live.samples.length >= 2
     return {
       ...svc,
       status: live.status,
@@ -45,6 +49,8 @@ function mergeService(
       metric: m?.value ?? svc.metric,
       metricLabel: m ? m.label : svc.metricLabel,
       detail: payloadDescription(live.payload),
+      sparkline: hasHistory ? live.samples.map((s) => s.v) : svc.sparkline,
+      sparkLabels: hasHistory ? live.samples.map((s) => `${s.v}${unit} · ${formatRelative(s.t)}`) : undefined,
       // Compact (Tier 3/4) cards render `note`; keep it live. Never touch the
       // note on large cards (it drives the degraded warn line there).
       note: size === 'sm' ? (payloadNote(live.payload) ?? svc.note) : svc.note,
