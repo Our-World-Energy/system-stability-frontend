@@ -50,6 +50,7 @@ const snapshot = () => ({
     twentyi: { status: 'none', updated_at: now(), payload: { response_time_ms: rt(), description: 'All Systems Operational' } },
     one_portal: { status: 'none', updated_at: now(), payload: { status: 'none', http_status: 200, response_time_ms: rt(), health_status: 'ok' } },
     twilio: { status: 'none', updated_at: now(), payload: { indicator: 'none', description: 'All Systems Operational', response_time_ms: rt() } },
+    cloudflare: { status: 'none', updated_at: now(), payload: { response_time_ms: rt(), platform_status: 'none', cert_days_left: 62, domain_days_left: 210 } },
   },
   sent_at: now(),
 })
@@ -71,7 +72,7 @@ server.on('upgrade', (req, socket) => {
 
 // Mostly healthy, occasionally a blip, so you can watch a card change live.
 const cycle = ['none', 'none', 'minor', 'none', 'major', 'none', 'critical', 'none', 'vendor_silent', 'none']
-const rotation = ['aurora', 'solo', 'twentyi', 'one_portal', 'twilio']
+const rotation = ['aurora', 'solo', 'twentyi', 'one_portal', 'twilio', 'cloudflare']
 let i = 0
 setInterval(() => {
   const system = rotation[i % rotation.length]
@@ -80,7 +81,15 @@ setInterval(() => {
   const payload =
     system === 'solo'
       ? { response_time_ms: rt(), page_status: status === 'none' ? 'UP' : 'DEGRADED', active_incidents: status === 'none' ? 0 : 1 }
-      : { response_time_ms: rt(), description: status === 'none' ? 'All Systems Operational' : `Status: ${status}` }
+      : system === 'cloudflare'
+        ? {
+            response_time_ms: rt(),
+            // platform stays separate from the cert/domain countdowns (spec).
+            platform_status: status === 'vendor_silent' ? 'none' : status,
+            cert_days_left: status === 'minor' ? 18 : 62,
+            domain_days_left: status === 'major' ? 5 : 210,
+          }
+        : { response_time_ms: rt(), description: status === 'none' ? 'All Systems Operational' : `Status: ${status}` }
   for (const c of clients) send(c, { type: 'status_update', system, status, updated_at: now(), payload })
 }, 5000)
 

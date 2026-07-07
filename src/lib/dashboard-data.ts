@@ -88,6 +88,7 @@ export const tiers: Tier[] = [
       },
       {
         name: 'Cloudflare',
+        systemId: 'cloudflare',
         vendor: 'Statuspage.io',
         status: 'healthy',
         metric: '99.9%',

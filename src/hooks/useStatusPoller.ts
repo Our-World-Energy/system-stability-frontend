@@ -18,6 +18,7 @@ const SYSTEMS: { id: string; rest: string }[] = [
   { id: 'twentyi', rest: 'twentyi' },
   { id: 'twilio', rest: 'twilio' },
   { id: 'one_portal', rest: 'one-portal' },
+  { id: 'cloudflare', rest: 'cloudflare' },
 ]
 const POLL_MS = Number(import.meta.env.VITE_STATUS_POLL_MS) || 30000
 

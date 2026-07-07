@@ -35,11 +35,34 @@ export function payloadLatency(payload: Record<string, unknown>): string | undef
 }
 
 /**
+ * Cloudflare summary line from its composite payload.
+ * Cloudflare's card status is the worst of platform + cert + domain + dns, but
+ * `platform_status` and the countdowns are kept separate (spec) so you can tell
+ * "them" (platform) from "you" (cert/domain). Gated on the Cloudflare-only
+ * `cert_days_left`/`domain_days_left` fields so other composite systems (e.g.
+ * 20i, which also carries `platform_status`) are never affected.
+ */
+export function cloudflareSummary(payload: Record<string, unknown>): string | undefined {
+  const cert = payload.cert_days_left
+  const domain = payload.domain_days_left
+  if (typeof cert !== 'number' && typeof domain !== 'number') return undefined
+  const parts: string[] = []
+  const ps = payload.platform_status
+  if (typeof ps === 'string' && ps) parts.push(ps === 'none' ? 'Platform OK' : `Platform ${ps}`)
+  if (typeof cert === 'number') parts.push(`cert ${cert}d`)
+  if (typeof domain === 'number') parts.push(`domain ${domain}d`)
+  return parts.length ? parts.join(' · ') : undefined
+}
+
+/**
  * Short, vendor-agnostic status description from a live payload.
  * Payload shapes differ per system (Aurora uses `description`, Solo uses
  * `page_status`/`active_incidents`), so pull whichever known field exists.
  */
 export function payloadDescription(payload: Record<string, unknown>): string | undefined {
+  // Cloudflare is composite: surface platform + the most urgent countdown.
+  const cf = cloudflareSummary(payload)
+  if (cf) return cf
   // Vendors differ: Aurora=description, Solo=page_status, 20i=detail.
   const desc = payload.description ?? payload.page_status ?? payload.detail
   if (typeof desc === 'string' && desc.trim()) return desc.trim()
