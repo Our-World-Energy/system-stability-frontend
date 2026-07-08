@@ -84,30 +84,29 @@ export function Sparkline({ points, status = 'healthy', className, labels, marke
           strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
         />
-        {/* Persistent incident dots: yellow (degraded) / red (critical) */}
-        {markers?.map((m, i) => {
-          const c = markerColor[m]
-          if (!c || i >= pts.length) return null
-          return (
-            <circle
-              key={i}
-              cx={pts[i].x}
-              cy={pts[i].y}
-              r="2"
-              fill={c}
-              stroke="var(--color-surface)"
-              strokeWidth="1"
-              vectorEffect="non-scaling-stroke"
-            />
-          )
-        })}
         {active && (
-          <>
-            <line x1={active.x} y1={0} x2={active.x} y2={H} stroke={color} strokeOpacity="0.35" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-            <circle cx={active.x} cy={active.y} r="2.5" fill={color} stroke="var(--color-surface)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-          </>
+          <line x1={active.x} y1={0} x2={active.x} y2={H} stroke={color} strokeOpacity="0.35" strokeWidth="1" vectorEffect="non-scaling-stroke" />
         )}
       </svg>
+
+      {/* Incident dots as true circles (HTML overlay — immune to the SVG's non-uniform stretch) */}
+      {markers?.map((m, i) => {
+        const c = markerColor[m]
+        if (!c || i >= pts.length) return null
+        return (
+          <span
+            key={i}
+            className="pointer-events-none absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-surface"
+            style={{ left: `${(i / (n - 1)) * 100}%`, top: `${(pts[i].y / H) * 100}%`, backgroundColor: c }}
+          />
+        )
+      })}
+      {active && (
+        <span
+          className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-surface"
+          style={{ left: `${(hover! / (n - 1)) * 100}%`, top: `${(active.y / H) * 100}%`, backgroundColor: color }}
+        />
+      )}
       {active && labels && (
         <span
           className={cn(

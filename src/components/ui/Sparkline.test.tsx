@@ -22,20 +22,20 @@ describe('Sparkline', () => {
     expect(html).not.toContain('<svg')
   })
 
-  it('draws incident dots only for degraded/critical points', () => {
+  it('draws round incident dots only for degraded/critical points', () => {
     const html = renderToStaticMarkup(
       <Sparkline points={[10, 20, 30, 40]} markers={['healthy', 'degraded', 'healthy', 'critical']} status="degraded" />,
     )
-    // Two dots: one degraded (yellow), one critical (red); healthy points get none.
-    expect(html.match(/<circle/g)?.length).toBe(2)
-    expect(html).toContain('var(--color-degraded)')
-    expect(html).toContain('var(--color-critical-bright)')
+    // Two rounded dots: one degraded (yellow), one critical (red); healthy points get none.
+    expect(html.match(/rounded-full/g)?.length).toBe(2)
+    expect(html).toContain('background-color:var(--color-degraded)')
+    expect(html).toContain('background-color:var(--color-critical-bright)')
   })
 
   it('draws no incident dots when all points are healthy', () => {
     const html = renderToStaticMarkup(
       <Sparkline points={[10, 20, 30]} markers={['healthy', 'healthy', 'healthy']} status="healthy" />,
     )
-    expect(html).not.toContain('<circle')
+    expect(html).not.toContain('rounded-full')
   })
 })
