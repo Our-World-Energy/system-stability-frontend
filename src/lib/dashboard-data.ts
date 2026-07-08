@@ -11,6 +11,10 @@ export interface Service {
   sparkline?: number[]
   /** Per-point tooltip labels for the sparkline; when set, the sparkline is interactive. */
   sparkLabels?: string[]
+  /** Per-point status, parallel to `sparkline` — drives yellow/red incident dots on the graph. */
+  sparkStatuses?: ServiceStatus[]
+  /** True when the card has no live API feed yet → rendered blurred with a "Coming Soon" overlay. */
+  comingSoon?: boolean
   /** When set, this card is driven live by the status feed (keyed by this id). */
   systemId?: string
   /** Live, vendor-agnostic detail line (e.g. "16ms · All Systems Operational"). */

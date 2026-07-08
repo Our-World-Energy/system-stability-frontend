@@ -1,29 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import {
-  Zap,
-  LayoutGrid,
-  Bell,
-  Inbox,
-  Target,
-  ScrollText,
-  Activity,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  X,
-} from 'lucide-react'
+import { Zap, LayoutGrid, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSidebarStore } from '@/store/sidebar'
 
-const navItems = [
-  { to: '/', icon: LayoutGrid, label: 'Overview' },
-  { to: '/alerts', icon: Bell, label: 'Alerts' },
-  { to: '/reviewer-inbox', icon: Inbox, label: 'Reviewer Inbox' },
-  { to: '/slos', icon: Target, label: 'SLOs' },
-  { to: '/audit-log', icon: ScrollText, label: 'Audit Log' },
-  { to: '/baselines', icon: Activity, label: 'Baselines' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
-]
+// Only Overview is exposed for now; the other routes still exist but are hidden.
+const navItems = [{ to: '/', icon: LayoutGrid, label: 'Overview' }]
 
 function Brand({ collapsed }: { collapsed: boolean }) {
   return (

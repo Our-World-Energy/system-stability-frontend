@@ -159,3 +159,25 @@ export function formatRelative(iso: string | null): string {
   if (h < 24) return `${h}h ago`
   return `${Math.floor(h / 24)}d ago`
 }
+
+/** ISO timestamp → local date + time, e.g. "Jul 8, 2:53 PM". Null/invalid → "". */
+export function formatDateTime(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+/** Human label for a status, used in tooltips. */
+export function statusWord(status: ServiceStatus): string {
+  switch (status) {
+    case 'healthy':
+      return 'Healthy'
+    case 'degraded':
+      return 'Degraded'
+    case 'critical':
+      return 'Critical'
+    default:
+      return 'No feed'
+  }
+}

@@ -13,8 +13,16 @@ interface SparklineProps {
   points: number[]
   status?: ServiceStatus
   className?: string
-  /** Per-point tooltip text (e.g. "16ms · 3s ago"). When set, the chart is interactive. */
+  /** Per-point tooltip text (e.g. "Degraded · 57ms · Jul 8, 2:53 PM"). When set, the chart is interactive. */
   labels?: string[]
+  /** Per-point status, parallel to `points`. degraded/critical points get a persistent colored dot. */
+  markers?: ServiceStatus[]
+}
+
+/** Persistent incident dots only for degraded/critical points; healthy/silent stay bare. */
+const markerColor: Partial<Record<ServiceStatus, string>> = {
+  degraded: 'var(--color-degraded)',
+  critical: 'var(--color-critical-bright)',
 }
 
 const W = 100
@@ -25,7 +33,7 @@ const H = 36
  * it becomes interactive: hovering shows a crosshair, a marker on the nearest
  * point, and a small tooltip with that point's value + time.
  */
-export function Sparkline({ points, status = 'healthy', className, labels }: SparklineProps) {
+export function Sparkline({ points, status = 'healthy', className, labels, markers }: SparklineProps) {
   const gid = 'spark-' + useId().replace(/:/g, '')
   const [hover, setHover] = useState<number | null>(null)
   const n = points.length
@@ -76,6 +84,23 @@ export function Sparkline({ points, status = 'healthy', className, labels }: Spa
           strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
         />
+        {/* Persistent incident dots: yellow (degraded) / red (critical) */}
+        {markers?.map((m, i) => {
+          const c = markerColor[m]
+          if (!c || i >= pts.length) return null
+          return (
+            <circle
+              key={i}
+              cx={pts[i].x}
+              cy={pts[i].y}
+              r="2"
+              fill={c}
+              stroke="var(--color-surface)"
+              strokeWidth="1"
+              vectorEffect="non-scaling-stroke"
+            />
+          )
+        })}
         {active && (
           <>
             <line x1={active.x} y1={0} x2={active.x} y2={H} stroke={color} strokeOpacity="0.35" strokeWidth="1" vectorEffect="non-scaling-stroke" />
@@ -86,7 +111,7 @@ export function Sparkline({ points, status = 'healthy', className, labels }: Spa
       {active && labels && (
         <span
           className={cn(
-            'pointer-events-none absolute bottom-full z-10 mb-1 whitespace-nowrap rounded border border-line-bright bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] text-fg shadow-md',
+            'pointer-events-none absolute bottom-full z-20 mb-1 whitespace-nowrap rounded border border-line-bright bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] text-fg shadow-md',
             shift,
           )}
           style={{ left: `${(hover! / (n - 1)) * 100}%` }}

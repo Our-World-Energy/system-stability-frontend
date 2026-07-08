@@ -4,10 +4,11 @@ import { mapStatus, normalizePayload } from '@/lib/ws-status'
 
 export type ConnectionState = 'connecting' | 'open' | 'reconnecting' | 'failed'
 
-/** One point of rolling history for the sparkline: a numeric sample + its time. */
+/** One point of rolling history for the sparkline: a numeric sample, its time, and the status then. */
 export interface Sample {
   v: number
   t: string
+  status: ServiceStatus
 }
 
 export interface LiveSystem {
@@ -82,13 +83,14 @@ function foldFrame(prev: LiveSystem | undefined, frame: SystemFrame): LiveSystem
       samples: prevSamples,
     }
   }
+  const st = mapStatus(frame.status)
   const sample = payloadSample(incoming)
   const samples =
     typeof sample === 'number'
-      ? [...prevSamples, { v: sample, t: frame.updated_at ?? '' }].slice(-MAX_SAMPLES)
+      ? [...prevSamples, { v: sample, t: frame.updated_at ?? '', status: st }].slice(-MAX_SAMPLES)
       : prevSamples
   return {
-    status: mapStatus(frame.status),
+    status: st,
     updatedAt: frame.updated_at ?? null,
     payload: incoming,
     pending: false,

@@ -11,7 +11,8 @@ interface ServiceCardProps {
 }
 
 export function ServiceCard({ service, size = 'lg' }: ServiceCardProps) {
-  const { name, vendor, status, updated, metric, metricLabel, note, sparkline, sparkLabels, detail, badge } = service
+  const { name, vendor, status, updated, metric, metricLabel, note, sparkline, sparkLabels, sparkStatuses, detail, badge, comingSoon } =
+    service
   const isCritical = status === 'critical'
   const isDegraded = status === 'degraded'
   const isSilent = status === 'vendor_silent'
@@ -19,12 +20,25 @@ export function ServiceCard({ service, size = 'lg' }: ServiceCardProps) {
   return (
     <div
       className={cn(
-        'group flex flex-col rounded-lg border bg-surface p-4 transition-colors',
-        'hover:border-line-bright',
-        isCritical ? 'border-critical/40 bg-critical/5' : 'border-line',
+        'group relative flex flex-col rounded-lg border bg-surface p-4 transition-colors',
+        'hover:z-20 hover:border-line-bright', // lift on hover so the tooltip sits above neighbours
+        // Clip only coming-soon cards (for the blur); interactive cards must NOT clip
+        // their hover tooltip.
+        comingSoon && 'overflow-hidden',
+        isCritical && !comingSoon ? 'border-critical/40 bg-critical/5' : 'border-line',
         size === 'lg' ? 'min-h-[168px]' : 'min-h-[96px]',
       )}
     >
+      {/* "Coming Soon" overlay for cards with no live API feed */}
+      {comingSoon && (
+        <div className="absolute inset-0 z-10 grid place-items-center">
+          <span className="rounded-full border border-line-bright bg-surface-3 px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-wider text-fg-muted shadow-sm">
+            Coming Soon
+          </span>
+        </div>
+      )}
+
+      <div className={cn('flex flex-1 flex-col', comingSoon && 'pointer-events-none select-none blur-[3px] saturate-50')}>
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -46,7 +60,7 @@ export function ServiceCard({ service, size = 'lg' }: ServiceCardProps) {
           {/* Body: sparkline or a status note */}
           {sparkline ? (
             <div className="mt-3 h-9 w-full">
-              <Sparkline points={sparkline} status={status} labels={sparkLabels} className="h-full w-full" />
+              <Sparkline points={sparkline} status={status} labels={sparkLabels} markers={sparkStatuses} className="h-full w-full" />
             </div>
           ) : note ? (
             <p className="mt-3 flex-1 text-xs leading-relaxed text-fg-muted">{note}</p>
@@ -111,6 +125,7 @@ export function ServiceCard({ service, size = 'lg' }: ServiceCardProps) {
           <span className="shrink-0 font-mono text-[11px] text-fg-subtle">{updated}</span>
         </div>
       )}
+      </div>
     </div>
   )
 }

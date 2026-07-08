@@ -1,14 +1,18 @@
-import { Menu, Search, SlidersHorizontal } from 'lucide-react'
+import { Menu, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getSystemSummary } from '@/lib/dashboard-data'
 import { useSidebarStore } from '@/store/sidebar'
 import { useStatusStore } from '@/store/status'
+import { useSearchStore } from '@/store/search'
 import { useLiveTiers } from '@/hooks/useLiveTiers'
 import { ConnectionBadge } from './ConnectionBadge'
+import { TierFilter } from './TierFilter'
 
 export function Navbar() {
   const openMobile = useSidebarStore((s) => s.openMobile)
   const connection = useStatusStore((s) => s.connection)
+  const query = useSearchStore((s) => s.query)
+  const setQuery = useSearchStore((s) => s.setQuery)
   const summary = getSystemSummary(useLiveTiers())
   const counters = [
     { value: summary.total, label: 'systems', dot: 'bg-fg-subtle' },
@@ -18,7 +22,7 @@ export function Navbar() {
     { value: summary.noFeed, label: 'no-feed', dot: 'bg-fg-subtle' },
   ]
   return (
-    <header className="sticky top-0 z-10 flex flex-col gap-4 border-b border-line bg-canvas/80 px-4 py-4 backdrop-blur sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+    <header className="sticky top-0 z-30 flex flex-col gap-4 border-b border-line bg-canvas/80 px-4 py-4 backdrop-blur sm:px-6 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-3 lg:flex-1">
         <button
           onClick={openMobile}
@@ -45,14 +49,13 @@ export function Navbar() {
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" />
           <input
             type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Search systems…"
             className="h-9 w-full rounded-lg border border-line bg-input pl-9 pr-4 text-sm text-fg outline-none transition-colors placeholder:text-fg-subtle focus:border-primary focus:ring-2 focus:ring-primary/20 lg:w-52 xl:w-64"
           />
         </div>
-        <button className="flex h-9 shrink-0 items-center gap-2 rounded-lg border border-line bg-transparent px-3 text-sm font-medium text-fg-muted transition-colors hover:border-line-bright hover:text-fg">
-          <SlidersHorizontal className="size-4" />
-          <span className="hidden sm:inline">Tier / Phase</span>
-        </button>
+        <TierFilter />
       </div>
     </header>
   )

@@ -1,5 +1,5 @@
 import { tiers, type Service, type Tier } from '@/lib/dashboard-data'
-import { formatRelative, payloadDescription, payloadMetric, payloadNote } from '@/lib/ws-status'
+import { formatDateTime, formatRelative, payloadDescription, payloadMetric, payloadNote, statusWord } from '@/lib/ws-status'
 import { useStatusStore, type ConnectionState, type LiveSystem } from '@/store/status'
 import { useTick } from './useTick'
 
@@ -14,7 +14,8 @@ function mergeService(
   connection: ConnectionState,
   size: 'lg' | 'sm',
 ): Service {
-  if (!svc.systemId) return svc
+  // Not wired to the live API → mark as "coming soon" (blurred placeholder).
+  if (!svc.systemId) return { ...svc, comingSoon: true }
 
   const live = systems[svc.systemId]
 
@@ -50,7 +51,13 @@ function mergeService(
       metricLabel: m ? m.label : svc.metricLabel,
       detail: payloadDescription(live.payload),
       sparkline: hasHistory ? live.samples.map((s) => s.v) : svc.sparkline,
-      sparkLabels: hasHistory ? live.samples.map((s) => `${s.v}${unit} · ${formatRelative(s.t)}`) : undefined,
+      sparkStatuses: hasHistory ? live.samples.map((s) => s.status) : undefined,
+      // Tooltip leads with the status + when it happened; value is secondary.
+      sparkLabels: hasHistory
+        ? live.samples.map((s) =>
+            [statusWord(s.status), s.v ? `${s.v}${unit}` : '', formatDateTime(s.t)].filter(Boolean).join(' · '),
+          )
+        : undefined,
       // Compact (Tier 3/4) cards render `note`; keep it live. Never touch the
       // note on large cards (it drives the degraded warn line there).
       note: size === 'sm' ? (payloadNote(live.payload) ?? svc.note) : svc.note,

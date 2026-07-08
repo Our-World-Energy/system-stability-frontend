@@ -90,25 +90,25 @@ describe('sparkline history (samples)', () => {
     s.applyUpdate('aurora', { status: 'none', updated_at: 't1', payload: { response_time_ms: 10 } })
     s.applyUpdate('aurora', { status: 'none', updated_at: 't2', payload: { response_time_ms: 20 } })
     expect(sys().aurora.samples).toEqual([
-      { v: 10, t: 't1' },
-      { v: 20, t: 't2' },
+      { v: 10, t: 't1', status: 'healthy' },
+      { v: 20, t: 't2', status: 'healthy' },
     ])
   })
 
-  it('tracks services_good for RingCentral (no response_time_ms)', () => {
+  it('tracks services_good for RingCentral with its status (major → degraded)', () => {
     useStatusStore.getState().applyUpdate('ringcentral', {
       status: 'major',
       updated_at: 't',
       payload: { services_total: 78, services_good: 77 },
     })
-    expect(sys().ringcentral.samples).toEqual([{ v: 77, t: 't' }])
+    expect(sys().ringcentral.samples).toEqual([{ v: 77, t: 't', status: 'degraded' }])
   })
 
   it('does not add a point for a webhook-only update but keeps prior history', () => {
     const s = useStatusStore.getState()
     s.applyUpdate('solo', { status: 'none', updated_at: 't1', payload: { status: 'none', http_status: 200, response_time_ms: 30 } })
     s.applyUpdate('solo', { updated_at: 't2', payload: { event_type: 'x', last_webhook_event_at: 't2' } })
-    expect(sys().solo.samples).toEqual([{ v: 30, t: 't1' }])
+    expect(sys().solo.samples).toEqual([{ v: 30, t: 't1', status: 'healthy' }])
   })
 })
 
