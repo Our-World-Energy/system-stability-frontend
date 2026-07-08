@@ -38,4 +38,21 @@ describe('Sparkline', () => {
     )
     expect(html).not.toContain('rounded-full')
   })
+
+  it('marks only status changes, not every degraded/critical sample', () => {
+    // degraded episode (2 samples) then escalation to critical (2 samples):
+    // one dot when it enters degraded, one dot when it escalates to critical.
+    const html = renderToStaticMarkup(
+      <Sparkline points={[10, 20, 30, 40]} markers={['degraded', 'degraded', 'critical', 'critical']} status="critical" />,
+    )
+    expect(html.match(/rounded-full/g)?.length).toBe(2)
+  })
+
+  it('does not re-mark a sustained degraded state each sample', () => {
+    // healthy → degraded (dot) → degraded → degraded: only the transition gets a dot.
+    const html = renderToStaticMarkup(
+      <Sparkline points={[10, 20, 30, 40]} markers={['healthy', 'degraded', 'degraded', 'degraded']} status="degraded" />,
+    )
+    expect(html.match(/rounded-full/g)?.length).toBe(1)
+  })
 })

@@ -89,10 +89,12 @@ export function Sparkline({ points, status = 'healthy', className, labels, marke
         )}
       </svg>
 
-      {/* Incident dots as true circles (HTML overlay — immune to the SVG's non-uniform stretch) */}
+      {/* Incident dots — only at status *changes* into degraded/critical (not every sample).
+          HTML overlay so they render as true circles despite the SVG's non-uniform stretch. */}
       {markers?.map((m, i) => {
         const c = markerColor[m]
-        if (!c || i >= pts.length) return null
+        const changed = i === 0 || m !== markers[i - 1]
+        if (!c || !changed || i >= pts.length) return null
         return (
           <span
             key={i}
