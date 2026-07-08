@@ -19,10 +19,12 @@ interface SparklineProps {
   markers?: ServiceStatus[]
 }
 
-/** Persistent incident dots only for degraded/critical points; healthy/silent stay bare. */
-const markerColor: Partial<Record<ServiceStatus, string>> = {
+/** Dot color at a status *change*, tinted by the new state (recovery→green, etc.). */
+const markerColor: Record<ServiceStatus, string> = {
+  healthy: 'var(--color-healthy)',
   degraded: 'var(--color-degraded)',
   critical: 'var(--color-critical-bright)',
+  vendor_silent: 'var(--color-fg-subtle)',
 }
 
 const W = 100
@@ -89,17 +91,16 @@ export function Sparkline({ points, status = 'healthy', className, labels, marke
         )}
       </svg>
 
-      {/* Incident dots — only at status *changes* into degraded/critical (not every sample).
-          HTML overlay so they render as true circles despite the SVG's non-uniform stretch. */}
+      {/* Dots ONLY at a status change (healthy↔degraded↔critical…), never on a steady
+          state. HTML overlay so they render as true circles despite the SVG's stretch. */}
       {markers?.map((m, i) => {
-        const c = markerColor[m]
-        const changed = i === 0 || m !== markers[i - 1]
-        if (!c || !changed || i >= pts.length) return null
+        const changed = i > 0 && m !== markers[i - 1]
+        if (!changed || i >= pts.length) return null
         return (
           <span
             key={i}
             className="pointer-events-none absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-surface"
-            style={{ left: `${(i / (n - 1)) * 100}%`, top: `${(pts[i].y / H) * 100}%`, backgroundColor: c }}
+            style={{ left: `${(i / (n - 1)) * 100}%`, top: `${(pts[i].y / H) * 100}%`, backgroundColor: markerColor[m] }}
           />
         )
       })}

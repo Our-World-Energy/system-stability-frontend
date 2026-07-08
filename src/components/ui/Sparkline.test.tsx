@@ -22,37 +22,39 @@ describe('Sparkline', () => {
     expect(html).not.toContain('<svg')
   })
 
-  it('draws round incident dots only for degraded/critical points', () => {
+  it('draws a dot at every status change, tinted by the new state', () => {
+    // healthy→degraded (yellow), degraded→healthy (green), healthy→critical (red).
     const html = renderToStaticMarkup(
       <Sparkline points={[10, 20, 30, 40]} markers={['healthy', 'degraded', 'healthy', 'critical']} status="degraded" />,
     )
-    // Two rounded dots: one degraded (yellow), one critical (red); healthy points get none.
-    expect(html.match(/rounded-full/g)?.length).toBe(2)
+    expect(html.match(/rounded-full/g)?.length).toBe(3)
     expect(html).toContain('background-color:var(--color-degraded)')
+    expect(html).toContain('background-color:var(--color-healthy)')
     expect(html).toContain('background-color:var(--color-critical-bright)')
   })
 
-  it('draws no incident dots when all points are healthy', () => {
-    const html = renderToStaticMarkup(
+  it('draws NO dots for a steady state (the key fix)', () => {
+    // A persistently degraded system must not sprinkle a dot on every sample.
+    const steady = renderToStaticMarkup(
+      <Sparkline points={[10, 20, 30, 40, 50]} markers={['degraded', 'degraded', 'degraded', 'degraded', 'degraded']} status="degraded" />,
+    )
+    expect(steady).not.toContain('rounded-full')
+
+    const allHealthy = renderToStaticMarkup(
       <Sparkline points={[10, 20, 30]} markers={['healthy', 'healthy', 'healthy']} status="healthy" />,
     )
-    expect(html).not.toContain('rounded-full')
+    expect(allHealthy).not.toContain('rounded-full')
   })
 
-  it('marks only status changes, not every degraded/critical sample', () => {
-    // degraded episode (2 samples) then escalation to critical (2 samples):
-    // one dot when it enters degraded, one dot when it escalates to critical.
+  it('marks only the transition, not every sample of the episode', () => {
+    // healthy → degraded(×3) → critical(×2): one dot entering degraded, one escalating.
     const html = renderToStaticMarkup(
-      <Sparkline points={[10, 20, 30, 40]} markers={['degraded', 'degraded', 'critical', 'critical']} status="critical" />,
+      <Sparkline
+        points={[10, 20, 30, 40, 50, 60]}
+        markers={['healthy', 'degraded', 'degraded', 'degraded', 'critical', 'critical']}
+        status="critical"
+      />,
     )
     expect(html.match(/rounded-full/g)?.length).toBe(2)
-  })
-
-  it('does not re-mark a sustained degraded state each sample', () => {
-    // healthy → degraded (dot) → degraded → degraded: only the transition gets a dot.
-    const html = renderToStaticMarkup(
-      <Sparkline points={[10, 20, 30, 40]} markers={['healthy', 'degraded', 'degraded', 'degraded']} status="degraded" />,
-    )
-    expect(html.match(/rounded-full/g)?.length).toBe(1)
   })
 })
