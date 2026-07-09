@@ -1,13 +1,14 @@
 # Deploying the dashboard (host: 149.28.112.32)
 
 The frontend is a static SPA. It's served by nginx, which also **reverse-proxies**
-the REST API and the SSE stream so the browser only ever talks to port 80
-(no need to expose the backend's internal ports `18964`/`3001`).
+the Go stability service so the browser only ever talks to port 80 (no need to
+expose the backend's internal port `18964`). Both REST and SSE are served by the
+same Go service on `:18964` — the old standalone realtime server (`:3001`) is gone.
 
 ```
 browser ──► 149.28.112.32:80 (nginx) ──┬─► /            static files (dist/)
                                         ├─► /api/        → 127.0.0.1:18964
-                                        └─► /sse/status  → 127.0.0.1:3001  (SSE stream)
+                                        └─► /sse/status  → 127.0.0.1:18964  (SSE stream)
 ```
 
 The live UI consumes the SSE stream (browser-native `EventSource`). For this
@@ -49,8 +50,8 @@ server {
         proxy_set_header Host $host;
     }
 
-    location /sse/ {                              # SSE stream → backend
-        proxy_pass http://127.0.0.1:3001;
+    location /sse/ {                              # SSE stream → Go service (same as /api)
+        proxy_pass http://127.0.0.1:18964;
         proxy_http_version 1.1;
         proxy_set_header Connection "";            # keep the upstream alive
         proxy_set_header Host $host;
@@ -68,11 +69,13 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## 4. Verify
 - Open `http://149.28.112.32/` → dashboard loads, connection badge turns **Live**.
-- Backend must be running locally on the host: REST on `:18964`, SSE on `:3001`.
+- The Go stability service must be running locally on the host on `:18964`
+  (serves both REST and SSE).
 - Quick checks from the server:
   ```bash
   curl -s localhost:18964/api/owe-stability-service/aurora/status   # REST up
-  curl -sN localhost:3001/sse/status | head -c 200                  # expect: event: initial_snapshot
+  curl -sN localhost:18964/sse/status | head -c 200                 # expect: event: initial_snapshot
+  curl -s localhost:18964/health                                    # {"data":{"status":"ok"}}
   ```
 
 ## Notes

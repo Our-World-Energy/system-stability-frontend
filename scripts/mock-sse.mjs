@@ -2,12 +2,13 @@
 // No dependencies — serves text/event-stream at GET /sse/status so the
 // dashboard shows live data without the real backend.
 //
-//   npm run mock:sse      # then run the app (default VITE_SSE_URL = localhost:3001)
+//   npm run mock:sse      # serves on :8080 (the Go service's local port)
+//                         # then run the app with VITE_SSE_URL=http://localhost:8080/sse/status
 //
 // Not for production. Point the app at the real server via VITE_SSE_URL when ready.
 import http from 'node:http'
 
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT || 8080
 const now = () => new Date().toISOString()
 const rt = () => 10 + Math.floor(Math.random() * 60)
 
@@ -21,6 +22,7 @@ const systems = {
   twilio: () => ({ status: 'minor', updated_at: now(), payload: { status: 'minor', indicator: 'minor', description: 'Partially Degraded Service', response_time_ms: rt(), checked_at: now() } }),
   cloudflare: () => ({ status: 'minor', updated_at: now(), payload: { status: 'minor', platform_status: 'minor', http_status: 200, response_time_ms: rt(), cert_days_left: 83, domain_days_left: 389, detail: 'Minor Service Outage', checked_at: now() } }),
   ringcentral: () => ({ status: 'major', updated_at: now(), payload: { status: 'major', worst_level: 'Warning', services_total: 78, services_good: 77, affected_services: ['Contact Center (Americas): Warning'], active_alerts: 1, api_probe_status: 'none', checked_at: now() } }),
+  atlassian: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', indicator: 'none', description: 'All Systems Operational', page_id: '0f54fx204jpt', response_time_ms: rt(), checked_at: now() } }),
 }
 
 const clients = new Set()

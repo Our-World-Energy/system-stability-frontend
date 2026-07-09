@@ -99,7 +99,8 @@ export function payloadDescription(payload: Record<string, unknown>): string | u
   const rc = ringcentralSummary(payload)
   if (rc) return rc
   // Vendors differ: Aurora=description, Solo=page_status, 20i=detail.
-  const desc = payload.description ?? payload.page_status ?? payload.detail
+  // error_detail is present only on vendor_silent — surface it so the reason shows.
+  const desc = payload.description ?? payload.error_detail ?? payload.page_status ?? payload.detail
   if (typeof desc === 'string' && desc.trim()) return desc.trim()
   if (typeof payload.active_incidents === 'number') {
     return payload.active_incidents === 0 ? 'No active incidents' : `${payload.active_incidents} active incidents`
@@ -122,8 +123,10 @@ export function payloadNote(payload: Record<string, unknown>): string | undefine
 
 /**
  * Resolve the status SSE (EventSource) URL.
- * Priority: explicit VITE_SSE_URL → derived from VITE_API_BASE_URL host
- * (port from VITE_SSE_PORT, default 3001, path /sse/status) → localhost.
+ * SSE now lives on the SAME origin as the REST status API (the Go stability
+ * service), at `/sse/status` — no separate realtime host/port.
+ * Priority: explicit VITE_SSE_URL → VITE_API_BASE_URL's origin + /sse/status →
+ * same-origin as the page.
  */
 export function resolveSseUrl(): string {
   const explicit = import.meta.env.VITE_SSE_URL
@@ -133,17 +136,16 @@ export function resolveSseUrl(): string {
     return explicit
   }
 
-  const port = import.meta.env.VITE_SSE_PORT || '3001'
   const apiBase = import.meta.env.VITE_API_BASE_URL
   if (apiBase) {
     try {
-      const u = new URL(apiBase, window.location.origin)
-      return `${u.protocol}//${u.hostname}:${port}/sse/status`
+      // Strip the API path (e.g. "/api"); SSE hangs off the same origin.
+      return `${new URL(apiBase, window.location.origin).origin}/sse/status`
     } catch {
-      /* malformed base → fall through to localhost */
+      /* malformed base → fall through */
     }
   }
-  return `http://localhost:${port}/sse/status`
+  return `${window.location.origin}/sse/status`
 }
 
 /** ISO timestamp → "3s ago" / "5m ago" / "2h ago". Null/invalid → "—". */

@@ -123,6 +123,16 @@ export const tiers: Tier[] = [
         sparkline: [78, 78, 77, 78, 78, 76, 78, 77, 78, 78],
       },
       {
+        name: 'Atlassian',
+        systemId: 'atlassian',
+        vendor: 'Statuspage.io',
+        status: 'healthy',
+        metric: '—',
+        metricLabel: 'Response Time',
+        updated: '—',
+        sparkline: [20, 22, 21, 24, 23, 26, 25, 28, 27, 30],
+      },
+      {
         name: 'Welcome Call',
         vendor: 'internal /health',
         status: 'degraded',
@@ -151,7 +161,6 @@ export const tiers: Tier[] = [
       { name: 'Autodesk', vendor: 'Statuspage', status: 'healthy', note: 'All Green', updated: '1m ago' },
       { name: 'Tape', vendor: 'Webhook', status: 'healthy', note: 'Listening…', updated: '1m ago' },
       { name: 'Zapier', vendor: 'Statuspage', status: 'degraded', note: 'Relay slow', updated: '1m ago' },
-      { name: 'Atlassian', vendor: 'Statuspage', status: 'healthy', note: 'Jira stable', updated: '1m ago' },
     ],
   },
   {

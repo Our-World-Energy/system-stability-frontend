@@ -20,6 +20,7 @@ const SYSTEMS: { id: string; rest: string }[] = [
   { id: 'one_portal', rest: 'one-portal' },
   { id: 'cloudflare', rest: 'cloudflare' },
   { id: 'ringcentral', rest: 'ringcentral' },
+  { id: 'atlassian', rest: 'atlassian' },
 ]
 const POLL_MS = Number(import.meta.env.VITE_STATUS_POLL_MS) || 30000
 

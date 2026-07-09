@@ -6,9 +6,11 @@ import path from 'path'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
-  // Dev proxy target: the REST backend origin (derived from VITE_API_BASE_URL).
-  // Lets the browser call /api/* same-origin, dodging CORS during local dev.
-  let apiOrigin = 'http://149.28.112.32:18964'
+  // Dev proxy target: the Go stability service origin (derived from
+  // VITE_API_BASE_URL). Serves both /api/* (REST) and /sse/status (stream), so
+  // the browser can hit them same-origin, dodging CORS during local dev.
+  // Default to a locally-run Go service; override via VITE_API_BASE_URL.
+  let apiOrigin = 'http://localhost:8080'
   try {
     if (env.VITE_API_BASE_URL) apiOrigin = new URL(env.VITE_API_BASE_URL).origin
   } catch {
@@ -40,12 +42,15 @@ export default defineConfig(({ mode }) => {
       open: true,
       proxy: {
         '/api': { target: apiOrigin, changeOrigin: true },
+        // Plain HTTP streaming (SSE), not a WebSocket upgrade → ws: false.
+        '/sse': { target: apiOrigin, changeOrigin: true, ws: false },
       },
     },
     preview: {
       port: 4000,
       proxy: {
         '/api': { target: apiOrigin, changeOrigin: true },
+        '/sse': { target: apiOrigin, changeOrigin: true, ws: false },
       },
     },
   }

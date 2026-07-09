@@ -5,6 +5,10 @@
       "destination": "http://149.28.112.32:18964/api/:path*"
     },
     {
+      "source": "/sse/:path*",
+      "destination": "http://149.28.112.32:18964/sse/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
