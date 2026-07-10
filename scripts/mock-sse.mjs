@@ -23,6 +23,8 @@ const systems = {
   cloudflare: () => ({ status: 'minor', updated_at: now(), payload: { status: 'minor', platform_status: 'minor', http_status: 200, response_time_ms: rt(), cert_days_left: 83, domain_days_left: 389, detail: 'Minor Service Outage', checked_at: now() } }),
   ringcentral: () => ({ status: 'major', updated_at: now(), payload: { status: 'major', worst_level: 'Warning', services_total: 78, services_good: 77, affected_services: ['Contact Center (Americas): Warning'], active_alerts: 1, api_probe_status: 'none', checked_at: now() } }),
   atlassian: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', indicator: 'none', description: 'All Systems Operational', page_id: '0f54fx204jpt', response_time_ms: rt(), checked_at: now() } }),
+  sendgrid: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', indicator: 'none', description: 'All Systems Operational', page_id: '85jqbm2yry9k', response_time_ms: rt(), checked_at: now() } }),
+  autodesk: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', indicator: 'none', description: 'All Systems Operational', response_time_ms: rt(), checked_at: now() } }),
 }
 
 const clients = new Set()

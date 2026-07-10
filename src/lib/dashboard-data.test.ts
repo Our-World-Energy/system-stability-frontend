@@ -7,9 +7,20 @@ const wiredIds = tiers
   .filter((id): id is string => !!id)
 
 describe('wired systems (dashboard-data)', () => {
-  it('wires exactly the 8 live SSE systems, including atlassian', () => {
+  it('wires exactly the 10 live SSE systems, including sendgrid & autodesk', () => {
     expect(new Set(wiredIds)).toEqual(
-      new Set(['aurora', 'solo', 'one_portal', 'twentyi', 'twilio', 'cloudflare', 'ringcentral', 'atlassian']),
+      new Set([
+        'aurora',
+        'solo',
+        'one_portal',
+        'twentyi',
+        'twilio',
+        'cloudflare',
+        'ringcentral',
+        'atlassian',
+        'sendgrid',
+        'autodesk',
+      ]),
     )
   })
 

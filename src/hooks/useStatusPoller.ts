@@ -21,6 +21,8 @@ const SYSTEMS: { id: string; rest: string }[] = [
   { id: 'cloudflare', rest: 'cloudflare' },
   { id: 'ringcentral', rest: 'ringcentral' },
   { id: 'atlassian', rest: 'atlassian' },
+  { id: 'sendgrid', rest: 'sendgrid' },
+  { id: 'autodesk', rest: 'autodesk' },
 ]
 const POLL_MS = Number(import.meta.env.VITE_STATUS_POLL_MS) || 30000
 

@@ -8,7 +8,7 @@ import { useFilterStore } from '@/store/filters'
 const gridFor: Record<string, string> = {
   'tier-1': 'grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4',
   'tier-2': 'grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4',
-  'tier-3': 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6',
+  'tier-3': 'grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4',
   'tier-4': 'grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4',
 }
 
@@ -49,7 +49,7 @@ export function Dashboard() {
   return (
     <div className="space-y-8 pb-4">
       {visibleTiers.map((tier) => {
-        const size = tier.id === 'tier-1' || tier.id === 'tier-2' ? 'lg' : 'sm'
+        const size = tier.id === 'tier-4' ? 'sm' : 'lg'
         return (
           <section key={tier.id} className="space-y-4">
             <TierDivider label={tier.label} />

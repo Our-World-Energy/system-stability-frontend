@@ -91,7 +91,7 @@ export function useLiveTiers(): Tier[] {
   useTick(1000) // refresh "Xs ago" labels
 
   return tiers.map((tier) => {
-    const size = tier.id === 'tier-1' || tier.id === 'tier-2' ? 'lg' : 'sm'
+    const size = tier.id === 'tier-4' ? 'sm' : 'lg'
     return {
       ...tier,
       services: tier.services.map((svc) => mergeService(svc, systems, connection, size)),
