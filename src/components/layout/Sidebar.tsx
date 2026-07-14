@@ -10,7 +10,7 @@ const navItems = [{ to: '/', icon: LayoutGrid, label: 'Overview' }]
 function Brand({ collapsed }: { collapsed: boolean }) {
   return (
     <div className={cn('flex h-16 items-center gap-3 px-4', collapsed && 'justify-center px-0')}>
-      <img src={logoUrl} alt="Our World Energy" className="size-12 shrink-0" />
+      <img src={logoUrl} alt="Our World Energy" className="size-10 shrink-0" />
       {!collapsed && (
         <div className="overflow-hidden">
           <p className="truncate text-sm font-bold leading-tight text-fg">OWE</p>
