@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom'
-import { Zap, LayoutGrid, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { LayoutGrid, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSidebarStore } from '@/store/sidebar'
+import logoUrl from '@/assets/Logo.svg'
 
 // Only Overview is exposed for now; the other routes still exist but are hidden.
 const navItems = [{ to: '/', icon: LayoutGrid, label: 'Overview' }]
@@ -9,9 +10,7 @@ const navItems = [{ to: '/', icon: LayoutGrid, label: 'Overview' }]
 function Brand({ collapsed }: { collapsed: boolean }) {
   return (
     <div className={cn('flex h-16 items-center gap-3 px-4', collapsed && 'justify-center px-0')}>
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-[0.25rem] bg-primary">
-        <Zap className="size-5 fill-[#003915] text-[#003915]" />
-      </div>
+      <img src={logoUrl} alt="Our World Energy" className="size-9 shrink-0" />
       {!collapsed && (
         <div className="overflow-hidden">
           <p className="truncate text-sm font-bold leading-tight text-fg">OWE</p>
