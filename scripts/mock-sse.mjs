@@ -25,6 +25,7 @@ const systems = {
   atlassian: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', indicator: 'none', description: 'All Systems Operational', page_id: '0f54fx204jpt', response_time_ms: rt(), checked_at: now() } }),
   sendgrid: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', indicator: 'none', description: 'All Systems Operational', page_id: '85jqbm2yry9k', response_time_ms: rt(), checked_at: now() } }),
   autodesk: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', indicator: 'none', description: 'All Systems Operational', response_time_ms: rt(), checked_at: now() } }),
+  docusign: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', indicator: 'none', description: 'All Systems Operational', page_id: 'mwr4rgcd2g69', response_time_ms: rt(), checked_at: now() } }),
 }
 
 const clients = new Set()

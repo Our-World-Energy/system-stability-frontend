@@ -23,6 +23,7 @@ const SYSTEMS: { id: string; rest: string }[] = [
   { id: 'atlassian', rest: 'atlassian' },
   { id: 'sendgrid', rest: 'sendgrid' },
   { id: 'autodesk', rest: 'autodesk' },
+  { id: 'docusign', rest: 'docusign' },
 ]
 const POLL_MS = Number(import.meta.env.VITE_STATUS_POLL_MS) || 30000
 
