@@ -19,6 +19,9 @@ export interface Service {
   systemId?: string
   /** Live, vendor-agnostic detail line (e.g. "16ms · All Systems Operational"). */
   detail?: string
+  /** True when the vendor reports a planned maintenance window (e.g. One Verify's
+   * `ready_status: "maintenance"`) → show a maintenance badge instead of a warning. */
+  maintenance?: boolean
   /** Optional footer marker shown above the timestamp. */
   badge?: { type: 'book' } | { type: 'pill'; text: string }
 }
@@ -145,12 +148,13 @@ export const tiers: Tier[] = [
       },
       {
         name: 'One Verify',
+        systemId: 'one_verify',
         vendor: 'internal /health',
         status: 'healthy',
-        metric: 'Active',
-        metricLabel: 'Service Status',
-        note: 'ID Verification active.',
-        updated: '30s ago',
+        metric: '—',
+        metricLabel: 'Response Time',
+        updated: '—',
+        sparkline: [24, 26, 23, 28, 25, 30, 27, 32, 29, 34],
       },
     ],
   },

@@ -7,7 +7,7 @@ const wiredIds = tiers
   .filter((id): id is string => !!id)
 
 describe('wired systems (dashboard-data)', () => {
-  it('wires exactly the 11 live SSE systems, including sendgrid, autodesk & docusign', () => {
+  it('wires exactly the 12 live SSE systems, including docusign & one_verify', () => {
     expect(new Set(wiredIds)).toEqual(
       new Set([
         'aurora',
@@ -21,6 +21,7 @@ describe('wired systems (dashboard-data)', () => {
         'sendgrid',
         'autodesk',
         'docusign',
+        'one_verify',
       ]),
     )
   })

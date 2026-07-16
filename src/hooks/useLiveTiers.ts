@@ -50,6 +50,9 @@ function mergeService(
       metric: m?.value ?? svc.metric,
       metricLabel: m ? m.label : svc.metricLabel,
       detail: payloadDescription(live.payload),
+      // Planned maintenance (e.g. One Verify's ready_status) → badge, not a warning.
+      // Severity still comes from the envelope status, never from ready_status alone.
+      maintenance: live.payload.ready_status === 'maintenance',
       sparkline: hasHistory ? live.samples.map((s) => s.v) : svc.sparkline,
       sparkStatuses: hasHistory ? live.samples.map((s) => s.status) : undefined,
       // Tooltip leads with the status + when it happened; value is secondary.

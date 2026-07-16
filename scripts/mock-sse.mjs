@@ -26,6 +26,7 @@ const systems = {
   sendgrid: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', indicator: 'none', description: 'All Systems Operational', page_id: '85jqbm2yry9k', response_time_ms: rt(), checked_at: now() } }),
   autodesk: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', indicator: 'none', description: 'All Systems Operational', response_time_ms: rt(), checked_at: now() } }),
   docusign: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', indicator: 'none', description: 'All Systems Operational', page_id: 'mwr4rgcd2g69', response_time_ms: rt(), checked_at: now() } }),
+  one_verify: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', health_status: 'ok', ready_status: 'ok', version: '1.0.0', uptime_s: 0, http_status: 200, response_time_ms: rt(), endpoint: 'https://enujqqjrbmxofwxlaeik.supabase.co/functions/v1', checked_at: now() } }),
 }
 
 const clients = new Set()
@@ -65,7 +66,16 @@ setInterval(() => {
   const forced = cycle[Math.floor(i / keys.length) % cycle.length]
   i++
   const base = systems[system]()
-  const msg = { type: 'status_update', system, status: forced, updated_at: now(), payload: { ...base.payload, status: forced, checked_at: now() } }
+  const payload = { ...base.payload, status: forced, checked_at: now() }
+  // One Verify: exercise its readiness/dependency states so the maintenance
+  // badge and failed-dependency line are visible while cycling.
+  if (system === 'one_verify') {
+    if (forced === 'minor') Object.assign(payload, { ready_status: 'maintenance', detail: 'Scheduled maintenance until 03:00 UTC' })
+    else if (forced === 'major') Object.assign(payload, { ready_status: 'degraded', failed: ['ai_gateway'], detail: 'failed dependencies: ai_gateway' })
+    else if (forced === 'critical') Object.assign(payload, { ready_status: 'degraded', failed: ['verify_db'], detail: 'failed dependencies: verify_db' })
+    else if (forced === 'vendor_silent') Object.assign(payload, { health_status: '', http_status: 0, detail: 'health fetch failed: connection refused' })
+  }
+  const msg = { type: 'status_update', system, status: forced, updated_at: now(), payload }
   for (const res of clients) write(res, 'status_update', msg)
 }, 5000)
 

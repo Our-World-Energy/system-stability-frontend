@@ -24,6 +24,8 @@ const SYSTEMS: { id: string; rest: string }[] = [
   { id: 'sendgrid', rest: 'sendgrid' },
   { id: 'autodesk', rest: 'autodesk' },
   { id: 'docusign', rest: 'docusign' },
+  // One Verify is keyed `one_verify` on the feed but `one-verify` on REST.
+  { id: 'one_verify', rest: 'one-verify' },
 ]
 const POLL_MS = Number(import.meta.env.VITE_STATUS_POLL_MS) || 30000
 

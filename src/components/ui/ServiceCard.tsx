@@ -1,4 +1,4 @@
-import { TriangleAlert, BookOpen } from 'lucide-react'
+import { TriangleAlert, BookOpen, Wrench } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Service } from '@/lib/dashboard-data'
 import { StatusPill } from './StatusPill'
@@ -11,7 +11,7 @@ interface ServiceCardProps {
 }
 
 export function ServiceCard({ service, size = 'lg' }: ServiceCardProps) {
-  const { name, vendor, status, updated, metric, metricLabel, note, sparkline, sparkLabels, sparkStatuses, detail, badge, comingSoon } =
+  const { name, vendor, status, updated, metric, metricLabel, note, sparkline, sparkLabels, sparkStatuses, detail, badge, comingSoon, maintenance } =
     service
   const isCritical = status === 'critical'
   const isDegraded = status === 'degraded'
@@ -45,7 +45,18 @@ export function ServiceCard({ service, size = 'lg' }: ServiceCardProps) {
           <p className="truncate text-sm font-semibold text-fg">{name}</p>
           <p className="truncate font-mono text-[11px] text-fg-muted">{vendor}</p>
         </div>
-        <StatusPill status={status} />
+        <div className="flex shrink-0 items-center gap-1.5">
+          {maintenance && (
+            <span
+              title="In planned maintenance"
+              className="flex items-center gap-1 rounded-full border border-line-bright bg-surface-3 px-2 py-0.5 font-mono text-[9px] font-medium uppercase tracking-wide text-fg-muted"
+            >
+              <Wrench className="size-2.5" />
+              Maint
+            </span>
+          )}
+          <StatusPill status={status} />
+        </div>
       </div>
 
       {/* Live payload summary (wired cards only) */}
