@@ -32,6 +32,9 @@ export interface Tier {
   services: Service[]
 }
 
+// Only SSE-wired (live) systems are displayed. Each card carries a `systemId`
+// and is organized into the roadmap tier it belongs to. Non-wired demo cards
+// were removed — nothing renders here without a live feed behind it.
 export const tiers: Tier[] = [
   {
     id: 'tier-1',
@@ -60,16 +63,6 @@ export const tiers: Tier[] = [
         badge: { type: 'pill', text: 'SIGNAL+' },
       },
       {
-        name: 'One Portal',
-        systemId: 'one_portal',
-        vendor: '/health',
-        status: 'healthy',
-        metric: '—',
-        metricLabel: 'Response Time',
-        updated: '—',
-        sparkline: [20, 24, 21, 26, 30, 28, 32, 31, 36, 40],
-      },
-      {
         name: 'DocuSign',
         systemId: 'docusign',
         vendor: 'Statuspage.io',
@@ -86,6 +79,16 @@ export const tiers: Tier[] = [
     label: 'Tier 2 — Infrastructure',
     services: [
       {
+        name: 'Cloudflare',
+        systemId: 'cloudflare',
+        vendor: 'Statuspage.io',
+        status: 'healthy',
+        metric: '99.9%',
+        metricLabel: 'Uptime',
+        note: 'Network operations optimal.',
+        updated: '30s ago',
+      },
+      {
         name: '20i',
         // The feed keys this system as "twentyi" (a JSON key can't start with a digit).
         systemId: 'twentyi',
@@ -95,16 +98,6 @@ export const tiers: Tier[] = [
         metricLabel: 'Response Time',
         updated: '—',
         sparkline: [28, 30, 27, 32, 31, 34, 30, 33, 35, 32],
-      },
-      {
-        name: 'Cloudflare',
-        systemId: 'cloudflare',
-        vendor: 'Statuspage.io',
-        status: 'healthy',
-        metric: '99.9%',
-        metricLabel: 'Uptime',
-        note: 'Network operations optimal.',
-        updated: '30s ago',
       },
       {
         name: 'Twilio',
@@ -117,36 +110,6 @@ export const tiers: Tier[] = [
         sparkline: [55, 50, 58, 52, 60, 57, 62, 59, 64, 61],
       },
       {
-        name: 'RingCentral',
-        systemId: 'ringcentral',
-        vendor: 'status.json',
-        status: 'healthy',
-        metric: '—',
-        metricLabel: 'Services Up',
-        updated: '—',
-        sparkline: [78, 78, 77, 78, 78, 76, 78, 77, 78, 78],
-      },
-      {
-        name: 'Atlassian',
-        systemId: 'atlassian',
-        vendor: 'Statuspage.io',
-        status: 'healthy',
-        metric: '—',
-        metricLabel: 'Response Time',
-        updated: '—',
-        sparkline: [20, 22, 21, 24, 23, 26, 25, 28, 27, 30],
-      },
-      {
-        name: 'Welcome Call',
-        vendor: 'internal /health',
-        status: 'degraded',
-        metric: '12',
-        metricLabel: 'Calls Today',
-        note: 'Latency High',
-        updated: '30s ago',
-        sparkline: [40, 38, 44, 36, 30, 34, 22, 28, 18, 24],
-      },
-      {
         name: 'One Verify',
         systemId: 'one_verify',
         vendor: 'internal /health',
@@ -156,22 +119,32 @@ export const tiers: Tier[] = [
         updated: '—',
         sparkline: [24, 26, 23, 28, 25, 30, 27, 32, 29, 34],
       },
+      {
+        name: 'One Portal',
+        systemId: 'one_portal',
+        vendor: '/health',
+        status: 'healthy',
+        metric: '—',
+        metricLabel: 'Response Time',
+        updated: '—',
+        sparkline: [20, 24, 21, 26, 30, 28, 32, 31, 36, 40],
+      },
+      {
+        name: 'RingCentral',
+        systemId: 'ringcentral',
+        vendor: 'status.json',
+        status: 'healthy',
+        metric: '—',
+        metricLabel: 'Services Up',
+        updated: '—',
+        sparkline: [78, 78, 77, 78, 78, 76, 78, 77, 78, 78],
+      },
     ],
   },
   {
     id: 'tier-3',
     label: 'Tier 3 — Operational',
     services: [
-      {
-        name: 'SendGrid',
-        systemId: 'sendgrid',
-        vendor: 'Statuspage.io',
-        status: 'healthy',
-        metric: '—',
-        metricLabel: 'Response Time',
-        updated: '—',
-        sparkline: [26, 24, 28, 25, 30, 27, 32, 29, 34, 31],
-      },
       {
         name: 'Autodesk',
         systemId: 'autodesk',
@@ -182,9 +155,16 @@ export const tiers: Tier[] = [
         updated: '—',
         sparkline: [33, 31, 35, 32, 36, 34, 38, 35, 40, 37],
       },
-      { name: 'UKG', vendor: 'Synthetic', status: 'healthy', note: 'Login success', updated: '1m ago' },
-      { name: 'Tape', vendor: 'Webhook', status: 'healthy', note: 'Listening…', updated: '1m ago' },
-      { name: 'Zapier', vendor: 'Statuspage', status: 'degraded', note: 'Relay slow', updated: '1m ago' },
+      {
+        name: 'SendGrid',
+        systemId: 'sendgrid',
+        vendor: 'Statuspage.io',
+        status: 'healthy',
+        metric: '—',
+        metricLabel: 'Response Time',
+        updated: '—',
+        sparkline: [26, 24, 28, 25, 30, 27, 32, 29, 34, 31],
+      },
     ],
   },
   {
@@ -192,27 +172,15 @@ export const tiers: Tier[] = [
     label: 'Tier 4 — Lowest Priority',
     services: [
       {
-        name: '360 Hosting',
-        vendor: 'K8s Scrape',
-        status: 'vendor_silent',
-        note: 'No status feed available',
-        updated: '—',
-      },
-      {
-        name: 'Tesla PV',
-        vendor: 'Synthetic',
-        status: 'critical',
-        note: 'Auth Fail: SSO Service Unavailable',
-        updated: '5m ago',
-      },
-      {
-        name: 'Enphase',
-        vendor: 'Synthetic',
+        name: 'Atlassian',
+        systemId: 'atlassian',
+        vendor: 'Statuspage.io',
         status: 'healthy',
-        note: 'API responding within normal parameters',
-        updated: '5m ago',
+        metric: '—',
+        metricLabel: 'Response Time',
+        updated: '—',
+        sparkline: [20, 22, 21, 24, 23, 26, 25, 28, 27, 30],
       },
-      { name: 'Palmetto', vendor: 'Synthetic', status: 'healthy', note: 'Sync completed successfully', updated: '5m ago' },
     ],
   },
 ]
