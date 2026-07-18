@@ -195,6 +195,19 @@ export const tiers: Tier[] = [
   },
 ]
 
+/**
+ * The systemIds wired to the live feed, in tier order. Single source of truth
+ * for "which systems are live" — both the SSE overlay (useLiveTiers) and the
+ * REST poller derive from this, so adding a `systemId` card here is all it takes
+ * to light a system up on every transport.
+ */
+export function wiredSystemIds(allTiers: Tier[] = tiers): string[] {
+  return allTiers
+    .flatMap((t) => t.services)
+    .map((s) => s.systemId)
+    .filter((id): id is string => !!id)
+}
+
 /** Live counts derived from the data so the header always matches the cards. */
 export function getSystemSummary(allTiers: Tier[] = tiers) {
   const all = allTiers.flatMap((t) => t.services)

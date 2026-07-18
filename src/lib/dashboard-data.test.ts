@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { tiers } from './dashboard-data'
+import { tiers, wiredSystemIds } from './dashboard-data'
 
-const wiredIds = tiers
-  .flatMap((t) => t.services)
-  .map((s) => s.systemId)
-  .filter((id): id is string => !!id)
+const wiredIds = wiredSystemIds()
 
 describe('wired systems (dashboard-data)', () => {
   it('wires exactly the 13 live SSE systems, including docusign, one_verify & tape', () => {

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { wiredSystemIds } from '@/lib/dashboard-data'
 import { useStatusStore } from '@/store/status'
 
 /**
@@ -10,23 +11,16 @@ import { useStatusStore } from '@/store/status'
  * NOTE: the live UI uses SSE; this poller is a debug/host-constraint stopgap
  * (enabled via VITE_STATUS_TRANSPORT=rest).
  */
-// `id` = SSE/store key; `rest` = REST endpoint path (defaults to id).
-// One Portal is keyed `one_portal` on the WS but `one-portal` on REST.
-const SYSTEMS: { id: string; rest: string }[] = [
-  { id: 'aurora', rest: 'aurora' },
-  { id: 'solo', rest: 'solo' },
-  { id: 'twentyi', rest: 'twentyi' },
-  { id: 'twilio', rest: 'twilio' },
-  { id: 'one_portal', rest: 'one-portal' },
-  { id: 'cloudflare', rest: 'cloudflare' },
-  { id: 'ringcentral', rest: 'ringcentral' },
-  { id: 'atlassian', rest: 'atlassian' },
-  { id: 'sendgrid', rest: 'sendgrid' },
-  { id: 'autodesk', rest: 'autodesk' },
-  { id: 'docusign', rest: 'docusign' },
-  // One Verify is keyed `one_verify` on the feed but `one-verify` on REST.
-  { id: 'one_verify', rest: 'one-verify' },
-]
+// The systems to poll are derived from the wired cards in dashboard-data, so the
+// REST and SSE transports can never drift apart. `id` = feed/store key; `rest` =
+// REST endpoint path, which by convention is the feed key with underscores
+// swapped for hyphens (one_portal → one-portal, one_verify → one-verify). Add an
+// override here only if a system's REST path ever diverges from that rule.
+const REST_PATH_OVERRIDES: Record<string, string> = {}
+const SYSTEMS: { id: string; rest: string }[] = wiredSystemIds().map((id) => ({
+  id,
+  rest: REST_PATH_OVERRIDES[id] ?? id.replace(/_/g, '-'),
+}))
 const POLL_MS = Number(import.meta.env.VITE_STATUS_POLL_MS) || 30000
 
 /** Relative API path prefix (e.g. "/api") so requests hit the dev proxy. */
