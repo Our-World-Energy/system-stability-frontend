@@ -165,6 +165,16 @@ export const tiers: Tier[] = [
         updated: '—',
         sparkline: [26, 24, 28, 25, 30, 27, 32, 29, 34, 31],
       },
+      {
+        name: 'Tape',
+        systemId: 'tape',
+        vendor: 'Synthetic',
+        status: 'healthy',
+        metric: '—',
+        metricLabel: 'Response Time',
+        updated: '—',
+        sparkline: [22, 25, 23, 27, 24, 29, 26, 31, 28, 33],
+      },
     ],
   },
   {

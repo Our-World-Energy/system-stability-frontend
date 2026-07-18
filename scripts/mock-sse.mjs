@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 8080
 const now = () => new Date().toISOString()
 const rt = () => 10 + Math.floor(Math.random() * 60)
 
-// The 7 systems the real backend streams. `one_portal` starts null to exercise
+// The systems the real backend streams. `one_portal` starts null to exercise
 // the "waiting for first check" (pending) UI, then fills on the first update.
 const systems = {
   aurora: () => ({ status: 'none', updated_at: now(), payload: { indicator: 'none', description: 'All Systems Operational', response_time_ms: rt(), checked_at: now() } }),
@@ -27,6 +27,7 @@ const systems = {
   autodesk: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', indicator: 'none', description: 'All Systems Operational', response_time_ms: rt(), checked_at: now() } }),
   docusign: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', indicator: 'none', description: 'All Systems Operational', page_id: 'mwr4rgcd2g69', response_time_ms: rt(), checked_at: now() } }),
   one_verify: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', health_status: 'ok', ready_status: 'ok', version: '1.0.0', uptime_s: 0, http_status: 200, response_time_ms: rt(), endpoint: 'https://enujqqjrbmxofwxlaeik.supabase.co/functions/v1', checked_at: now() } }),
+  tape: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', runs_checked: 25, failed_runs: 0, last_run_status: 'running', last_run_id: '65338379', response_time_ms: rt(), checked_at: now() } }),
 }
 
 const clients = new Set()
