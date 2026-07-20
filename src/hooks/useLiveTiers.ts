@@ -1,5 +1,15 @@
 import { tiers, type Service, type Tier } from '@/lib/dashboard-data'
-import { formatDateTime, formatRelative, payloadDescription, payloadMetric, payloadNote, statusWord } from '@/lib/ws-status'
+import {
+  formatDateTime,
+  formatRelative,
+  formatUptime,
+  owedbIndicators,
+  owedbSummary,
+  payloadDescription,
+  payloadMetric,
+  payloadNote,
+  statusWord,
+} from '@/lib/ws-status'
 import { useStatusStore, type ConnectionState, type LiveSystem } from '@/store/status'
 import { useTick } from './useTick'
 
@@ -43,13 +53,24 @@ function mergeService(
     // keep the static decorative line (and no tooltip, so no fake numbers).
     const unit = typeof live.payload.response_time_ms === 'number' ? 'ms' : ''
     const hasHistory = live.samples.length >= 2
+    // OWE DB carries per-DB state (main_db/lite_db) + uptime. Gated on its own
+    // payload fields so every other card is untouched. On vendor_silent the DB
+    // fields come back empty → indicators is undefined, so no chips/badge and
+    // the metric falls back — we never render "DB down" when we couldn't read it.
+    const dbIndicators = owedbIndicators(live.payload)
+    const uptime = dbIndicators ? formatUptime(live.payload.uptime_seconds) : undefined
     return {
       ...svc,
       status: live.status,
       updated: formatRelative(live.updatedAt),
-      metric: m?.value ?? svc.metric,
-      metricLabel: m ? m.label : svc.metricLabel,
-      detail: payloadDescription(live.payload),
+      metric: uptime ?? m?.value ?? svc.metric,
+      metricLabel: uptime ? 'Uptime' : m ? m.label : svc.metricLabel,
+      detail: (dbIndicators && owedbSummary(live.payload)) || payloadDescription(live.payload),
+      dbIndicators,
+      // Only warn when the vendor explicitly reports historical data not ready
+      // (and we actually have a reading); undefined → no badge.
+      historicalDataReady:
+        dbIndicators && live.payload.historical_data_ready === false ? false : undefined,
       // Planned maintenance (e.g. One Verify's ready_status) → badge, not a warning.
       // Severity still comes from the envelope status, never from ready_status alone.
       maintenance: live.payload.ready_status === 'maintenance',

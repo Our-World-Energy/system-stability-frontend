@@ -1,4 +1,4 @@
-import { TriangleAlert, BookOpen, Wrench } from 'lucide-react'
+import { TriangleAlert, BookOpen, Wrench, History } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Service } from '@/lib/dashboard-data'
 import { StatusPill } from './StatusPill'
@@ -11,7 +11,7 @@ interface ServiceCardProps {
 }
 
 export function ServiceCard({ service, size = 'lg' }: ServiceCardProps) {
-  const { name, vendor, status, updated, metric, metricLabel, note, sparkline, sparkLabels, sparkStatuses, detail, badge, comingSoon, maintenance } =
+  const { name, vendor, status, updated, metric, metricLabel, note, sparkline, sparkLabels, sparkStatuses, detail, badge, comingSoon, maintenance, dbIndicators, historicalDataReady } =
     service
   const isCritical = status === 'critical'
   const isDegraded = status === 'degraded'
@@ -46,6 +46,15 @@ export function ServiceCard({ service, size = 'lg' }: ServiceCardProps) {
           <p className="truncate font-mono text-[11px] text-fg-muted">{vendor}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
+          {historicalDataReady === false && (
+            <span
+              title="Historical data not ready yet"
+              className="flex items-center gap-1 rounded-full border border-degraded/30 bg-degraded/10 px-2 py-0.5 font-mono text-[9px] font-medium uppercase tracking-wide text-degraded"
+            >
+              <History className="size-2.5" />
+              Hist
+            </span>
+          )}
           {maintenance && (
             <span
               title="In planned maintenance"
@@ -64,6 +73,26 @@ export function ServiceCard({ service, size = 'lg' }: ServiceCardProps) {
         <p className="mt-2 truncate font-mono text-[10px] text-fg-subtle" title={detail}>
           {detail}
         </p>
+      )}
+
+      {/* Per-database sub-indicators (OWE DB: main_db / lite_db) so users can see
+          which DB is affected, not just the overall card color. */}
+      {dbIndicators && dbIndicators.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {dbIndicators.map((db) => (
+            <span
+              key={db.label}
+              title={db.error || `${db.label}: ${db.up ? 'UP' : 'DOWN'}`}
+              className={cn(
+                'flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[9px] font-medium uppercase tracking-wide',
+                db.up ? 'border-healthy/25 bg-healthy/10 text-healthy' : 'border-critical/40 bg-critical/15 text-critical-bright',
+              )}
+            >
+              <span className={cn('size-1.5 rounded-full', db.up ? 'bg-healthy' : 'bg-critical-bright')} />
+              {db.label} {db.up ? 'UP' : 'DOWN'}
+            </span>
+          ))}
+        </div>
       )}
 
       {size === 'lg' ? (

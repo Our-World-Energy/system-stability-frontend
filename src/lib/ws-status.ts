@@ -1,4 +1,4 @@
-import type { ServiceStatus } from './dashboard-data'
+import type { DbIndicator, ServiceStatus } from './dashboard-data'
 
 /**
  * Server status vocabulary → UI status.
@@ -84,6 +84,60 @@ export function ringcentralSummary(payload: Record<string, unknown>): string | u
     return `${base} · ${affected[0]}`
   }
   return base
+}
+
+/**
+ * OWE DB per-database sub-indicators (main_db + lite_db) from its payload.
+ * Gated on the OWE DB-only `main_db`/`lite_db` fields so no other system is
+ * affected, and each field must be a non-empty "UP"/"DOWN" string — on
+ * vendor_silent these come back empty, so this returns undefined and the card
+ * renders no chips (we never claim a DB is down when we couldn't read it).
+ */
+export function owedbIndicators(payload: Record<string, unknown>): DbIndicator[] | undefined {
+  const spec: { key: string; errKey: string; label: string }[] = [
+    { key: 'main_db', errKey: 'main_db_error', label: 'Main DB' },
+    { key: 'lite_db', errKey: 'lite_db_error', label: 'Lite DB' },
+  ]
+  const out: DbIndicator[] = []
+  for (const { key, errKey, label } of spec) {
+    const raw = payload[key]
+    if (typeof raw !== 'string' || !raw.trim()) continue
+    const err = payload[errKey]
+    out.push({
+      label,
+      up: raw.trim().toUpperCase() === 'UP',
+      error: typeof err === 'string' && err.trim() ? err.trim() : undefined,
+    })
+  }
+  return out.length ? out : undefined
+}
+
+/**
+ * OWE DB detail line: the vendor's human-readable reason. When something is
+ * wrong `error_detail` carries the specifics (spec: show it whenever status
+ * isn't none); otherwise fall back to the health `message`.
+ */
+export function owedbSummary(payload: Record<string, unknown>): string | undefined {
+  const err = payload.error_detail
+  if (typeof err === 'string' && err.trim()) return err.trim()
+  const msg = payload.message
+  if (typeof msg === 'string' && msg.trim()) return msg.trim()
+  return undefined
+}
+
+/**
+ * Seconds of uptime → compact human-readable string ("1d 0h", "3h 12m", "5m").
+ * Non-positive / non-numeric (e.g. vendor_silent, where it's 0) → undefined so
+ * the card falls back to its normal metric instead of showing "0m".
+ */
+export function formatUptime(seconds: unknown): string | undefined {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) return undefined
+  const d = Math.floor(seconds / 86400)
+  const h = Math.floor((seconds % 86400) / 3600)
+  if (d > 0) return `${d}d ${h}h`
+  const m = Math.floor((seconds % 3600) / 60)
+  if (h > 0) return `${h}h ${m}m`
+  return `${Math.max(1, m)}m`
 }
 
 /**

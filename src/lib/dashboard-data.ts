@@ -22,8 +22,22 @@ export interface Service {
   /** True when the vendor reports a planned maintenance window (e.g. One Verify's
    * `ready_status: "maintenance"`) → show a maintenance badge instead of a warning. */
   maintenance?: boolean
+  /** Per-database UP/DOWN sub-indicators (OWE DB: main_db + lite_db) → rendered as
+   * small chips so users see which DB is affected, not just the overall color. */
+  dbIndicators?: DbIndicator[]
+  /** False when the vendor reports historical data isn't ready yet (OWE DB's
+   * `historical_data_ready: false`) → show a small "Hist" badge. */
+  historicalDataReady?: boolean
   /** Optional footer marker shown above the timestamp. */
   badge?: { type: 'book' } | { type: 'pill'; text: string }
+}
+
+/** A single database health sub-indicator for cards that report per-DB state. */
+export interface DbIndicator {
+  label: string
+  up: boolean
+  /** Vendor error string for this DB, surfaced in a tooltip when down. */
+  error?: string
 }
 
 export interface Tier {
@@ -174,6 +188,16 @@ export const tiers: Tier[] = [
         metricLabel: 'Response Time',
         updated: '—',
         sparkline: [22, 25, 23, 27, 24, 29, 26, 31, 28, 33],
+      },
+      {
+        name: 'OWE DB',
+        systemId: 'owedb',
+        vendor: '/health',
+        status: 'healthy',
+        metric: '—',
+        metricLabel: 'Uptime',
+        updated: '—',
+        sparkline: [30, 32, 29, 33, 31, 35, 32, 34, 33, 36],
       },
     ],
   },

@@ -28,6 +28,7 @@ const systems = {
   docusign: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', indicator: 'none', description: 'All Systems Operational', page_id: 'mwr4rgcd2g69', response_time_ms: rt(), checked_at: now() } }),
   one_verify: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', health_status: 'ok', ready_status: 'ok', version: '1.0.0', uptime_s: 0, http_status: 200, response_time_ms: rt(), endpoint: 'https://enujqqjrbmxofwxlaeik.supabase.co/functions/v1', checked_at: now() } }),
   tape: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', runs_checked: 25, failed_runs: 0, last_run_status: 'running', last_run_id: '65338379', response_time_ms: rt(), checked_at: now() } }),
+  owedb: () => ({ status: 'none', updated_at: now(), payload: { status: 'none', http_status: 200, message: 'Server Health Status', main_db: 'UP', main_db_error: '', lite_db: 'UP', lite_db_error: '', historical_data_ready: true, uptime_seconds: 86400, response_time_ms: rt(), error_detail: '', checked_at: now() } }),
 }
 
 const clients = new Set()
@@ -75,6 +76,14 @@ setInterval(() => {
     else if (forced === 'major') Object.assign(payload, { ready_status: 'degraded', failed: ['ai_gateway'], detail: 'failed dependencies: ai_gateway' })
     else if (forced === 'critical') Object.assign(payload, { ready_status: 'degraded', failed: ['verify_db'], detail: 'failed dependencies: verify_db' })
     else if (forced === 'vendor_silent') Object.assign(payload, { health_status: '', http_status: 0, detail: 'health fetch failed: connection refused' })
+  }
+  // OWE DB: exercise the per-DB indicators, historical-data badge and the
+  // vendor_silent "unable to verify" state so all card affordances are visible.
+  if (system === 'owedb') {
+    if (forced === 'minor') Object.assign(payload, { lite_db: 'DOWN', lite_db_error: 'owe_lite_db connection is not initialized', error_detail: 'owe_lite_db connection is not initialized' })
+    else if (forced === 'major') Object.assign(payload, { lite_db: 'DOWN', lite_db_error: 'owe_lite_db connection is not initialized', historical_data_ready: false, error_detail: 'owe_lite_db down; historical data unavailable' })
+    else if (forced === 'critical') Object.assign(payload, { main_db: 'DOWN', main_db_error: 'owe_main_db connection refused', http_status: 503, error_detail: 'owe_main_db connection refused' })
+    else if (forced === 'vendor_silent') Object.assign(payload, { http_status: 0, main_db: '', lite_db: '', historical_data_ready: false, uptime_seconds: 0, message: '', error_detail: 'health fetch failed: bad api key' })
   }
   const msg = { type: 'status_update', system, status: forced, updated_at: now(), payload }
   for (const res of clients) write(res, 'status_update', msg)
