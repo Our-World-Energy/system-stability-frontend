@@ -11,6 +11,11 @@ import { Analytics } from '@/pages/Analytics'
 import { Stability } from '@/pages/Stability'
 import { Performance } from '@/pages/Performance'
 import { Settings } from '@/pages/Settings'
+import { CredentialManager } from '@/pages/CredentialManager'
+import { RequestLogs } from '@/pages/RequestLogs'
+import { CredentialManagement } from '@/pages/CredentialManagement'
+import { ActivityLedger } from '@/pages/ActivityLedger'
+import { PendingApprovals } from '@/pages/PendingApprovals'
 import { NotFound } from '@/pages/NotFound'
 
 const queryClient = new QueryClient({
@@ -38,6 +43,11 @@ export default function App() {
             <Route path="slos" element={<Stability />} />
             <Route path="audit-log" element={<Analytics />} />
             <Route path="baselines" element={<Performance />} />
+            <Route path="credentials" element={<CredentialManager />} />
+            <Route path="credentials/logs" element={<RequestLogs />} />
+            <Route path="credentials/admin" element={<CredentialManagement />} />
+            <Route path="credentials/admin/logs" element={<ActivityLedger />} />
+            <Route path="credentials/admin/pending" element={<PendingApprovals />} />
             <Route path="settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Route>
