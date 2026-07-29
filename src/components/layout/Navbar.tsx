@@ -1,6 +1,8 @@
 import { Menu, Search } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { getSystemSummary } from '@/lib/dashboard-data'
+import { resolvePageMeta } from '@/lib/page-meta'
 import { useSidebarStore } from '@/store/sidebar'
 import { useStatusStore } from '@/store/status'
 import { useSearchStore } from '@/store/search'
@@ -13,6 +15,8 @@ export function Navbar() {
   const connection = useStatusStore((s) => s.connection)
   const query = useSearchStore((s) => s.query)
   const setQuery = useSearchStore((s) => s.setQuery)
+  const { pathname } = useLocation()
+  const pageMeta = resolvePageMeta(pathname)
   const summary = getSystemSummary(useLiveTiers())
   const counters = [
     { value: summary.total, label: 'systems', dot: 'bg-fg-subtle' },
@@ -22,40 +26,47 @@ export function Navbar() {
     { value: summary.noFeed, label: 'no-feed', dot: 'bg-fg-subtle' },
   ]
   return (
-    <header className="sticky top-0 z-30 flex flex-col gap-4 border-b border-line bg-canvas/80 px-4 py-4 backdrop-blur sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+    <header className="border-line bg-canvas/80 sticky top-0 z-30 flex flex-col gap-4 border-b px-4 py-4 backdrop-blur sm:px-6 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-3 lg:flex-1">
         <button
           onClick={openMobile}
           aria-label="Open menu"
-          className="grid size-9 shrink-0 place-items-center rounded-lg border border-line text-fg-muted transition-colors hover:border-line-bright hover:text-fg lg:hidden"
+          className="border-line text-fg-muted hover:border-line-bright hover:text-fg grid size-9 shrink-0 place-items-center rounded-lg border transition-colors lg:hidden"
         >
           <Menu className="size-5" />
         </button>
-        <h1 className="text-2xl font-semibold tracking-tight text-fg">System Visibility</h1>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-          {counters.map((c) => (
-            <span key={c.label} className="flex items-center gap-1.5 font-mono text-[13px]">
-              <span className={cn('size-1.5 rounded-full', c.dot)} />
-              <span className="font-semibold text-fg">{c.value}</span>
-              <span className="text-fg-muted">{c.label}</span>
-            </span>
-          ))}
-        </div>
+        <h1 className="text-fg text-2xl font-semibold tracking-tight">{pageMeta.title}</h1>
+        {pageMeta.showSystemStats && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            {counters.map((c) => (
+              <span key={c.label} className="flex items-center gap-1.5 font-mono text-[13px]">
+                <span className={cn('size-1.5 rounded-full', c.dot)} />
+                <span className="text-fg font-semibold">{c.value}</span>
+                <span className="text-fg-muted">{c.label}</span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-2 lg:shrink-0">
         <ConnectionBadge connection={connection} />
-        <div className="relative flex-1 lg:flex-none">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-subtle" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search systems…"
-            className="h-9 w-full rounded-lg border border-line bg-input pl-9 pr-4 text-sm text-fg outline-none transition-colors placeholder:text-fg-subtle focus:border-primary focus:ring-2 focus:ring-primary/20 lg:w-52 xl:w-64"
-          />
-        </div>
-        <TierFilter />
+        {/* Search + tier filter are Overview tools; other pages show only title + Live. */}
+        {pageMeta.showSystemStats && (
+          <>
+            <div className="relative flex-1 lg:flex-none">
+              <Search className="text-fg-subtle pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search systems…"
+                className="border-line bg-input text-fg placeholder:text-fg-subtle focus:border-primary focus:ring-primary/20 h-9 w-full rounded-lg border pr-4 pl-9 text-sm transition-colors outline-none focus:ring-2 lg:w-52 xl:w-64"
+              />
+            </div>
+            <TierFilter />
+          </>
+        )}
       </div>
     </header>
   )
