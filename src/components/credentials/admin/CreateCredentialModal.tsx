@@ -4,7 +4,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Field, controlClass } from '@/components/ui/Field'
 import { cn } from '@/lib/utils'
-import { twoFactorApprovers, twoFactorTypes } from '@/lib/admin-credentials-data'
+import { twoFactorTypes } from '@/lib/admin-credentials-data'
 import { SecretInput } from './SecretInput'
 
 interface CreateCredentialModalProps {
@@ -21,7 +21,7 @@ export function CreateCredentialModal({ open, onClose, onCreate }: CreateCredent
   const [url, setUrl] = useState('')
   const [notes, setNotes] = useState('')
   const [twoFactorType, setTwoFactorType] = useState<string>(twoFactorTypes[0])
-  const [twoFactorApprover, setTwoFactorApprover] = useState<string>(twoFactorApprovers[0])
+  const [twoFactorApprover, setTwoFactorApprover] = useState('')
 
   const canCreate = name.trim().length > 0 && secret.trim().length > 0
 
@@ -88,13 +88,12 @@ export function CreateCredentialModal({ open, onClose, onCreate }: CreateCredent
             </SelectControl>
           </Field>
           <Field label="2FA Approver">
-            <SelectControl value={twoFactorApprover} onChange={setTwoFactorApprover}>
-              {twoFactorApprovers.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </SelectControl>
+            <input
+              value={twoFactorApprover}
+              onChange={(e) => setTwoFactorApprover(e.target.value)}
+              placeholder="e.g. Sarah Jenkins"
+              className={cn(controlClass, 'h-11')}
+            />
           </Field>
         </div>
 
