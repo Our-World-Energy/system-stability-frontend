@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /*
   Design system: "Solar Infrastructure Intelligence"
@@ -7,8 +7,8 @@
 */
 @theme {
   /* Fonts — Inter for UI, JetBrains Mono for quantitative data */
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
 
   /* Surfaces / tonal layering */
   --color-canvas: #111319; /* Level 0 — app shell background */
@@ -45,9 +45,51 @@
 }
 
 /*
+  Light theme — runtime overrides of the same semantic tokens. The values in
+  @theme above are the dark defaults (used when data-theme is "dark" or unset);
+  these override them only under <html data-theme="light">. Every component
+  reads the tokens (bg-canvas, text-fg, border-line, …), so both themes come
+  "for free" without touching component markup. Toggle via the store in
+  `src/store/theme.ts`.
+*/
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  /* Surfaces — soft muted greys (deliberately not pure white, to avoid glare) */
+  --color-canvas: #e7eaf0; /* app shell — dim enough that white cards read as raised */
+  --color-sidebar: #f1f3f7;
+  --color-surface: #f7f9fc; /* cards — soft off-white, never #fff */
+  --color-surface-2: #eceff4;
+  --color-surface-3: #e0e5ec; /* hover / chips */
+  --color-input: #eef1f6;
+
+  /* Borders */
+  --color-line: #d7dde6;
+  --color-line-bright: #bfc8d4;
+
+  /* Text — softened near-black so contrast is comfortable, not harsh */
+  --color-fg: #1f2733;
+  --color-fg-muted: #58626f;
+  --color-fg-subtle: #909aa7;
+
+  /* Brand — darker emerald so it stays legible on white */
+  --color-primary: #16a34a;
+  --color-primary-bright: #15803d;
+  --color-primary-dim: #166534;
+
+  /* Semantic status — deepened for contrast on light surfaces */
+  --color-healthy: #16a34a;
+  --color-degraded: #d97706;
+  --color-degraded-dim: #b45309;
+  --color-critical: #dc2626;
+  --color-critical-bright: #b91c1c;
+}
+
+/*
   Base layer — kept INSIDE @layer base so Tailwind utilities (which live in
   @layer utilities) continue to win. Unlayered rules would override every
-  p-*/m-*/space-y-* utility, so never reset margin/padding outside a layer here.
+  spacing utility (padding, margin, space-y), so never reset margin or padding
+  outside a layer here.
 */
 @layer base {
   :root {
@@ -71,7 +113,6 @@
     display: flex;
     flex-direction: column;
   }
-
 }
 
 /*
@@ -113,5 +154,25 @@
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--color-line-bright) transparent;
+  }
+}
+
+/* Subtle fade-and-rise, used when search results/captions mount into view. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-rise-in {
+  animation: rise-in 0.3s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise-in {
+    animation: none;
   }
 }

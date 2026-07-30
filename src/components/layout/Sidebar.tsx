@@ -1,39 +1,9 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { LayoutGrid, KeyRound, ShieldCheck, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { navItems, activeNavItem } from '@/lib/navigation'
 import { useSidebarStore } from '@/store/sidebar'
 import logoUrl from '@/assets/Logo.svg'
-
-// Only Overview and Credentials are exposed for now; other routes still exist but are hidden.
-// The two Credential entries are the Requester catalog and the Admin console — later
-// only one will show, chosen by the signed-in user's role.
-//
-// Each item owns its active-state test because the paths overlap: `/credentials`
-// is a prefix of `/credentials/admin`, so a plain prefix match would light both.
-// Requester stays active on its sub-routes (e.g. /credentials/logs) but yields the
-// whole /credentials/admin subtree to the Admin entry.
-const navItems: {
-  to: string
-  icon: typeof LayoutGrid
-  label: string
-  isActive: (path: string) => boolean
-}[] = [
-  { to: '/', icon: LayoutGrid, label: 'Overview', isActive: (p) => p === '/' },
-  {
-    to: '/credentials',
-    icon: KeyRound,
-    label: 'Credentials',
-    isActive: (p) =>
-      p === '/credentials' ||
-      (p.startsWith('/credentials/') && !p.startsWith('/credentials/admin')),
-  },
-  {
-    to: '/credentials/admin',
-    icon: ShieldCheck,
-    label: 'Credential Admin',
-    isActive: (p) => p === '/credentials/admin' || p.startsWith('/credentials/admin/'),
-  },
-]
 
 function Brand({ collapsed }: { collapsed: boolean }) {
   return (
@@ -53,11 +23,13 @@ function Brand({ collapsed }: { collapsed: boolean }) {
 
 function NavList({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
   const { pathname } = useLocation()
+  const active = activeNavItem(pathname)
+
   return (
     <nav className="flex-1 overflow-x-hidden overflow-y-auto py-3">
       <ul className="space-y-0.5 px-2">
-        {navItems.map(({ to, icon: Icon, label, isActive: matchActive }) => {
-          const active = matchActive(pathname)
+        {navItems.map(({ to, label, icon: Icon }) => {
+          const isActive = active?.to === to
           return (
             <li key={to}>
               <NavLink
@@ -66,13 +38,13 @@ function NavList({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: (
                 title={collapsed ? label : undefined}
                 className={cn(
                   'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                  active
+                  isActive
                     ? 'bg-primary/10 text-primary-bright'
                     : 'text-fg-muted hover:bg-surface hover:text-fg',
                   collapsed && 'justify-center px-0',
                 )}
               >
-                {active && (
+                {isActive && (
                   <span className="bg-primary-bright absolute top-1/2 left-0 h-5 w-0.5 -translate-y-1/2 rounded-r" />
                 )}
                 <Icon className="size-5 shrink-0" />
