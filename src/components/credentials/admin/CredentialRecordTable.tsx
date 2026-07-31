@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { Check, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CredentialRecord } from '@/lib/admin-credentials-data'
 import { RowActions, type RecordAction } from './RowActions'
@@ -7,7 +9,7 @@ interface CredentialRecordTableProps {
   onAction: (action: RecordAction, record: CredentialRecord) => void
 }
 
-const columns = ['Name & Tags', 'Status', 'Owner', 'Elevation', 'Last Rotated', 'Actions']
+const columns = ['Name & Tags', 'Status', 'Owner', 'Elevation', 'Last Rotated', 'Secret', 'Actions']
 
 /** Admin record list with per-row rotate/archive/purge actions. */
 export function CredentialRecordTable({ records, onAction }: CredentialRecordTableProps) {
@@ -21,7 +23,7 @@ export function CredentialRecordTable({ records, onAction }: CredentialRecordTab
 
   return (
     <div className="border-line bg-surface overflow-x-auto rounded-lg border">
-      <table className="w-full min-w-[820px] border-collapse text-sm">
+      <table className="w-full min-w-[980px] border-collapse text-sm">
         <thead>
           <tr className="border-line border-b">
             {columns.map((col) => (
@@ -77,6 +79,9 @@ export function CredentialRecordTable({ records, onAction }: CredentialRecordTab
                   {record.lastRotated ?? 'Never rotated'}
                 </td>
                 <td className="px-4 py-3.5">
+                  <SecretCell secret={record.secret} />
+                </td>
+                <td className="px-4 py-3.5">
                   <RowActions record={record} onAction={onAction} />
                 </td>
               </tr>
@@ -84,6 +89,34 @@ export function CredentialRecordTable({ records, onAction }: CredentialRecordTab
           })}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+/** Admin-only secret — masked at all times; copy-to-clipboard without revealing. */
+function SecretCell({ secret }: { secret: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const copy = () => {
+    void navigator.clipboard?.writeText(secret)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-fg-subtle font-mono text-xs tracking-widest">••••••••••••••••</span>
+      <button
+        onClick={copy}
+        aria-label="Copy secret"
+        title="Copy secret"
+        className={cn(
+          'hover:bg-surface-3 grid size-7 shrink-0 place-items-center rounded-md transition-colors',
+          copied ? 'text-healthy' : 'text-fg-subtle hover:text-fg',
+        )}
+      >
+        {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+      </button>
     </div>
   )
 }

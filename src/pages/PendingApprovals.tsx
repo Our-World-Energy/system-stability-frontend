@@ -1,8 +1,7 @@
 import { useState } from 'react'
-import { AlertTriangle, ChevronLeft, ChevronRight, Clock, SlidersHorizontal } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import {
   approvalQueue,
@@ -43,24 +42,18 @@ export function PendingApprovals() {
 
   return (
     <div className="space-y-6 pb-4">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <Link
-            to="/credentials/admin"
-            className="text-fg-muted hover:text-fg mb-2 inline-flex items-center gap-1.5 font-mono text-xs transition-colors"
-          >
-            <ChevronLeft className="size-4" />
-            Credential Management
-          </Link>
-          <h1 className="text-fg text-2xl font-semibold tracking-tight">Pending Approvals</h1>
-          <p className="text-fg-muted mt-1 text-sm">
-            Review and action outstanding authorization requests.
-          </p>
-        </div>
-        <Button variant="outline" className="text-xs">
-          <SlidersHorizontal className="size-3.5" />
-          Advanced Filters
-        </Button>
+      <header>
+        <Link
+          to="/credentials/admin"
+          className="text-fg-muted hover:text-fg mb-2 inline-flex items-center gap-1.5 font-mono text-xs transition-colors"
+        >
+          <ChevronLeft className="size-4" />
+          Credential Management
+        </Link>
+        <h1 className="text-fg text-2xl font-semibold tracking-tight">Pending Approvals</h1>
+        <p className="text-fg-muted mt-1 text-sm">
+          Review and action outstanding authorization requests.
+        </p>
       </header>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -289,8 +282,9 @@ function Legend() {
 
 function Pagination() {
   return (
-    <div className="flex items-center gap-1 font-mono text-xs">
-      <PageButton>First</PageButton>
+    <div className="flex flex-wrap items-center justify-center gap-1 font-mono text-xs sm:justify-end">
+      {/* First/Last are hidden on small screens to keep the control from overflowing. */}
+      <PageButton className="hidden sm:inline-flex">First</PageButton>
       <PageButton>
         <ChevronLeft className="size-3.5" />
         Prev
@@ -316,14 +310,19 @@ function Pagination() {
         Next
         <ChevronRight className="size-3.5" />
       </PageButton>
-      <PageButton>Last</PageButton>
+      <PageButton className="hidden sm:inline-flex">Last</PageButton>
     </div>
   )
 }
 
-function PageButton({ children }: { children: React.ReactNode }) {
+function PageButton({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <button className="border-line text-fg-muted hover:border-line-bright hover:text-fg inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 transition-colors">
+    <button
+      className={cn(
+        'border-line text-fg-muted hover:border-line-bright hover:text-fg inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 transition-colors',
+        className,
+      )}
+    >
       {children}
     </button>
   )

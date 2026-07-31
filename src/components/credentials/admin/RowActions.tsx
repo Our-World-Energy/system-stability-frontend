@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { Archive, MoreVertical, RotateCw, Trash2 } from 'lucide-react'
+import { MoreVertical, RotateCw, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CredentialRecord } from '@/lib/admin-credentials-data'
 
-export type RecordAction = 'rotate' | 'archive' | 'purge'
+export type RecordAction = 'rotate' | 'purge'
 
 interface RowActionsProps {
   record: CredentialRecord
   onAction: (action: RecordAction, record: CredentialRecord) => void
 }
 
-/** Per-row controls: inline rotate/archive icons plus an overflow menu. */
+/** Per-row controls: an inline rotate icon plus an overflow menu. */
 export function RowActions({ record, onAction }: RowActionsProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -38,9 +38,6 @@ export function RowActions({ record, onAction }: RowActionsProps) {
           <RotateCw className="size-4" />
         </IconButton>
       )}
-      <IconButton label="Archive" onClick={() => run('archive')}>
-        <Archive className="size-4" />
-      </IconButton>
 
       <div ref={ref} className="relative">
         <IconButton label="More actions" onClick={() => setOpen((v) => !v)}>
@@ -54,10 +51,6 @@ export function RowActions({ record, onAction }: RowActionsProps) {
                 Rotate Credential
               </MenuItem>
             )}
-            <MenuItem onClick={() => run('archive')}>
-              <Archive className="size-4" />
-              Archive Credential
-            </MenuItem>
             <MenuItem onClick={() => run('purge')} destructive>
               <Trash2 className="size-4" />
               Purge Record

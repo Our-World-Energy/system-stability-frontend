@@ -1,8 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ScrollText } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { credentials, type CatalogFilter, type Credential } from '@/lib/credentials-data'
+import {
+  credentials,
+  GRANT_WINDOW_MS,
+  type CatalogFilter,
+  type Credential,
+} from '@/lib/credentials-data'
 import { CredentialTable } from '@/components/credentials/CredentialTable'
 import { CredentialSearchScreen } from '@/components/credentials/CredentialSearchScreen'
 import {
@@ -18,17 +23,23 @@ const filters: { id: CatalogFilter; label: string }[] = [
   { id: 'requires_approval', label: 'Requires approval' },
 ]
 
-/** The dialog currently open in the request flow. */
-type FlowStep =
-  | { kind: 'request'; credential: Credential }
-  | { kind: 'approved'; credential: Credential }
-  | { kind: 'denied'; credential: Credential }
-  | null
-
 export function CredentialManager() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<CatalogFilter>('all')
-  const [flow, setFlow] = useState<FlowStep>(null)
+
+  // Which dialog is open, if any.
+  const [requestCred, setRequestCred] = useState<Credential | null>(null)
+  const [deniedCred, setDeniedCred] = useState<Credential | null>(null)
+  const [viewCred, setViewCred] = useState<Credential | null>(null)
+
+  // Active grants (credential id → expiry epoch ms) and a 1s clock driving the
+  // countdowns in the table and the approved dialog.
+  const [grants, setGrants] = useState<Record<string, number>>({})
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -39,12 +50,17 @@ export function CredentialManager() {
     })
   }, [query, filter])
 
-  // Demo policy: auto-grant credentials are approved instantly; anything that
-  // requires approval is denied so both outcome dialogs are reachable. This is
-  // where the provisioning API call will live once integrated.
+  // Demo policy: auto-grant credentials are approved instantly (opening a copy
+  // window on the row); anything requiring approval is denied so both outcome
+  // dialogs stay reachable. This is where the provisioning API call will live.
   const handleSubmit = (draft: AccessRequestDraft) => {
-    const approved = draft.credential.eligibility === 'auto_grants'
-    setFlow({ kind: approved ? 'approved' : 'denied', credential: draft.credential })
+    setRequestCred(null)
+    if (draft.credential.eligibility === 'auto_grants') {
+      setGrants((g) => ({ ...g, [draft.credential.id]: Date.now() + GRANT_WINDOW_MS }))
+      setViewCred(draft.credential)
+    } else {
+      setDeniedCred(draft.credential)
+    }
   }
 
   return (
@@ -87,25 +103,32 @@ export function CredentialManager() {
 
         <CredentialTable
           credentials={visible}
-          onRequest={(credential) => setFlow({ kind: 'request', credential })}
+          grants={grants}
+          now={now}
+          onRequest={setRequestCred}
+          onViewKey={setViewCred}
         />
       </CredentialSearchScreen>
 
       <RequestAccessModal
-        credential={flow?.kind === 'request' ? flow.credential : null}
-        onClose={() => setFlow(null)}
+        credential={requestCred}
+        onClose={() => setRequestCred(null)}
         onSubmit={handleSubmit}
       />
 
-      {flow?.kind === 'approved' && (
-        <RequestApprovedModal credential={flow.credential} onClose={() => setFlow(null)} />
+      {viewCred && (
+        <RequestApprovedModal
+          credential={viewCred}
+          expiresAt={grants[viewCred.id] ?? 0}
+          onClose={() => setViewCred(null)}
+        />
       )}
 
-      {flow?.kind === 'denied' && (
+      {deniedCred && (
         <RequestDeniedModal
-          credential={flow.credential}
-          onClose={() => setFlow(null)}
-          onContactAdmin={() => setFlow(null)}
+          credential={deniedCred}
+          onClose={() => setDeniedCred(null)}
+          onContactAdmin={() => setDeniedCred(null)}
         />
       )}
     </>

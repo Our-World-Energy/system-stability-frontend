@@ -28,6 +28,23 @@ export interface Credential {
   namespace: string
 }
 
+/** Length of a granted elevation window (kept in sync with the approval dialog). */
+export const GRANT_WINDOW_MS = (59 * 60 + 59) * 1000
+
+/** Deterministic demo secret for a credential; the real key comes from the API. */
+export function demoSecret(keyName: string): string {
+  return `sk_live_${keyName.toLowerCase()}_9f3a2b7c`
+}
+
+/** Format a millisecond duration as HH:MM:SS (clamped at zero). */
+export function formatCountdown(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000))
+  const hh = Math.floor(total / 3600)
+  const mm = Math.floor((total % 3600) / 60)
+  const ss = total % 60
+  return [hh, mm, ss].map((n) => String(n).padStart(2, '0')).join(':')
+}
+
 /** The catalog a Requester can browse and request one credential at a time. */
 export const credentials: Credential[] = [
   {

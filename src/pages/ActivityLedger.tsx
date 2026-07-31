@@ -18,20 +18,28 @@ import {
 
 const columns = ['Requester', 'Credential ID', 'Timestamp', 'Status', 'Approver', 'Actions']
 
+/** Which ledger the admin is viewing — the same feed, framed two ways. */
+type LedgerScope = 'activity' | 'admin'
+
 export function ActivityLedger() {
   const [selected, setSelected] = useState<LedgerEntry | null>(null)
+  const [scope, setScope] = useState<LedgerScope>('activity')
+  const title = scope === 'admin' ? 'Admin Activity Ledger' : 'Activity Ledger'
 
   return (
     <div className="space-y-6 pb-4">
-      <header>
-        <Link
-          to="/credentials/admin"
-          className="text-fg-muted hover:text-fg mb-2 inline-flex items-center gap-1.5 font-mono text-xs transition-colors"
-        >
-          <ChevronLeft className="size-4" />
-          Credential Management
-        </Link>
-        <h1 className="text-fg text-2xl font-semibold tracking-tight">Global Activity Ledger</h1>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <Link
+            to="/credentials/admin"
+            className="text-fg-muted hover:text-fg mb-2 inline-flex items-center gap-1.5 font-mono text-xs transition-colors"
+          >
+            <ChevronLeft className="size-4" />
+            Credential Management
+          </Link>
+          <h1 className="text-fg text-2xl font-semibold tracking-tight">{title}</h1>
+        </div>
+        <LedgerScopeToggle scope={scope} onChange={setScope} />
       </header>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -66,7 +74,7 @@ export function ActivityLedger() {
         {/* Ledger table */}
         <section className="border-line bg-surface rounded-lg border">
           <div className="border-line flex items-center justify-between border-b px-5 py-4">
-            <h2 className="text-fg text-sm font-semibold">Global Activity Ledger</h2>
+            <h2 className="text-fg text-sm font-semibold">{title}</h2>
             <span className="text-fg-subtle font-mono text-[10px] tracking-[0.08em] uppercase">
               Displaying {ledgerTotals.displayed} of {ledgerTotals.total} entries
             </span>
@@ -147,6 +155,39 @@ export function ActivityLedger() {
         detail={selected ? ledgerEntryToDetail(selected) : null}
         onClose={() => setSelected(null)}
       />
+    </div>
+  )
+}
+
+// ── Scope toggle ─────────────────────────────────────────────────────────────
+
+const scopes: { id: LedgerScope; label: string }[] = [
+  { id: 'activity', label: 'Activity Ledger' },
+  { id: 'admin', label: 'Admin Activity Ledger' },
+]
+
+/** Segmented control switching the ledger framing (same underlying feed). */
+function LedgerScopeToggle({
+  scope,
+  onChange,
+}: {
+  scope: LedgerScope
+  onChange: (scope: LedgerScope) => void
+}) {
+  return (
+    <div className="border-line bg-surface inline-flex rounded-lg border p-0.5">
+      {scopes.map((s) => (
+        <button
+          key={s.id}
+          onClick={() => onChange(s.id)}
+          className={cn(
+            'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+            scope === s.id ? 'bg-primary/15 text-primary-bright' : 'text-fg-muted hover:text-fg',
+          )}
+        >
+          {s.label}
+        </button>
+      ))}
     </div>
   )
 }
