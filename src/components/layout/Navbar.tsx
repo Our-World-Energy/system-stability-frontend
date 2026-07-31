@@ -9,6 +9,7 @@ import { useSearchStore } from '@/store/search'
 import { useLiveTiers } from '@/hooks/useLiveTiers'
 import { ConnectionBadge } from './ConnectionBadge'
 import { TierFilter } from './TierFilter'
+import { ThemeToggle } from './ThemeToggle'
 
 export function Navbar() {
   const openMobile = useSidebarStore((s) => s.openMobile)
@@ -50,6 +51,7 @@ export function Navbar() {
       </div>
 
       <div className="flex items-center gap-2 lg:shrink-0">
+        <ThemeToggle />
         <ConnectionBadge connection={connection} />
         {/* Search + tier filter are Overview tools; other pages show only title + Live. */}
         {pageMeta.showSystemStats && (

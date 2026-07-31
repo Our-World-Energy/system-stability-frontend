@@ -71,14 +71,5 @@ export const twoFactorTypes = [
 ] as const
 export type TwoFactorType = (typeof twoFactorTypes)[number]
 
-/** People who can approve a credential's 2FA challenges. */
-export const twoFactorApprovers = [
-  'Sarah Jenkins',
-  'Marcus Chen',
-  'Priya Nair',
-  'David Okafor',
-  'admin_central',
-]
-
 /** Encryption scheme surfaced on the purge dialog. */
 export const ENCRYPTION_SCHEME = 'AES-256-GCM'

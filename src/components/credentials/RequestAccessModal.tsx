@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, Copy, KeyRound, User } from 'lucide-react'
+import { ChevronDown, Copy, KeyRound, Mail, User } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { reasonCategories, type Credential, type ReasonCategory } from '@/lib/credentials-data'
@@ -7,7 +7,10 @@ import { reasonCategories, type Credential, type ReasonCategory } from '@/lib/cr
 export interface AccessRequestDraft {
   credential: Credential
   reason: ReasonCategory
-  beneficiary: string
+  /** Required when requesting on behalf of another user. */
+  beneficiaryName: string
+  /** Optional contact email for the beneficiary. */
+  beneficiaryEmail: string
   justification: string
 }
 
@@ -20,18 +23,20 @@ interface RequestAccessModalProps {
 /** Submit form for a temporary elevation request against a single credential. */
 export function RequestAccessModal({ credential, onClose, onSubmit }: RequestAccessModalProps) {
   const [reason, setReason] = useState<ReasonCategory>('On behalf of another user')
-  const [beneficiary, setBeneficiary] = useState('')
+  const [beneficiaryName, setBeneficiaryName] = useState('')
+  const [beneficiaryEmail, setBeneficiaryEmail] = useState('')
   const [justification, setJustification] = useState('')
 
   if (!credential) return null
 
   const needsBeneficiary = reason === 'On behalf of another user'
+  // Name is mandatory when acting for someone else; email is always optional.
   const canSubmit =
-    justification.trim().length > 0 && (!needsBeneficiary || beneficiary.trim().length > 0)
+    justification.trim().length > 0 && (!needsBeneficiary || beneficiaryName.trim().length > 0)
 
   const handleSubmit = () => {
     if (!canSubmit) return
-    onSubmit({ credential, reason, beneficiary, justification })
+    onSubmit({ credential, reason, beneficiaryName, beneficiaryEmail, justification })
   }
 
   return (
@@ -85,17 +90,37 @@ export function RequestAccessModal({ credential, onClose, onSubmit }: RequestAcc
 
         {needsBeneficiary && (
           <div className="border-primary/40 bg-primary/5 rounded-lg border p-3">
-            <label className="text-primary-bright mb-2 block font-mono text-[11px] font-semibold tracking-[0.08em] uppercase">
-              Beneficiary (required)
-            </label>
-            <div className="relative">
-              <User className="text-fg-subtle pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-              <input
-                value={beneficiary}
-                onChange={(e) => setBeneficiary(e.target.value)}
-                placeholder="j.smith@solar.app"
-                className="border-line bg-input text-fg placeholder:text-fg-subtle focus:border-primary focus:ring-primary/20 h-10 w-full rounded-lg border pr-3 pl-9 text-sm transition-colors outline-none focus:ring-2"
-              />
+            <p className="text-primary-bright mb-2 font-mono text-[11px] font-semibold tracking-[0.08em] uppercase">
+              Beneficiary
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-fg-muted mb-1.5 block text-xs">
+                  Name <span className="text-critical-bright">*</span>
+                </label>
+                <div className="relative">
+                  <User className="text-fg-subtle pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                  <input
+                    value={beneficiaryName}
+                    onChange={(e) => setBeneficiaryName(e.target.value)}
+                    placeholder="Jordan Smith"
+                    className="border-line bg-input text-fg placeholder:text-fg-subtle focus:border-primary focus:ring-primary/20 h-10 w-full rounded-lg border pr-3 pl-9 text-sm transition-colors outline-none focus:ring-2"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-fg-muted mb-1.5 block text-xs">Email (optional)</label>
+                <div className="relative">
+                  <Mail className="text-fg-subtle pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    value={beneficiaryEmail}
+                    onChange={(e) => setBeneficiaryEmail(e.target.value)}
+                    placeholder="j.smith@solar.app"
+                    className="border-line bg-input text-fg placeholder:text-fg-subtle focus:border-primary focus:ring-primary/20 h-10 w-full rounded-lg border pr-3 pl-9 font-mono text-sm transition-colors outline-none focus:ring-2"
+                  />
+                </div>
+              </div>
             </div>
             <p className="text-fg-muted mt-2 text-xs">
               Access will be provisioned directly to this user's workspace.

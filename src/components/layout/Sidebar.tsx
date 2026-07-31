@@ -9,7 +9,10 @@ import {
   Users,
   X,
 } from 'lucide-react'
+import { NavLink, useLocation } from 'react-router-dom'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { navItems, activeNavItem } from '@/lib/navigation'
 import { useSidebarStore } from '@/store/sidebar'
 import { useAuthStore } from '@/store/auth'
 import logoUrl from '@/assets/Logo.svg'
@@ -64,11 +67,13 @@ function Brand({ collapsed }: { collapsed: boolean }) {
 
 function NavList({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
   const { pathname } = useLocation()
+  const active = activeNavItem(pathname)
+
   return (
     <nav className="flex-1 overflow-x-hidden overflow-y-auto py-3">
       <ul className="space-y-0.5 px-2">
-        {navItems.map(({ to, icon: Icon, label, isActive: matchActive }) => {
-          const active = matchActive(pathname)
+        {navItems.map(({ to, label, icon: Icon }) => {
+          const isActive = active?.to === to
           return (
             <li key={to}>
               <NavLink
@@ -77,13 +82,13 @@ function NavList({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: (
                 title={collapsed ? label : undefined}
                 className={cn(
                   'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                  active
+                  isActive
                     ? 'bg-primary/10 text-primary-bright'
                     : 'text-fg-muted hover:bg-surface hover:text-fg',
                   collapsed && 'justify-center px-0',
                 )}
               >
-                {active && (
+                {isActive && (
                   <span className="bg-primary-bright absolute top-1/2 left-0 h-5 w-0.5 -translate-y-1/2 rounded-r" />
                 )}
                 <Icon className="size-5 shrink-0" />

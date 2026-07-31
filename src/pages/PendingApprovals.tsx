@@ -3,6 +3,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight, Clock, SlidersHorizontal } fr
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import {
   approvalQueue,
   approvalStats,
@@ -26,11 +27,19 @@ const severityColor: Record<WaitSeverity, string> = {
   critical: 'text-critical-bright',
 }
 
+/** A pending Approve/Deny awaiting the admin's confirmation. */
+type PendingDecision = { request: ApprovalRequest; decision: 'approve' | 'deny' }
+
 export function PendingApprovals() {
   // Local queue copy so Approve/Deny visibly clears the row; the real actions
   // will POST to the authorization API once integrated.
   const [queue, setQueue] = useState<ApprovalRequest[]>(approvalQueue)
-  const action = (id: string) => setQueue((q) => q.filter((r) => r.id !== id))
+  const [pending, setPending] = useState<PendingDecision | null>(null)
+
+  const confirmDecision = () => {
+    if (pending) setQueue((q) => q.filter((r) => r.id !== pending.request.id))
+    setPending(null)
+  }
 
   return (
     <div className="space-y-6 pb-4">
@@ -168,13 +177,13 @@ export function PendingApprovals() {
                   <td className="px-4 py-3.5">
                     <div className="flex items-center justify-end gap-2">
                       <button
-                        onClick={() => action(req.id)}
+                        onClick={() => setPending({ request: req, decision: 'approve' })}
                         className="bg-primary text-canvas hover:bg-primary-bright rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
                       >
                         Approve
                       </button>
                       <button
-                        onClick={() => action(req.id)}
+                        onClick={() => setPending({ request: req, decision: 'deny' })}
                         className="border-critical/40 text-critical-bright hover:bg-critical/10 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors"
                       >
                         Deny
@@ -199,6 +208,25 @@ export function PendingApprovals() {
           <Pagination />
         </div>
       </section>
+
+      <ConfirmDialog
+        open={pending !== null}
+        tone={pending?.decision === 'deny' ? 'danger' : 'primary'}
+        title={pending?.decision === 'deny' ? 'Deny request?' : 'Approve request?'}
+        confirmLabel={pending?.decision === 'deny' ? 'Deny' : 'Approve'}
+        description={
+          pending && (
+            <>
+              You're about to {pending.decision}{' '}
+              <span className="text-primary-bright font-mono">{pending.request.id}</span> —{' '}
+              <span className="text-fg">{pending.request.userName}</span>'s request for{' '}
+              <span className="text-fg font-mono">{pending.request.resource}</span>.
+            </>
+          )
+        }
+        onConfirm={confirmDecision}
+        onClose={() => setPending(null)}
+      />
     </div>
   )
 }

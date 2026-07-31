@@ -1,7 +1,7 @@
+import { pageNavigation } from '@/config/navigation'
+
 /*
-  Per-route header metadata. The Navbar title (and whether the live system-status
-  counters are shown) is derived from the current pathname so the header always
-  reflects the page you're on. Add a route here to give it its own header.
+  Per-route header metadata derived from the central page navigation config.
 */
 
 export interface PageMeta {
@@ -11,6 +11,16 @@ export interface PageMeta {
   showSystemStats?: boolean
 }
 
+/** Ordered most-specific first so nested routes win over their parents. */
+const routes: { path: string; meta: PageMeta }[] = pageNavigation
+  .map((page) => ({
+    path: page.path,
+    meta: {
+      title: page.navbarTitle,
+      showSystemStats: page.showSystemStats,
+    },
+  }))
+  .sort((a, b) => b.path.length - a.path.length)
 /** Ordered most-specific first; `/` matches only exactly, so it can sit last. */
 const routes: { path: string; meta: PageMeta }[] = [
   { path: '/credentials/admin/logs', meta: { title: 'Credential Manager' } },
