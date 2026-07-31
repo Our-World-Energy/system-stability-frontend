@@ -2,39 +2,37 @@ import { useEffect, useState } from 'react'
 import { CheckCircle2, Copy, Lock } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
-import type { Credential } from '@/lib/credentials-data'
+import { cn } from '@/lib/utils'
+import { demoSecret, formatCountdown, type Credential } from '@/lib/credentials-data'
 
 interface RequestApprovedModalProps {
   credential: Credential
+  /** Epoch ms when the elevation window closes; copy is blocked once passed. */
+  expiresAt: number
   onClose: () => void
 }
 
-/** Initial elevation window in seconds (1 hour), counted down live. */
-const WINDOW_SECONDS = 59 * 60 + 59
-
-function formatWindow(totalSeconds: number): string {
-  const s = Math.max(0, totalSeconds)
-  const hh = Math.floor(s / 3600)
-  const mm = Math.floor((s % 3600) / 60)
-  const ss = s % 60
-  return [hh, mm, ss].map((n) => String(n).padStart(2, '0')).join(':')
-}
-
-/** Success dialog shown when an elevation is granted; exposes a masked temp key. */
-export function RequestApprovedModal({ credential, onClose }: RequestApprovedModalProps) {
-  const [remaining, setRemaining] = useState(WINDOW_SECONDS)
+/** Success dialog for a granted elevation; exposes a copyable temp key until expiry. */
+export function RequestApprovedModal({
+  credential,
+  expiresAt,
+  onClose,
+}: RequestApprovedModalProps) {
+  const [now, setNow] = useState(() => Date.now())
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    const id = setInterval(() => setRemaining((r) => Math.max(0, r - 1)), 1000)
+    const id = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(id)
   }, [])
 
-  const minutesLeft = Math.ceil(remaining / 60)
+  const remaining = Math.max(0, expiresAt - now)
+  const expired = remaining <= 0
+  const minutesLeft = Math.ceil(remaining / 60000)
 
   const handleCopy = () => {
-    // Placeholder secret — the real key will come from the provisioning API.
-    void navigator.clipboard?.writeText(`sk_tmp_${credential.keyName.toLowerCase()}_redacted`)
+    if (expired) return
+    void navigator.clipboard?.writeText(demoSecret(credential.keyName))
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -68,7 +66,14 @@ export function RequestApprovedModal({ credential, onClose }: RequestApprovedMod
                 <p className="text-fg-subtle font-mono text-[10px] tracking-[0.08em] uppercase">
                   Window Expires
                 </p>
-                <p className="text-fg font-mono text-sm font-semibold">{formatWindow(remaining)}</p>
+                <p
+                  className={cn(
+                    'font-mono text-sm font-semibold',
+                    expired ? 'text-critical-bright' : 'text-fg',
+                  )}
+                >
+                  {formatCountdown(remaining)}
+                </p>
               </div>
             </div>
             <p className="text-fg-muted mt-1 text-xs">Namespace: {credential.namespace}</p>
@@ -87,17 +92,29 @@ export function RequestApprovedModal({ credential, onClose }: RequestApprovedMod
           </div>
         </div>
 
-        <Button onClick={handleCopy} className="w-full py-2.5">
+        <Button onClick={handleCopy} disabled={expired} className="w-full py-2.5">
           <Copy className="size-4" />
-          {copied ? 'Copied to Clipboard' : 'Copy to Clipboard'}
+          {expired ? 'Access Expired' : copied ? 'Copied to Clipboard' : 'Copy to Clipboard'}
         </Button>
 
-        <div className="border-critical/30 bg-critical/5 flex items-start gap-2 rounded-lg border p-3">
+        <div
+          className={cn(
+            'flex items-start gap-2 rounded-lg border p-3',
+            expired ? 'border-critical/40 bg-critical/10' : 'border-critical/30 bg-critical/5',
+          )}
+        >
           <Lock className="text-critical-bright mt-0.5 size-4 shrink-0" />
           <p className="text-fg-muted text-xs leading-relaxed">
-            Access expires in <span className="text-fg font-semibold">{minutesLeft} minutes</span>.
-            For security, keys are never displayed in plain text within this dashboard. Use the copy
-            button to secure your credential.
+            {expired ? (
+              'This access window has closed — the key can no longer be copied. Submit a new request if you still need access.'
+            ) : (
+              <>
+                Access expires in{' '}
+                <span className="text-fg font-semibold">{minutesLeft} minutes</span>. For security,
+                keys are never displayed in plain text within this dashboard. Use the copy button to
+                secure your credential.
+              </>
+            )}
           </p>
         </div>
       </div>

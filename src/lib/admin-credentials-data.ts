@@ -19,6 +19,8 @@ export interface CredentialRecord {
   elevation: string
   /** Relative rotation age, e.g. "12 days ago". Null when never rotated. */
   lastRotated: string | null
+  /** Stored secret — admin-visible in the management table (masked by default). */
+  secret: string
 }
 
 export const credentialRecords: CredentialRecord[] = [
@@ -30,6 +32,7 @@ export const credentialRecords: CredentialRecord[] = [
     owner: 'srv_cluster_admin',
     elevation: '1h',
     lastRotated: '12 days ago',
+    secret: 'pg_live_7f3a2b9c4d1e8f60',
   },
   {
     id: 'legacy-gateway-auth',
@@ -39,6 +42,7 @@ export const credentialRecords: CredentialRecord[] = [
     owner: 'sys_root',
     elevation: '0h',
     lastRotated: '452 days ago',
+    secret: 'gw_auth_0a1b2c3d4e5f6a7b',
   },
   {
     id: 'aws-iam-root-sentinel',
@@ -48,6 +52,7 @@ export const credentialRecords: CredentialRecord[] = [
     owner: 'admin_central',
     elevation: '15m',
     lastRotated: '2 days ago',
+    secret: 'AKIA9F3A2B7C4D1E8F60',
   },
   {
     id: 'k8s-secret-manager-v2',
@@ -57,6 +62,7 @@ export const credentialRecords: CredentialRecord[] = [
     owner: 'k8s_operator',
     elevation: '24h',
     lastRotated: null,
+    secret: 'k8s_sm_9c8b7a6d5e4f3a2b',
   },
 ]
 

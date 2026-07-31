@@ -9,7 +9,6 @@ import { CredentialRecordTable } from '@/components/credentials/admin/Credential
 import type { RecordAction } from '@/components/credentials/admin/RowActions'
 import { CreateCredentialModal } from '@/components/credentials/admin/CreateCredentialModal'
 import { RotateCredentialModal } from '@/components/credentials/admin/RotateCredentialModal'
-import { ArchiveCredentialModal } from '@/components/credentials/admin/ArchiveCredentialModal'
 import { PurgeCredentialModal } from '@/components/credentials/admin/PurgeCredentialModal'
 
 /** The dialog currently open on the management console. */
@@ -78,13 +77,6 @@ export function CredentialManagement() {
           record={modal.record}
           onClose={() => setModal(null)}
           onRotate={commit}
-        />
-      )}
-      {modal?.kind === 'archive' && (
-        <ArchiveCredentialModal
-          record={modal.record}
-          onClose={() => setModal(null)}
-          onArchive={commit}
         />
       )}
       {modal?.kind === 'purge' && (
