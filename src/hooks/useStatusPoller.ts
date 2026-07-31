@@ -2,20 +2,7 @@ import { useEffect } from 'react'
 import { wiredSystemIds } from '@/lib/dashboard-data'
 import { useStatusStore } from '@/store/status'
 
-/**
- * REST fallback for the live feed, used only for debugging or on hosts that
- * can't hold a long-lived SSE stream (e.g. Vercel). Polls the per-system debug
- * endpoints and patches the same store the SSE stream uses, so the cards render
- * identically. Goes through the Vite proxy (relative /api) to avoid CORS in dev.
- *
- * NOTE: the live UI uses SSE; this poller is a debug/host-constraint stopgap
- * (enabled via VITE_STATUS_TRANSPORT=rest).
- */
-// The systems to poll are derived from the wired cards in dashboard-data, so the
-// REST and SSE transports can never drift apart. `id` = feed/store key; `rest` =
-// REST endpoint path, which by convention is the feed key with underscores
-// swapped for hyphens (one_portal → one-portal, one_verify → one-verify). Add an
-// override here only if a system's REST path ever diverges from that rule.
+
 const REST_PATH_OVERRIDES: Record<string, string> = {}
 const SYSTEMS: { id: string; rest: string }[] = wiredSystemIds().map((id) => ({
   id,

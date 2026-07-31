@@ -1,9 +1,15 @@
-import { NavLink, useLocation } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { ChevronLeft, ChevronRight, LogOut, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { navItems, activeNavItem } from '@/lib/navigation'
 import { useSidebarStore } from '@/store/sidebar'
+import { useAuthStore } from '@/store/auth'
 import logoUrl from '@/assets/Logo.svg'
+
+// Which routes appear here — and their labels, icons and order — comes from
+// `src/config/navigation.ts`. Active highlighting is resolved by activeNavItem,
+// which picks the most specific match, so overlapping paths like /credentials
+// and /credentials/admin light the right entry without per-item predicates.
 
 function Brand({ collapsed }: { collapsed: boolean }) {
   return (
@@ -58,20 +64,54 @@ function NavList({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: (
   )
 }
 
+/** Initials for the avatar: first letters of the first two words, or an email's stem. */
+function initialsOf(name: string) {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  if (words.length > 1) return (words[0][0] + words[1][0]).toUpperCase()
+  return name.slice(0, 2).toUpperCase()
+}
+
 function UserChip({ collapsed }: { collapsed: boolean }) {
+  const navigate = useNavigate()
+  const { token, user, signOut } = useAuthStore()
+
+  // Placeholder identity until a session exists — the auth backend isn't wired yet.
+  const name = user?.name ?? user?.email ?? 'Alex Chan'
+  const role = user?.role ?? 'Grid Operations'
+
+  const handleSignOut = () => {
+    signOut()
+    navigate('/login', { replace: true })
+  }
+
+  const signOutButton = (
+    <button
+      onClick={handleSignOut}
+      title="Sign out"
+      aria-label="Sign out"
+      className="text-fg-muted hover:bg-surface hover:text-fg grid size-8 shrink-0 place-items-center rounded-lg transition-colors"
+    >
+      <LogOut className="size-4" />
+    </button>
+  )
+
   return (
-    <div className={cn('border-line border-t p-3', collapsed && 'flex justify-center')}>
+    <div
+      className={cn('border-line border-t p-3', collapsed && 'flex flex-col items-center gap-2')}
+    >
       <div className={cn('flex items-center gap-3', collapsed && 'gap-0')}>
         <div className="bg-primary/15 text-primary-bright flex size-9 shrink-0 items-center justify-center rounded-full font-mono text-xs font-bold">
-          AC
+          {initialsOf(name)}
         </div>
         {!collapsed && (
-          <div className="min-w-0">
-            <p className="text-fg truncate text-sm leading-tight font-medium">Alex Chan</p>
-            <p className="text-fg-muted truncate text-xs leading-tight">Grid Operations</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-fg truncate text-sm leading-tight font-medium">{name}</p>
+            <p className="text-fg-muted truncate text-xs leading-tight">{role}</p>
           </div>
         )}
+        {!collapsed && token && signOutButton}
       </div>
+      {collapsed && token && signOutButton}
     </div>
   )
 }
