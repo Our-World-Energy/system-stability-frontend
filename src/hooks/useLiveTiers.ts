@@ -13,11 +13,7 @@ import {
 import { useStatusStore, type ConnectionState, type LiveSystem } from '@/store/status'
 import { useTick } from './useTick'
 
-/**
- * Overlay live SSE data onto a single static service.
- * Only services with a `systemId` are wired (Option B: Aurora + Solo);
- * every other card renders exactly as authored.
- */
+
 function mergeService(
   svc: Service,
   systems: Record<string, LiveSystem>,

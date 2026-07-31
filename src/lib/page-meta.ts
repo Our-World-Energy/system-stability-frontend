@@ -18,6 +18,7 @@ const routes: { path: string; meta: PageMeta }[] = [
   { path: '/credentials/admin', meta: { title: 'Credential Manager' } },
   { path: '/credentials/logs', meta: { title: 'Credential Manager' } },
   { path: '/credentials', meta: { title: 'Credential Manager' } },
+  { path: '/users', meta: { title: 'User Management' } },
   { path: '/alerts', meta: { title: 'Incidents' } },
   { path: '/reviewer-inbox', meta: { title: 'Reviewer Inbox' } },
   { path: '/slos', meta: { title: 'Stability & SLOs' } },

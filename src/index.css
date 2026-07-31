@@ -29,11 +29,11 @@
 
   /* Brand — Solar Emerald */
   --color-primary: #22c55e;
-  --color-primary-bright: #4be277;
+  --color-primary-bright: #6ffbbe;
   --color-primary-dim: #16a34a;
 
   /* Semantic status */
-  --color-healthy: #4be277;
+  --color-healthy: #6ffbbe;
   --color-degraded: #ffba61;
   --color-degraded-dim: #ef9900;
   --color-critical: #ff5449;
@@ -47,7 +47,10 @@
 /*
   Base layer — kept INSIDE @layer base so Tailwind utilities (which live in
   @layer utilities) continue to win. Unlayered rules would override every
-  p-*/m-*/space-y-* utility, so never reset margin/padding outside a layer here.
+  p-*, m-* and space-y-* utility, so never reset margin/padding outside a layer
+  here. (Comma-separated on purpose — slash-joining those names embeds a comment
+  terminator mid-sentence, which ends this block early and spills the remaining
+  words into the stylesheet as invalid CSS.)
 */
 @layer base {
   :root {

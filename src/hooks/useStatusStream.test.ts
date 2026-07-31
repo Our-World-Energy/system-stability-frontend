@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { attachStatusStream, type EventSourceLike } from './useStatusStream'
 import { useStatusStore } from '@/store/status'
 
-/** Minimal in-memory EventSource stand-in that lets tests drive named events. */
 class MockEventSource implements EventSourceLike {
   static CLOSED = 2
   readyState = 0 // CONNECTING

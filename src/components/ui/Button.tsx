@@ -1,9 +1,13 @@
 import { cn } from '@/lib/utils'
 
-type Variant = 'primary' | 'ghost' | 'outline'
+type Variant = 'primary' | 'cta' | 'ghost' | 'outline'
 
 const variants: Record<Variant, string> = {
   primary: 'bg-primary text-canvas font-semibold hover:bg-primary-bright active:bg-primary-dim',
+  // The bright mint call-to-action from the designs: sign-in, create user, save.
+  // Its deep-green label and the stepped-down hover/active mints are sampled
+  // values with no token of their own.
+  cta: 'bg-primary-bright font-bold text-[#005E2D] hover:bg-[#66E7AF] active:bg-[#5DD3A0]',
   ghost: 'text-fg-muted hover:text-fg hover:bg-surface-3',
   outline: 'border border-line-bright text-fg hover:bg-surface-3',
 }
