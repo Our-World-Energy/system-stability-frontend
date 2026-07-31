@@ -16,7 +16,9 @@ describe('User Management page', () => {
   it('renders the first page of the registry with its counts', () => {
     render(<UserManagement />)
 
-    expect(screen.getByText('User Management')).toBeTruthy()
+    // The page renders no heading of its own — the navbar owns the title.
+    expect(screen.queryByText('User Management')).toBeNull()
+    expect(screen.getByText('User Registry')).toBeTruthy()
     expect(registryRows()).toHaveLength(PAGE_SIZE)
     expect(screen.getByText(`Showing ${PAGE_SIZE} of ${seedUsers.length} users`)).toBeTruthy()
     expect(screen.getByText(seedUsers[0].name)).toBeTruthy()
@@ -46,21 +48,87 @@ describe('User Management page', () => {
     fireEvent.change(screen.getByLabelText(/email_address/i), {
       target: { value: 'nadia.rahman@ourworldenergy.com' },
     })
+
+    // Department pickers only exist once a department-scoped role is chosen.
     // Queried by role so the accessible name is used — that skips the decorative
-    // asterisk, which plain textContent would include. Anchored so "department"
-    // doesn't also match "department role".
-    fireEvent.change(screen.getByRole('combobox', { name: /^department$/i }), {
-      target: { value: 'Platform Eng' },
+    // asterisk, which plain textContent would include.
+    expect(screen.queryByRole('combobox', { name: /^department$/i })).toBeNull()
+    fireEvent.change(screen.getByRole('combobox', { name: /^role$/i }), {
+      target: { value: 'Standard User' },
     })
-    fireEvent.change(screen.getByRole('combobox', { name: /^department role$/i }), {
-      target: { value: 'Engineer' },
+
+    fireEvent.change(screen.getByRole('combobox', { name: /^department$/i }), {
+      target: { value: 'Field Operations' },
+    })
+    fireEvent.change(screen.getByRole('combobox', { name: /^sub-department$/i }), {
+      target: { value: 'Installation' },
     })
     expect(create.disabled).toBe(false)
 
     fireEvent.click(create)
 
     expect(screen.getByText('Nadia Rahman')).toBeTruthy()
+    expect(screen.getByText('Installation')).toBeTruthy()
     expect(screen.getByText(`Showing ${PAGE_SIZE} of ${seedUsers.length + 1} users`)).toBeTruthy()
+  })
+
+  it('an org-wide role needs no department and submits without one', () => {
+    render(<UserManagement />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+    fireEvent.change(screen.getByLabelText(/full_name/i), { target: { value: 'Omar Haddad' } })
+    fireEvent.change(screen.getByLabelText(/email_address/i), {
+      target: { value: 'omar.haddad@ourworldenergy.com' },
+    })
+    fireEvent.change(screen.getByRole('combobox', { name: /^role$/i }), {
+      target: { value: 'Platform Admin' },
+    })
+
+    expect(screen.queryByRole('combobox', { name: /^department$/i })).toBeNull()
+    const create = screen.getByRole('button', { name: /Create User/i }) as HTMLButtonElement
+    expect(create.disabled).toBe(false)
+
+    fireEvent.click(create)
+    expect(screen.getByText('Omar Haddad')).toBeTruthy()
+  })
+
+  it('sub-department options follow the chosen department, and reset when it changes', () => {
+    render(<UserManagement />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+    fireEvent.change(screen.getByRole('combobox', { name: /^role$/i }), {
+      target: { value: 'Standard User' },
+    })
+
+    const subDept = () => screen.getByRole('combobox', { name: /^sub-department$/i })
+    // Disabled until a department narrows the list.
+    expect((subDept() as HTMLSelectElement).disabled).toBe(true)
+
+    fireEvent.change(screen.getByRole('combobox', { name: /^department$/i }), {
+      target: { value: 'Sales' },
+    })
+    expect(
+      within(subDept())
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual([
+      'Select sub-department…',
+      'Business Development',
+      'Partner Success',
+      'Sales Operations',
+    ])
+
+    fireEvent.change(subDept(), { target: { value: 'Partner Success' } })
+    expect((subDept() as HTMLSelectElement).value).toBe('Partner Success')
+
+    // Switching department must drop the now-invalid sub-department.
+    fireEvent.change(screen.getByRole('combobox', { name: /^department$/i }), {
+      target: { value: 'Technology' },
+    })
+    expect((subDept() as HTMLSelectElement).value).toBe('')
+    expect(
+      (screen.getByRole('button', { name: /Create User/i }) as HTMLButtonElement).disabled,
+    ).toBe(true)
   })
 
   it('saves an edit back to the row', () => {

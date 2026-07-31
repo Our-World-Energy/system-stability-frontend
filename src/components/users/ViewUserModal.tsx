@@ -47,15 +47,20 @@ export function ViewUserModal({ user, onClose, onEdit }: ViewUserModalProps) {
         <Row label="Phone">
           <span className="text-fg font-mono text-[13px]">{user.phone}</span>
         </Row>
-        <Row label="System Role">
+        <Row label="Role">
           <RolePill role={user.role} />
         </Row>
-        <Row label="Department">
-          <span className="text-fg text-sm">{user.department}</span>
-        </Row>
-        <Row label="Department Role">
-          <span className="text-primary-bright font-mono text-[13px]">{user.departmentRole}</span>
-        </Row>
+        {/* Org-wide roles carry no department, so these rows only apply to some users. */}
+        {user.department && (
+          <Row label="Department">
+            <span className="text-fg text-sm">{user.department}</span>
+          </Row>
+        )}
+        {user.subDepartment && (
+          <Row label="Sub-Department">
+            <span className="text-primary-bright font-mono text-[13px]">{user.subDepartment}</span>
+          </Row>
+        )}
         <Row label="Status">
           <span
             className={cn(

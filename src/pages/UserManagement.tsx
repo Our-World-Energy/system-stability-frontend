@@ -34,9 +34,9 @@ export function UserManagement() {
       id: `OWE-${String(1000 + registry.length * 37).slice(0, 4)}-N`,
       name: draft.name.trim(),
       email: draft.email.trim(),
-      role: 'Pending Auth', // New accounts await clearance before a role is granted.
+      role: draft.role as User['role'],
       department: draft.department,
-      departmentRole: draft.departmentRole,
+      subDepartment: draft.subDepartment,
       phone: draft.phone.trim(),
       justification: draft.justification.trim(),
       status: 'Pending Review',
@@ -55,8 +55,9 @@ export function UserManagement() {
               name: draft.name.trim(),
               email: draft.email.trim(),
               phone: draft.phone.trim(),
+              role: draft.role as User['role'],
               department: draft.department,
-              departmentRole: draft.departmentRole,
+              subDepartment: draft.subDepartment,
               justification: draft.justification.trim(),
             }
           : u,
@@ -72,13 +73,8 @@ export function UserManagement() {
 
   return (
     <div className="space-y-6 pb-4">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-fg text-2xl font-semibold tracking-tight">User Management</h1>
-          <p className="text-fg-muted mt-1 text-sm">
-            Configure user access levels and system permissions across monitored nodes.
-          </p>
-        </div>
+      {/* No page heading here — the navbar already renders "User Management". */}
+      <header className="flex justify-end">
         <Button variant="cta" onClick={() => setModal({ kind: 'add' })}>
           <UserPlus className="size-4" />
           Add User

@@ -21,22 +21,6 @@ const routes: { path: string; meta: PageMeta }[] = pageNavigation
     },
   }))
   .sort((a, b) => b.path.length - a.path.length)
-/** Ordered most-specific first; `/` matches only exactly, so it can sit last. */
-const routes: { path: string; meta: PageMeta }[] = [
-  { path: '/credentials/admin/logs', meta: { title: 'Credential Manager' } },
-  { path: '/credentials/admin/pending', meta: { title: 'Credential Manager' } },
-  { path: '/credentials/admin', meta: { title: 'Credential Manager' } },
-  { path: '/credentials/logs', meta: { title: 'Credential Manager' } },
-  { path: '/credentials', meta: { title: 'Credential Manager' } },
-  { path: '/users', meta: { title: 'User Management' } },
-  { path: '/alerts', meta: { title: 'Incidents' } },
-  { path: '/reviewer-inbox', meta: { title: 'Reviewer Inbox' } },
-  { path: '/slos', meta: { title: 'Stability & SLOs' } },
-  { path: '/audit-log', meta: { title: 'Audit Log' } },
-  { path: '/baselines', meta: { title: 'Performance Baselines' } },
-  { path: '/settings', meta: { title: 'Settings' } },
-  { path: '/', meta: { title: 'System Visibility', showSystemStats: true } },
-]
 
 const fallback: PageMeta = { title: 'System Stability' }
 

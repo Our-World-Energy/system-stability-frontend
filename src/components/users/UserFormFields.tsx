@@ -1,7 +1,7 @@
 import { ChevronDown } from 'lucide-react'
 import { Field, controlClass } from '@/components/ui/Field'
 import { cn } from '@/lib/utils'
-import { departmentRoles, departments } from '@/lib/users-data'
+import { departments, roleNeedsDepartment, subDepartmentsFor, userRoles } from '@/lib/users-data'
 import type { UserDraft } from '@/lib/user-draft'
 
 interface UserFormFieldsProps {
@@ -14,10 +14,23 @@ interface UserFormFieldsProps {
   variant: 'create' | 'edit'
 }
 
-/** The shared six-field grid behind both the add and edit dialogs. */
+/**
+ * The shared field set behind both the add and edit dialogs.
+ *
+ * Role is chosen before anything organisational, because it decides whether the
+ * department pickers apply at all. Department and sub-department then cascade:
+ * sub-department options come from the chosen department, and changing the
+ * department clears the sub-department so an invalid pair can't be submitted.
+ */
 export function UserFormFields({ draft, onChange, variant }: UserFormFieldsProps) {
   const creating = variant === 'create'
   const label = (snake: string, spaced: string) => (creating ? snake : spaced)
+  const showOrgFields = roleNeedsDepartment(draft.role)
+  const subDepartments = subDepartmentsFor(draft.department)
+
+  const changeRole = (role: string) =>
+    // Leaving a department-scoped role strands the org fields — clear them.
+    onChange(roleNeedsDepartment(role) ? { role } : { role, department: '', subDepartment: '' })
 
   return (
     <div className="space-y-5">
@@ -58,28 +71,44 @@ export function UserFormFields({ draft, onChange, variant }: UserFormFieldsProps
         />
       </Field>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="department" htmlFor="user-department" required={creating}>
-          <Select
-            id="user-department"
-            value={draft.department}
-            onChange={(value) => onChange({ department: value })}
-            placeholder="Select department…"
-            options={departments}
-          />
-        </Field>
+      <Field label="role" htmlFor="user-role" required={creating}>
+        <Select
+          id="user-role"
+          value={draft.role}
+          onChange={changeRole}
+          placeholder="Select role…"
+          options={userRoles}
+          accent
+        />
+      </Field>
 
-        <Field label="department role" htmlFor="user-department-role" required={creating}>
-          <Select
-            id="user-department-role"
-            value={draft.departmentRole}
-            onChange={(value) => onChange({ departmentRole: value })}
-            placeholder="Select authorization level…"
-            options={departmentRoles}
-            accent
-          />
-        </Field>
-      </div>
+      {showOrgFields && (
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field label="department" htmlFor="user-department" required={creating}>
+            <Select
+              id="user-department"
+              value={draft.department}
+              // Sub-departments differ per department, so the old pick can't stand.
+              onChange={(department) => onChange({ department, subDepartment: '' })}
+              placeholder="Select department…"
+              options={departments}
+            />
+          </Field>
+
+          <Field label="sub-department" htmlFor="user-sub-department" required={creating}>
+            <Select
+              id="user-sub-department"
+              value={draft.subDepartment}
+              onChange={(subDepartment) => onChange({ subDepartment })}
+              placeholder={
+                draft.department ? 'Select sub-department…' : 'Select a department first'
+              }
+              options={subDepartments}
+              disabled={!draft.department}
+            />
+          </Field>
+        </div>
+      )}
 
       <Field
         label={label('description_justification', 'description / justification')}
@@ -105,6 +134,7 @@ function Select({
   placeholder,
   options,
   accent,
+  disabled,
 }: {
   id: string
   value: string
@@ -113,16 +143,18 @@ function Select({
   options: readonly string[]
   /** Renders the chosen value in emerald mono, as the Edit design shows for the role. */
   accent?: boolean
+  disabled?: boolean
 }) {
   return (
     <div className="relative">
       <select
         id={id}
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         className={cn(
           controlClass,
-          'h-11 appearance-none pr-10',
+          'h-11 appearance-none pr-10 disabled:cursor-not-allowed disabled:opacity-50',
           !value && 'text-fg-subtle',
           accent && value && 'text-primary-bright font-mono',
         )}

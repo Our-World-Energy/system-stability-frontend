@@ -1,13 +1,14 @@
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/lib/users-data'
 
-/** Outline tint per clearance level, matching the registry design. */
+/** Outline tint per role — the three admin tiers read warmest, staff read neutral. */
 const roleStyles: Record<UserRole, string> = {
-  'System Admin': 'border-primary/60 text-primary-bright',
-  'Security Op': 'border-indigo-400/60 text-indigo-300',
-  Developer: 'border-line-bright text-fg-muted',
-  'Pending Auth': 'border-degraded/70 text-degraded',
-  Observer: 'border-line-bright text-fg-muted',
+  'Organizational Admin': 'border-primary/60 text-primary-bright',
+  'Platform Admin': 'border-indigo-400/60 text-indigo-300',
+  'Dev Admin': 'border-sky-400/60 text-sky-300',
+  'Executive User': 'border-degraded/70 text-degraded',
+  'Management User': 'border-line-bright text-fg',
+  'Standard User': 'border-line-bright text-fg-muted',
 }
 
 export function RolePill({ role }: { role: UserRole }) {

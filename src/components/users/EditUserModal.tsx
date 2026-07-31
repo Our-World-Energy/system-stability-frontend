@@ -17,8 +17,9 @@ export function EditUserModal({ user, onClose, onSave }: EditUserModalProps) {
     name: user.name,
     phone: user.phone,
     email: user.email,
+    role: user.role,
     department: user.department,
-    departmentRole: user.departmentRole,
+    subDepartment: user.subDepartment,
     justification: user.justification,
   })
 

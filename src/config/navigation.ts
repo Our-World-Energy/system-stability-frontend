@@ -1,4 +1,4 @@
-import { KeyRound, LayoutGrid, ShieldCheck } from 'lucide-react'
+import { KeyRound, LayoutGrid, ShieldCheck, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export interface PageNavigationConfig {
@@ -25,6 +25,11 @@ export const pageNavigation = [
     navbarTitle: 'System Visibility',
     showSystemStats: true,
     sidebar: { label: 'Overview', icon: LayoutGrid },
+  },
+  {
+    path: '/users',
+    navbarTitle: 'User Management',
+    sidebar: { label: 'Users', icon: Users },
   },
   {
     path: '/credentials',

@@ -77,7 +77,21 @@ export function UserRegistryTable({
                   <td className="px-5 py-4">
                     <RolePill role={user.role} />
                   </td>
-                  <td className="text-fg-muted px-5 py-4">{user.department}</td>
+                  <td className="px-5 py-4">
+                    {user.department ? (
+                      <>
+                        <p className="text-fg-muted">{user.department}</p>
+                        {user.subDepartment && (
+                          <p className="text-fg-subtle mt-0.5 font-mono text-xs">
+                            {user.subDepartment}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      // Org-wide roles sit outside the department tree.
+                      <span className="text-fg-subtle">—</span>
+                    )}
+                  </td>
                   <td className="px-5 py-4">
                     <div className="flex items-center justify-end gap-1">
                       <IconButton

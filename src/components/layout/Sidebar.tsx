@@ -1,53 +1,15 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import {
-  LayoutGrid,
-  KeyRound,
-  ShieldCheck,
-  ChevronLeft,
-  ChevronRight,
-  LogOut,
-  Users,
-  X,
-} from 'lucide-react'
-import { NavLink, useLocation } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, LogOut, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { navItems, activeNavItem } from '@/lib/navigation'
 import { useSidebarStore } from '@/store/sidebar'
 import { useAuthStore } from '@/store/auth'
 import logoUrl from '@/assets/Logo.svg'
 
-// Only Overview, Users and Credentials are exposed for now; other routes still exist but are hidden.
-// The two Credential entries are the Requester catalog and the Admin console — later
-// only one will show, chosen by the signed-in user's role.
-//
-// Each item owns its active-state test because the paths overlap: `/credentials`
-// is a prefix of `/credentials/admin`, so a plain prefix match would light both.
-// Requester stays active on its sub-routes (e.g. /credentials/logs) but yields the
-// whole /credentials/admin subtree to the Admin entry.
-const navItems: {
-  to: string
-  icon: typeof LayoutGrid
-  label: string
-  isActive: (path: string) => boolean
-}[] = [
-  { to: '/', icon: LayoutGrid, label: 'Overview', isActive: (p) => p === '/' },
-  { to: '/users', icon: Users, label: 'Users', isActive: (p) => p.startsWith('/users') },
-  {
-    to: '/credentials',
-    icon: KeyRound,
-    label: 'Credentials',
-    isActive: (p) =>
-      p === '/credentials' ||
-      (p.startsWith('/credentials/') && !p.startsWith('/credentials/admin')),
-  },
-  {
-    to: '/credentials/admin',
-    icon: ShieldCheck,
-    label: 'Credential Admin',
-    isActive: (p) => p === '/credentials/admin' || p.startsWith('/credentials/admin/'),
-  },
-]
+// Which routes appear here — and their labels, icons and order — comes from
+// `src/config/navigation.ts`. Active highlighting is resolved by activeNavItem,
+// which picks the most specific match, so overlapping paths like /credentials
+// and /credentials/admin light the right entry without per-item predicates.
 
 function Brand({ collapsed }: { collapsed: boolean }) {
   return (
