@@ -25,7 +25,11 @@ describe('Sparkline', () => {
   it('draws a dot at every status change, tinted by the new state', () => {
     // healthy→degraded (yellow), degraded→healthy (green), healthy→critical (red).
     const html = renderToStaticMarkup(
-      <Sparkline points={[10, 20, 30, 40]} markers={['healthy', 'degraded', 'healthy', 'critical']} status="degraded" />,
+      <Sparkline
+        points={[10, 20, 30, 40]}
+        markers={['healthy', 'degraded', 'healthy', 'critical']}
+        status="degraded"
+      />,
     )
     expect(html.match(/rounded-full/g)?.length).toBe(3)
     expect(html).toContain('background-color:var(--color-degraded)')
@@ -36,12 +40,20 @@ describe('Sparkline', () => {
   it('draws NO dots for a steady state (the key fix)', () => {
     // A persistently degraded system must not sprinkle a dot on every sample.
     const steady = renderToStaticMarkup(
-      <Sparkline points={[10, 20, 30, 40, 50]} markers={['degraded', 'degraded', 'degraded', 'degraded', 'degraded']} status="degraded" />,
+      <Sparkline
+        points={[10, 20, 30, 40, 50]}
+        markers={['degraded', 'degraded', 'degraded', 'degraded', 'degraded']}
+        status="degraded"
+      />,
     )
     expect(steady).not.toContain('rounded-full')
 
     const allHealthy = renderToStaticMarkup(
-      <Sparkline points={[10, 20, 30]} markers={['healthy', 'healthy', 'healthy']} status="healthy" />,
+      <Sparkline
+        points={[10, 20, 30]}
+        markers={['healthy', 'healthy', 'healthy']}
+        status="healthy"
+      />,
     )
     expect(allHealthy).not.toContain('rounded-full')
   })

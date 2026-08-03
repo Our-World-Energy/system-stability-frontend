@@ -9,11 +9,23 @@
       "destination": "http://149.28.112.32:18964/sse/:path*"
     },
     {
+      "source": "/stability/:path*",
+      "destination": "http://149.28.112.32:28753/api/owe-stability-service/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
+    {
+      "source": "/stability/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" }
+      ]
+    },
     {
       "source": "/api/(.*)",
       "headers": [

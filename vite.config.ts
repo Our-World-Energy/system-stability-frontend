@@ -17,6 +17,19 @@ export default defineConfig(({ mode }) => {
     /* keep default */
   }
 
+  // The credential manager (owe-stability-service) is a different service on a
+  // different port, and it sends no CORS headers — so the browser must reach it
+  // same-origin. `/stability/*` is proxied to `<origin>/api/owe-stability-service/*`,
+  // which is the prefix lib/api/client.ts posts to.
+  const stabilityOrigin = env.VITE_STABILITY_SERVICE_ORIGIN || 'http://149.28.112.32:28753'
+  const stabilityProxy = {
+    '/stability': {
+      target: stabilityOrigin,
+      changeOrigin: true,
+      rewrite: (p: string) => p.replace(/^\/stability/, '/api/owe-stability-service'),
+    },
+  }
+
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
@@ -44,6 +57,7 @@ export default defineConfig(({ mode }) => {
         '/api': { target: apiOrigin, changeOrigin: true },
         // Plain HTTP streaming (SSE), not a WebSocket upgrade → ws: false.
         '/sse': { target: apiOrigin, changeOrigin: true, ws: false },
+        ...stabilityProxy,
       },
     },
     preview: {
@@ -51,6 +65,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/api': { target: apiOrigin, changeOrigin: true },
         '/sse': { target: apiOrigin, changeOrigin: true, ws: false },
+        ...stabilityProxy,
       },
     },
   }

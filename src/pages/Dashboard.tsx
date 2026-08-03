@@ -14,7 +14,9 @@ const gridFor: Record<string, string> = {
 
 export function Dashboard() {
   const tiers = useLiveTiers()
-  const query = useSearchStore((s) => s.query).trim().toLowerCase()
+  const query = useSearchStore((s) => s.query)
+    .trim()
+    .toLowerCase()
   const selectedTiers = useFilterStore((s) => s.tiers)
 
   // 1) keep only selected tiers, then 2) filter cards by name/vendor when searching.
@@ -33,7 +35,7 @@ export function Dashboard() {
   if (visibleTiers.length === 0) {
     return (
       <div className="grid place-items-center py-24 text-center">
-        <p className="font-mono text-sm text-fg-muted">
+        <p className="text-fg-muted font-mono text-sm">
           {query ? (
             <>
               No systems match “<span className="text-fg">{query}</span>”

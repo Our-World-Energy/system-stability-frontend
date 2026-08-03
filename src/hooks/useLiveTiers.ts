@@ -13,7 +13,6 @@ import {
 import { useStatusStore, type ConnectionState, type LiveSystem } from '@/store/status'
 import { useTick } from './useTick'
 
-
 function mergeService(
   svc: Service,
   systems: Record<string, LiveSystem>,
@@ -75,7 +74,9 @@ function mergeService(
       // Tooltip leads with the status + when it happened; value is secondary.
       sparkLabels: hasHistory
         ? live.samples.map((s) =>
-            [statusWord(s.status), s.v ? `${s.v}${unit}` : '', formatDateTime(s.t)].filter(Boolean).join(' · '),
+            [statusWord(s.status), s.v ? `${s.v}${unit}` : '', formatDateTime(s.t)]
+              .filter(Boolean)
+              .join(' · '),
           )
         : undefined,
       // Compact (Tier 3/4) cards render `note`; keep it live. Never touch the

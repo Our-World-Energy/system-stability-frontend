@@ -40,12 +40,15 @@ export function payloadLatency(payload: Record<string, unknown>): string | undef
  * RingCentral has no response time but reports service counts instead
  * (→ "77/78" / "Services Up"). Falls back to the card's static metric.
  */
-export function payloadMetric(payload: Record<string, unknown>): { value: string; label: string } | undefined {
+export function payloadMetric(
+  payload: Record<string, unknown>,
+): { value: string; label: string } | undefined {
   const rt = payload.response_time_ms
   if (typeof rt === 'number') return { value: `${rt}ms`, label: 'Response Time' }
   const good = payload.services_good
   const total = payload.services_total
-  if (typeof good === 'number' && typeof total === 'number') return { value: `${good}/${total}`, label: 'Services Up' }
+  if (typeof good === 'number' && typeof total === 'number')
+    return { value: `${good}/${total}`, label: 'Services Up' }
   return undefined
 }
 
@@ -157,7 +160,9 @@ export function payloadDescription(payload: Record<string, unknown>): string | u
   const desc = payload.description ?? payload.error_detail ?? payload.page_status ?? payload.detail
   if (typeof desc === 'string' && desc.trim()) return desc.trim()
   if (typeof payload.active_incidents === 'number') {
-    return payload.active_incidents === 0 ? 'No active incidents' : `${payload.active_incidents} active incidents`
+    return payload.active_incidents === 0
+      ? 'No active incidents'
+      : `${payload.active_incidents} active incidents`
   }
   return undefined
 }
@@ -221,7 +226,12 @@ export function formatDateTime(iso: string | null): string {
   if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }
 
 /** Human label for a status, used in tooltips. */

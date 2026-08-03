@@ -4,7 +4,7 @@ import { Navbar } from './Navbar'
 
 export function AppLayout() {
   return (
-    <div className="flex h-screen overflow-hidden bg-canvas text-fg">
+    <div className="bg-canvas text-fg flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Navbar />

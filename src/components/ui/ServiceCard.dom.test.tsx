@@ -6,7 +6,12 @@ import type { Service } from '@/lib/dashboard-data'
 
 afterEach(cleanup)
 
-const base: Service = { name: 'DocuSign', vendor: 'Statuspage.io', status: 'healthy', updated: '3s ago' }
+const base: Service = {
+  name: 'DocuSign',
+  vendor: 'Statuspage.io',
+  status: 'healthy',
+  updated: '3s ago',
+}
 
 describe('ServiceCard coming-soon', () => {
   it('shows a "Coming Soon" overlay and blurs content when comingSoon', () => {
@@ -52,7 +57,12 @@ describe('ServiceCard per-DB indicators (OWE DB)', () => {
   })
 
   it('renders no chips when there are no dbIndicators (e.g. vendor_silent)', () => {
-    render(<ServiceCard service={{ ...owedb, status: 'vendor_silent', dbIndicators: undefined }} size="lg" />)
+    render(
+      <ServiceCard
+        service={{ ...owedb, status: 'vendor_silent', dbIndicators: undefined }}
+        size="lg"
+      />,
+    )
     expect(screen.queryByText('Main DB UP')).toBeNull()
     expect(screen.queryByText(/DOWN/)).toBeNull()
   })

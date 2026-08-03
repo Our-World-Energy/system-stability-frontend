@@ -1,26 +1,29 @@
 import { cn } from '@/lib/utils'
-import type { Eligibility } from '@/lib/credentials-data'
 
-const map: Record<Eligibility, { label: string; cls: string; dot?: string }> = {
-  auto_grants: {
+/**
+ * Eligibility is not a field of its own on the API — it is the credential's
+ * `auto_grant` flag, read from the requester's point of view.
+ */
+const map = {
+  auto: {
     label: 'AUTO-GRANTS',
     cls: 'text-healthy border-healthy/25 bg-healthy/10',
     dot: 'bg-healthy',
   },
-  requires_approval: {
+  approval: {
     label: 'REQUIRES APPROVAL',
     cls: 'text-fg-muted border-line-bright bg-surface-3',
   },
-}
+} as const
 
 interface EligibilityBadgeProps {
-  eligibility: Eligibility
+  autoGrant: boolean
   className?: string
 }
 
 /** Pill indicating whether a credential grants instantly or needs review. */
-export function EligibilityBadge({ eligibility, className }: EligibilityBadgeProps) {
-  const { label, cls, dot } = map[eligibility]
+export function EligibilityBadge({ autoGrant, className }: EligibilityBadgeProps) {
+  const { label, cls, dot } = autoGrant ? map.auto : { ...map.approval, dot: undefined }
   return (
     <span
       className={cn(
