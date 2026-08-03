@@ -402,22 +402,6 @@ export const users: User[] = [
   },
 ]
 
-/** Header counters on the growth card. */
-export const userGrowth = {
-  total: 1284,
-  changePercent: 12,
-  /** Daily active-node counts across the trailing 30 days, earliest first. */
-  series: [
-    412, 428, 441, 470, 508, 556, 612, 668, 726, 784, 836, 878, 908, 926, 934, 930, 918, 902, 890,
-    886, 894, 918, 958, 1012, 1076, 1142, 1198, 1240, 1266, 1284,
-  ],
-  /** Same window, one period earlier — the muted comparison line. */
-  previousSeries: [
-    380, 388, 396, 410, 430, 456, 486, 518, 552, 584, 612, 634, 650, 660, 664, 662, 656, 648, 642,
-    640, 646, 660, 682, 712, 748, 786, 820, 846, 862, 872,
-  ],
-}
-
 export interface RoleAllocation {
   label: string
   count: number

@@ -5,10 +5,10 @@ type Variant = 'primary' | 'cta' | 'ghost' | 'outline'
 const variants: Record<Variant, string> = {
   primary: 'bg-primary text-canvas font-semibold hover:bg-primary-bright active:bg-primary-dim',
   // Call-to-action: sign-in, create user, save. Brand green at rest, brightening
-  // on hover; the pressed mint is a chosen value with no token of its own. The
-  // label is a fixed near-black rather than `text-canvas`, because that token
-  // flips to a light grey under the light theme and would vanish on the green.
-  cta: 'bg-primary font-bold text-black hover:bg-primary-bright active:bg-[#5DD3A0]',
+  // on hover. Label and pressed fill are their own tokens (not `text-canvas`,
+  // which flips to a light grey and would vanish on the green): near-black on
+  // the dark theme's bright green, white on the light theme's deeper green.
+  cta: 'bg-primary text-on-primary font-bold hover:bg-primary-bright active:bg-primary-press',
   ghost: 'text-fg-muted hover:text-fg hover:bg-surface-3',
   outline: 'border border-line-bright text-fg hover:bg-surface-3',
 }

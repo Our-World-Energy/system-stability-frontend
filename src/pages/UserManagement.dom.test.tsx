@@ -122,7 +122,11 @@ describe('User Management page', () => {
     expect(create.disabled).toBe(false)
 
     fireEvent.click(create)
-    expect(within(registryRows()[0]).getByText('AWS, Datadog')).toBeTruthy()
+    // The registry lists departments, so the grant shows up on the row it created
+    // only via search — and in the edit dialog it was saved to.
+    expect(within(registryRows()[0]).getByText('Omar Haddad')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Omar Haddad' }))
+    expect(screen.getByRole('button', { name: /AWS, Datadog/ })).toBeTruthy()
   })
 
   it('switching away from a platform role drops the platform grant', () => {
@@ -169,6 +173,33 @@ describe('User Management page', () => {
 
     fireEvent.click(create)
     expect(within(registryRows()[0]).getByText('Sales')).toBeTruthy()
+  })
+
+  it('switches the active-users range, and only then offers the date pickers', () => {
+    render(<UserManagement />)
+
+    const pill = (name: string) => screen.getByRole('button', { name })
+    // Defaults to the trailing week.
+    expect(pill('Last 7 days')).toHaveProperty('ariaPressed', 'true')
+    expect(screen.queryByLabelText('from')).toBeNull()
+
+    fireEvent.click(pill('Today'))
+    expect(pill('Today')).toHaveProperty('ariaPressed', 'true')
+    expect(pill('Last 7 days')).toHaveProperty('ariaPressed', 'false')
+    // Hourly buckets, so the axis starts at midnight.
+    expect(screen.getByText('00:00')).toBeTruthy()
+
+    fireEvent.click(pill('Custom range'))
+    const from = screen.getByLabelText('from') as HTMLInputElement
+    const to = screen.getByLabelText('to') as HTMLInputElement
+    expect(from.value).toBeTruthy()
+
+    // Moving the start past the end drags the end with it rather than inverting.
+    fireEvent.change(from, { target: { value: to.value } })
+    expect(from.value).toBe(to.value)
+
+    fireEvent.click(pill('This month'))
+    expect(screen.queryByLabelText('from')).toBeNull()
   })
 
   it('lists every role and its rotation rights in the access matrix', () => {
@@ -259,15 +290,59 @@ describe('User Management page', () => {
     expect(screen.getByText(`Showing ${PAGE_SIZE} of ${seedUsers.length - 1} users`)).toBeTruthy()
   })
 
-  it('opens the read-only view and hands off to the edit dialog', () => {
+  it('searches the registry across identity and scope', () => {
     render(<UserManagement />)
-    const target = seedUsers[2]
+    const target = seedUsers.find((u) => u.role === 'Standard User')!
 
-    fireEvent.click(screen.getByRole('button', { name: `View ${target.name}` }))
-    expect(screen.getByText(target.id)).toBeTruthy()
-    expect(screen.getByText(target.phone)).toBeTruthy()
+    fireEvent.change(screen.getByRole('searchbox', { name: /Search registry/i }), {
+      target: { value: target.email },
+    })
 
-    fireEvent.click(screen.getByRole('button', { name: /Edit User/i }))
-    expect(screen.getByText('Edit System User')).toBeTruthy()
+    expect(registryRows()).toHaveLength(1)
+    expect(within(registryRows()[0]).getByText(target.name)).toBeTruthy()
+    expect(screen.getByText(/filtered from 14/)).toBeTruthy()
+
+    // A term that matches nothing leaves the empty state, not a blank table.
+    fireEvent.change(screen.getByRole('searchbox', { name: /Search registry/i }), {
+      target: { value: 'zzz-no-such-user' },
+    })
+    expect(screen.getByText(/No users match this search or filter/i)).toBeTruthy()
+  })
+
+  it('filters the registry by role, and clears back to everyone', () => {
+    render(<UserManagement />)
+    const standardCount = seedUsers.filter((u) => u.role === 'Standard User').length
+
+    fireEvent.click(screen.getByRole('button', { name: /Filter registry by role/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Standard User' }))
+
+    expect(screen.getByText(`Showing ${PAGE_SIZE} of ${standardCount} users`)).toBeTruthy()
+    // Every visible row is the role that was checked.
+    for (const row of registryRows()) {
+      expect(within(row).getByText('Standard User')).toBeTruthy()
+    }
+
+    // Checking a second role widens the filter rather than replacing it.
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Executive User' }))
+    const executiveCount = seedUsers.filter((u) => u.role === 'Executive User').length
+    expect(
+      screen.getByText(`Showing ${PAGE_SIZE} of ${standardCount + executiveCount} users`),
+    ).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /Clear filter/i }))
+    expect(screen.getByText(`Showing ${PAGE_SIZE} of ${seedUsers.length} users`)).toBeTruthy()
+  })
+
+  it('filtering returns to the first page so the view is never empty', () => {
+    render(<UserManagement />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+    fireEvent.click(screen.getByRole('button', { name: /Filter registry by role/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Organizational Admin' }))
+
+    expect(registryRows()).toHaveLength(1)
+    expect(screen.getByRole('button', { name: '1' })).toHaveProperty('ariaCurrent', 'page')
   })
 })
