@@ -2,14 +2,17 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { UserManagement } from './UserManagement'
-import { users as seedUsers } from '@/lib/users-data'
+import { userRoles, users as seedUsers } from '@/lib/users-data'
 
 afterEach(cleanup)
 
 const PAGE_SIZE = 5
 
 function registryRows() {
-  return within(screen.getByRole('table')).getAllByRole('row').slice(1)
+  // Named, because the page also renders the role access matrix table.
+  return within(screen.getByRole('table', { name: 'User Registry' }))
+    .getAllByRole('row')
+    .slice(1)
 }
 
 describe('User Management page', () => {
@@ -72,7 +75,30 @@ describe('User Management page', () => {
     expect(screen.getByText(`Showing ${PAGE_SIZE} of ${seedUsers.length + 1} users`)).toBeTruthy()
   })
 
-  it('an org-wide role needs no department and submits without one', () => {
+  it('an org-wide role needs no scoping and submits without any', () => {
+    render(<UserManagement />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+    fireEvent.change(screen.getByLabelText(/full_name/i), { target: { value: 'Omar Haddad' } })
+    fireEvent.change(screen.getByLabelText(/email_address/i), {
+      target: { value: 'omar.haddad@ourworldenergy.com' },
+    })
+    fireEvent.change(screen.getByRole('combobox', { name: /^role$/i }), {
+      target: { value: 'Executive User' },
+    })
+
+    // Access is org-wide, so neither department nor platform scoping applies.
+    expect(screen.queryByRole('combobox', { name: /^department$/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Select platforms/i })).toBeNull()
+
+    const create = screen.getByRole('button', { name: /Create User/i }) as HTMLButtonElement
+    expect(create.disabled).toBe(false)
+
+    fireEvent.click(create)
+    expect(screen.getByText('Omar Haddad')).toBeTruthy()
+  })
+
+  it('a platform admin is scoped to platforms, not a department', () => {
     render(<UserManagement />)
 
     fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
@@ -85,11 +111,75 @@ describe('User Management page', () => {
     })
 
     expect(screen.queryByRole('combobox', { name: /^department$/i })).toBeNull()
+    // An admin scoped to no platform would hold no access, so it stays blocked.
     const create = screen.getByRole('button', { name: /Create User/i }) as HTMLButtonElement
+    expect(create.disabled).toBe(true)
+
+    // The grant is a checkbox dropdown, so several platforms can be picked at once.
+    fireEvent.click(screen.getByRole('button', { name: /Select platforms/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'AWS' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Datadog' }))
     expect(create.disabled).toBe(false)
 
     fireEvent.click(create)
-    expect(screen.getByText('Omar Haddad')).toBeTruthy()
+    expect(within(registryRows()[0]).getByText('AWS, Datadog')).toBeTruthy()
+  })
+
+  it('switching away from a platform role drops the platform grant', () => {
+    render(<UserManagement />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+    const role = screen.getByRole('combobox', { name: /^role$/i })
+    fireEvent.change(role, { target: { value: 'Platform Admin' } })
+
+    fireEvent.click(screen.getByRole('button', { name: /Select platforms/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'AWS' }))
+    expect(screen.getByRole('checkbox', { name: 'AWS' })).toHaveProperty('checked', true)
+
+    fireEvent.change(role, { target: { value: 'Dev Admin' } })
+    expect(screen.queryByRole('checkbox', { name: 'AWS' })).toBeNull()
+
+    fireEvent.change(role, { target: { value: 'Platform Admin' } })
+    fireEvent.click(screen.getByRole('button', { name: /Select platforms/i }))
+    expect(screen.getByRole('checkbox', { name: 'AWS' })).toHaveProperty('checked', false)
+  })
+
+  it('a management user is scoped by department only, with no sub-department', () => {
+    render(<UserManagement />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+    fireEvent.change(screen.getByLabelText(/full_name/i), { target: { value: 'Ada Reyes' } })
+    fireEvent.change(screen.getByLabelText(/email_address/i), {
+      target: { value: 'ada.reyes@ourworldenergy.com' },
+    })
+    fireEvent.change(screen.getByRole('combobox', { name: /^role$/i }), {
+      target: { value: 'Management User' },
+    })
+
+    // Management access covers the whole department, so it is never narrowed.
+    expect(screen.queryByRole('combobox', { name: /^sub-department$/i })).toBeNull()
+    const create = screen.getByRole('button', { name: /Create User/i }) as HTMLButtonElement
+    expect(create.disabled).toBe(true)
+
+    fireEvent.change(screen.getByRole('combobox', { name: /^department$/i }), {
+      target: { value: 'Sales' },
+    })
+    // A department alone completes the draft — no sub-department to wait for.
+    expect(create.disabled).toBe(false)
+
+    fireEvent.click(create)
+    expect(within(registryRows()[0]).getByText('Sales')).toBeTruthy()
+  })
+
+  it('lists every role and its rotation rights in the access matrix', () => {
+    render(<UserManagement />)
+    const matrix = within(screen.getByRole('table', { name: 'Role Access Matrix' }))
+
+    expect(matrix.getAllByRole('row').slice(1)).toHaveLength(userRoles.length)
+    const orgAdminRow = matrix.getByText('Organizational Admin').closest('tr')!
+    expect(within(orgAdminRow).getByText('Rotate / update')).toBeTruthy()
+    const standardRow = matrix.getAllByText('Standard User')[0].closest('tr')!
+    expect(within(standardRow).getByText('No rotation rights')).toBeTruthy()
   })
 
   it('sub-department options follow the chosen department, and reset when it changes', () => {

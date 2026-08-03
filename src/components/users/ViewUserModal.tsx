@@ -1,7 +1,7 @@
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
-import type { User } from '@/lib/users-data'
+import { accessScopeOf, roleCapabilities, type User } from '@/lib/users-data'
 import { RolePill } from './RolePill'
 
 interface ViewUserModalProps {
@@ -17,6 +17,8 @@ interface ViewUserModalProps {
  * dialog shell and shows the same fields the edit form exposes.
  */
 export function ViewUserModal({ user, onClose, onEdit }: ViewUserModalProps) {
+  const capability = roleCapabilities[user.role]
+
   return (
     <Modal
       open
@@ -61,6 +63,14 @@ export function ViewUserModal({ user, onClose, onEdit }: ViewUserModalProps) {
             <span className="text-primary-bright font-mono text-[13px]">{user.subDepartment}</span>
           </Row>
         )}
+        {/* Platform-scoped roles carry their grant here instead of a department. */}
+        {capability.requires === 'platforms' && (
+          <Row label="Platforms">
+            <span className="text-primary-bright font-mono text-[13px]">
+              {user.platforms.length ? user.platforms.join(', ') : '—'}
+            </span>
+          </Row>
+        )}
         <Row label="Status">
           <span
             className={cn(
@@ -72,6 +82,31 @@ export function ViewUserModal({ user, onClose, onEdit }: ViewUserModalProps) {
           </span>
         </Row>
       </dl>
+
+      {/* The role's process, resolved against this account's own grant. */}
+      <div className="border-line mt-5 border-t pt-4">
+        <p className="text-fg-muted font-mono text-[11px] font-semibold tracking-[0.08em] uppercase">
+          Credential Access
+        </p>
+        <dl className="mt-3 space-y-4">
+          <Row label="Scope">
+            <span className="text-fg text-sm">{accessScopeOf(user)}</span>
+          </Row>
+          <Row label="Rotation">
+            <span
+              className={cn(
+                'font-mono text-xs font-bold tracking-[0.08em] uppercase',
+                capability.rotation === 'rotate' && 'text-primary-bright',
+                capability.rotation === 'request' && 'text-degraded',
+                capability.rotation === 'none' && 'text-fg-subtle',
+              )}
+            >
+              {capability.rotationLabel}
+            </span>
+          </Row>
+        </dl>
+        <p className="text-fg-muted mt-3 text-[13px] leading-relaxed">{capability.process}</p>
+      </div>
 
       <div className="border-line mt-5 border-t pt-4">
         <dt className="text-fg-muted font-mono text-[11px] font-semibold tracking-[0.08em] uppercase">

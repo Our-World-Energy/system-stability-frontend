@@ -1,6 +1,6 @@
 import { Eye, ListFilter, Pencil, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { User } from '@/lib/users-data'
+import { accessScopeOf, roleCapabilities, type RotationRight, type User } from '@/lib/users-data'
 import { RolePill } from './RolePill'
 
 export type UserAction = 'view' | 'delete' | 'edit'
@@ -15,7 +15,14 @@ interface UserRegistryTableProps {
   onPageChange: (page: number) => void
 }
 
-const columns = ['User', 'Emails', 'Role', 'Department', 'Actions']
+const columns = ['User', 'Emails', 'Role', 'Credential Access', 'Rotation', 'Actions']
+
+/** Column-width-friendly wording for the rotation right; the dialogs spell it out. */
+const rotationText: Record<RotationRight, string> = {
+  rotate: 'Rotate / update',
+  request: 'Request only',
+  none: 'View only',
+}
 
 /** The user registry: one row per account, with view/delete/edit per row. */
 export function UserRegistryTable({
@@ -41,7 +48,7 @@ export function UserRegistryTable({
       </header>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[860px] border-collapse text-sm">
+        <table aria-label="User Registry" className="w-full min-w-[980px] border-collapse text-sm">
           <thead>
             <tr className="border-line border-b">
               {columns.map((col) => (
@@ -77,20 +84,18 @@ export function UserRegistryTable({
                   <td className="px-5 py-4">
                     <RolePill role={user.role} />
                   </td>
+                  {/* What the role reaches, resolved against this user's own grant —
+                      a department, named platforms, or an org/environment-wide scope. */}
                   <td className="px-5 py-4">
-                    {user.department ? (
-                      <>
-                        <p className="text-fg-muted">{user.department}</p>
-                        {user.subDepartment && (
-                          <p className="text-fg-subtle mt-0.5 font-mono text-xs">
-                            {user.subDepartment}
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      // Org-wide roles sit outside the department tree.
-                      <span className="text-fg-subtle">—</span>
+                    <p className="text-fg-muted">{accessScopeOf(user)}</p>
+                    {user.subDepartment && (
+                      <p className="text-fg-subtle mt-0.5 font-mono text-xs">
+                        {user.subDepartment}
+                      </p>
                     )}
+                  </td>
+                  <td className="px-5 py-4">
+                    <RotationCell rotation={roleCapabilities[user.role].rotation} />
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex items-center justify-end gap-1">
@@ -129,6 +134,22 @@ export function UserRegistryTable({
         <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} />
       </footer>
     </section>
+  )
+}
+
+/** Rotation rights, tinted so "can change a secret" stands out while auditing. */
+function RotationCell({ rotation }: { rotation: RotationRight }) {
+  return (
+    <span
+      className={cn(
+        'font-mono text-[11px] font-bold tracking-[0.08em] whitespace-nowrap uppercase',
+        rotation === 'rotate' && 'text-primary-bright',
+        rotation === 'request' && 'text-degraded',
+        rotation === 'none' && 'text-fg-subtle',
+      )}
+    >
+      {rotationText[rotation]}
+    </span>
   )
 }
 
