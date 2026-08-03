@@ -1,54 +1,62 @@
-import { Eye, ListFilter, Pencil, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ListFilter, Pencil, Search, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { accessScopeOf, roleCapabilities, type RotationRight, type User } from '@/lib/users-data'
+import { userRoles, type User, type UserRole } from '@/lib/users-data'
 import { RolePill } from './RolePill'
 
-export type UserAction = 'view' | 'delete' | 'edit'
+export type UserAction = 'delete' | 'edit'
 
 interface UserRegistryTableProps {
   users: User[]
   onAction: (action: UserAction, user: User) => void
-  /** Total across every page, for the "Showing x of y" caption. */
+  /** Rows matching the current search and role filter, across every page. */
   totalCount: number
+  /** Rows in the registry before filtering, for the "filtered from" caption. */
+  unfilteredCount: number
+  query: string
+  onQueryChange: (query: string) => void
+  /** Roles the filter is narrowed to; empty means every role. */
+  roleFilter: UserRole[]
+  onToggleRole: (role: UserRole) => void
+  onClearRoleFilter: () => void
   page: number
   pageCount: number
   onPageChange: (page: number) => void
 }
 
-const columns = ['User', 'Emails', 'Role', 'Credential Access', 'Rotation', 'Actions']
+const columns = ['User', 'Emails', 'Role', 'Department', 'Actions']
 
-/** Column-width-friendly wording for the rotation right; the dialogs spell it out. */
-const rotationText: Record<RotationRight, string> = {
-  rotate: 'Rotate / update',
-  request: 'Request only',
-  none: 'View only',
-}
-
-/** The user registry: one row per account, with view/delete/edit per row. */
+/** The user registry: one row per account, with edit/delete per row. */
 export function UserRegistryTable({
   users,
   onAction,
   totalCount,
+  unfilteredCount,
+  query,
+  onQueryChange,
+  roleFilter,
+  onToggleRole,
+  onClearRoleFilter,
   page,
   pageCount,
   onPageChange,
 }: UserRegistryTableProps) {
   return (
     <section className="border-line bg-surface overflow-hidden rounded-lg border">
-      <header className="border-line flex items-center justify-between border-b px-5 py-4">
+      <header className="border-line flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
         <h2 className="text-fg text-sm font-semibold">User Registry</h2>
-        <button
-          type="button"
-          aria-label="Filter registry"
-          title="Filter registry"
-          className="text-fg-muted hover:bg-surface-3 hover:text-fg grid size-8 place-items-center rounded-lg transition-colors"
-        >
-          <ListFilter className="size-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <SearchBox query={query} onQueryChange={onQueryChange} />
+          <RoleFilter
+            roleFilter={roleFilter}
+            onToggleRole={onToggleRole}
+            onClearRoleFilter={onClearRoleFilter}
+          />
+        </div>
       </header>
 
       <div className="overflow-x-auto">
-        <table aria-label="User Registry" className="w-full min-w-[980px] border-collapse text-sm">
+        <table aria-label="User Registry" className="w-full min-w-[860px] border-collapse text-sm">
           <thead>
             <tr className="border-line border-b">
               {columns.map((col) => (
@@ -68,7 +76,9 @@ export function UserRegistryTable({
             {users.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="px-5 py-16 text-center">
-                  <p className="text-fg-muted font-mono text-sm">No users match this filter</p>
+                  <p className="text-fg-muted font-mono text-sm">
+                    No users match this search or filter
+                  </p>
                 </td>
               </tr>
             ) : (
@@ -84,27 +94,23 @@ export function UserRegistryTable({
                   <td className="px-5 py-4">
                     <RolePill role={user.role} />
                   </td>
-                  {/* What the role reaches, resolved against this user's own grant —
-                      a department, named platforms, or an org/environment-wide scope. */}
                   <td className="px-5 py-4">
-                    <p className="text-fg-muted">{accessScopeOf(user)}</p>
-                    {user.subDepartment && (
-                      <p className="text-fg-subtle mt-0.5 font-mono text-xs">
-                        {user.subDepartment}
-                      </p>
+                    {user.department ? (
+                      <>
+                        <p className="text-fg-muted">{user.department}</p>
+                        {user.subDepartment && (
+                          <p className="text-fg-subtle mt-0.5 font-mono text-xs">
+                            {user.subDepartment}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      // Org-wide and platform-scoped roles sit outside the department tree.
+                      <span className="text-fg-subtle">—</span>
                     )}
                   </td>
                   <td className="px-5 py-4">
-                    <RotationCell rotation={roleCapabilities[user.role].rotation} />
-                  </td>
-                  <td className="px-5 py-4">
                     <div className="flex items-center justify-end gap-1">
-                      <IconButton
-                        label={`View ${user.name}`}
-                        onClick={() => onAction('view', user)}
-                      >
-                        <Eye className="size-4" />
-                      </IconButton>
                       <IconButton
                         label={`Delete ${user.name}`}
                         destructive
@@ -130,6 +136,12 @@ export function UserRegistryTable({
       <footer className="border-line flex flex-wrap items-center justify-between gap-3 border-t px-5 py-4">
         <p className="text-fg-muted text-[13px]">
           Showing {users.length} of {totalCount.toLocaleString()} users
+          {totalCount !== unfilteredCount && (
+            <span className="text-fg-subtle">
+              {' '}
+              (filtered from {unfilteredCount.toLocaleString()})
+            </span>
+          )}
         </p>
         <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} />
       </footer>
@@ -137,19 +149,121 @@ export function UserRegistryTable({
   )
 }
 
-/** Rotation rights, tinted so "can change a secret" stands out while auditing. */
-function RotationCell({ rotation }: { rotation: RotationRight }) {
+/** Free-text search over the registry — name, email, ID, department, platforms. */
+function SearchBox({
+  query,
+  onQueryChange,
+}: {
+  query: string
+  onQueryChange: (query: string) => void
+}) {
   return (
-    <span
-      className={cn(
-        'font-mono text-[11px] font-bold tracking-[0.08em] whitespace-nowrap uppercase',
-        rotation === 'rotate' && 'text-primary-bright',
-        rotation === 'request' && 'text-degraded',
-        rotation === 'none' && 'text-fg-subtle',
+    <div className="relative">
+      <Search className="text-fg-subtle pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+      <input
+        type="search"
+        value={query}
+        aria-label="Search registry"
+        placeholder="Search users…"
+        onChange={(e) => onQueryChange(e.target.value)}
+        className="border-line bg-input text-fg placeholder:text-fg-subtle focus:border-primary focus:ring-primary/20 h-9 w-52 rounded-lg border pr-3 pl-9 text-sm transition-colors outline-none focus:ring-2 sm:w-64"
+      />
+    </div>
+  )
+}
+
+/**
+ * Role filter behind the header's filter icon — a checkbox dropdown, since the
+ * registry mixes six clearance levels and narrowing to more than one at a time
+ * is the normal case (e.g. "show me every admin tier").
+ */
+function RoleFilter({
+  roleFilter,
+  onToggleRole,
+  onClearRoleFilter,
+}: {
+  roleFilter: UserRole[]
+  onToggleRole: (role: UserRole) => void
+  onClearRoleFilter: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+
+  // Click-outside and Escape close it, as the dropdown isn't a native control.
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (e: MouseEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
+  const active = roleFilter.length > 0
+
+  return (
+    <div ref={root} className="relative">
+      <button
+        type="button"
+        aria-label="Filter registry by role"
+        title="Filter registry by role"
+        aria-expanded={open}
+        aria-haspopup="true"
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          'relative grid size-9 place-items-center rounded-lg border transition-colors',
+          active || open
+            ? 'border-primary/50 bg-primary/10 text-primary-bright'
+            : 'text-fg-muted hover:bg-surface-3 hover:text-fg border-transparent',
+        )}
+      >
+        <ListFilter className="size-4" />
+        {active && (
+          <span className="bg-primary text-on-primary ring-surface absolute -top-1.5 -right-1.5 grid size-4 place-items-center rounded-full font-mono text-[10px] font-bold ring-2">
+            {roleFilter.length}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="border-line bg-surface absolute right-0 z-20 mt-1 w-60 rounded-lg border p-1 shadow-lg">
+          <p className="text-fg-subtle px-2.5 pt-2 pb-1.5 font-mono text-[10px] font-semibold tracking-[0.08em] uppercase">
+            Filter by role
+          </p>
+          {userRoles.map((role) => (
+            <label
+              key={role}
+              className="hover:bg-surface-3 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2"
+            >
+              <input
+                type="checkbox"
+                checked={roleFilter.includes(role)}
+                onChange={() => onToggleRole(role)}
+                className="accent-primary-bright size-4"
+              />
+              <span className="text-fg text-[13px]">{role}</span>
+            </label>
+          ))}
+          {active && (
+            <button
+              type="button"
+              onClick={onClearRoleFilter}
+              className="border-line text-fg-muted hover:text-fg mt-1 flex w-full items-center gap-1.5 border-t px-2.5 py-2 text-[13px]"
+            >
+              <X className="size-3.5" />
+              Clear filter
+            </button>
+          )}
+        </div>
       )}
-    >
-      {rotationText[rotation]}
-    </span>
+    </div>
   )
 }
 

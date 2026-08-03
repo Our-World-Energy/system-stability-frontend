@@ -31,6 +31,12 @@
   --color-primary: #22c55e;
   --color-primary-bright: #4be277;
   --color-primary-dim: #16a34a;
+  /* Label sitting on a brand-green fill (CTA buttons). Near-black on the bright
+     dark-theme green; the light theme flips it to white against its deeper green. */
+  --color-on-primary: #000000;
+  /* Pressed CTA fill — mint under the dark theme, and dark enough under the
+     light theme that the white label stays legible. */
+  --color-primary-press: #5dd3a0;
 
   /* Semantic status */
   --color-healthy: #22c55e;
@@ -76,6 +82,8 @@
   --color-primary: #16a34a;
   --color-primary-bright: #15803d;
   --color-primary-dim: #166534;
+  --color-on-primary: #ffffff;
+  --color-primary-press: #166534;
 
   /* Semantic status — deepened for contrast on light surfaces */
   --color-healthy: #16a34a;
