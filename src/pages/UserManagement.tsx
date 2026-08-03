@@ -3,6 +3,7 @@ import { UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { UserGrowthChart } from '@/components/users/UserGrowthChart'
 import { RoleAllocation } from '@/components/users/RoleAllocation'
+import { RoleCapabilityMatrix } from '@/components/users/RoleCapabilityMatrix'
 import { UserRegistryTable, type UserAction } from '@/components/users/UserRegistryTable'
 import { AddUserModal } from '@/components/users/AddUserModal'
 import { EditUserModal } from '@/components/users/EditUserModal'
@@ -37,6 +38,7 @@ export function UserManagement() {
       role: draft.role as User['role'],
       department: draft.department,
       subDepartment: draft.subDepartment,
+      platforms: draft.platforms,
       phone: draft.phone.trim(),
       justification: draft.justification.trim(),
       status: 'Pending Review',
@@ -58,6 +60,7 @@ export function UserManagement() {
               role: draft.role as User['role'],
               department: draft.department,
               subDepartment: draft.subDepartment,
+              platforms: draft.platforms,
               justification: draft.justification.trim(),
             }
           : u,
@@ -94,6 +97,8 @@ export function UserManagement() {
         pageCount={pageCount}
         onPageChange={setPage}
       />
+
+      <RoleCapabilityMatrix />
 
       <AddUserModal
         open={modal?.kind === 'add'}
