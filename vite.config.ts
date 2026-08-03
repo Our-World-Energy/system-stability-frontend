@@ -3,8 +3,24 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+
+  // Refuse to ship the RSA private key.
+  //
+  // Every VITE_-prefixed variable is compiled into the JavaScript bundle in
+  // plaintext, and .env is loaded underneath .env.production — so a developer's
+  // local private key rides into a production build unless it is explicitly
+  // blanked. That failure is silent and unrecoverable once published, which is
+  // why it stops the build rather than warning.
+  if (command === 'build' && mode === 'production' && env.VITE_CREDENTIAL_PRIVATE_KEY?.trim()) {
+    throw new Error(
+      'VITE_CREDENTIAL_PRIVATE_KEY is set for this production build. It would be readable by ' +
+        'anyone who opens the bundle. Set it empty in .env.production (or unset it in the host ' +
+        "environment) — production has no legitimate use for the private half, and decryption " +
+        'belongs behind an authenticated service.',
+    )
+  }
 
   // Dev proxy target: the Go stability service origin (derived from
   // VITE_API_BASE_URL). Serves both /api/* (REST) and /sse/status (stream), so
