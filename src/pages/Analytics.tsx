@@ -9,7 +9,3 @@ export function Analytics() {
     </div>
   )
 }
-
-
-
-

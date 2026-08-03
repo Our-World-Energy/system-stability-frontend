@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { formatDateTime, formatUptime, owedbIndicators, owedbSummary, statusWord } from './ws-status'
+import {
+  formatDateTime,
+  formatUptime,
+  owedbIndicators,
+  owedbSummary,
+  statusWord,
+} from './ws-status'
 
 describe('formatDateTime', () => {
   it('returns a non-empty local string for a valid ISO timestamp', () => {
@@ -63,11 +69,15 @@ describe('owedbIndicators', () => {
 
 describe('owedbSummary', () => {
   it('prefers the error reason when present', () => {
-    expect(owedbSummary({ message: 'Server Health Status', error_detail: 'owe_lite_db down' })).toBe('owe_lite_db down')
+    expect(
+      owedbSummary({ message: 'Server Health Status', error_detail: 'owe_lite_db down' }),
+    ).toBe('owe_lite_db down')
   })
 
   it('falls back to the health message when there is no error', () => {
-    expect(owedbSummary({ message: 'Server Health Status', error_detail: '' })).toBe('Server Health Status')
+    expect(owedbSummary({ message: 'Server Health Status', error_detail: '' })).toBe(
+      'Server Health Status',
+    )
   })
 
   it('returns undefined when neither is set', () => {

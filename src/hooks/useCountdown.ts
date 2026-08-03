@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 
-
 export function useCountdown(expiresAt: number): number {
   const [remaining, setRemaining] = useState(() => secondsUntil(expiresAt))
 

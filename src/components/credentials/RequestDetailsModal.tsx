@@ -1,4 +1,5 @@
 import {
+  AlertCircle,
   BarChart3,
   Bot,
   CheckCircle2,
@@ -59,6 +60,13 @@ const finalStep: Record<
   expired: { label: 'FINAL ACTION: EXPIRED', icon: History, tone: 'expired' },
 }
 
+/**
+ * Build the audit trail from what the service actually records.
+ *
+ * The policy-check and routing steps only appear when the data carries them —
+ * the current credential-manager routes do not, so on live data the timeline is
+ * "requested → outcome" rather than a four-step story with two invented halves.
+ */
 function buildTimeline(detail: RequestDetail): TimelineStep[] {
   const steps: TimelineStep[] = [
     {
@@ -66,32 +74,38 @@ function buildTimeline(detail: RequestDetail): TimelineStep[] {
       time: detail.timestamp,
       detail: (
         <>
-          by {detail.requesterName} (<span className="font-mono">{detail.requesterId}</span>)
+          by <span className="font-mono">{detail.requesterName}</span>
         </>
       ),
       icon: Plus,
       tone: 'requested',
     },
-    {
+  ]
+
+  if (detail.policyCheckTime) {
+    steps.push({
       label: 'POLICY CHECK',
       time: detail.policyCheckTime,
       detail: <span className="italic">Automated validation passed.</span>,
       icon: Target,
       tone: 'policy',
-    },
-    {
+    })
+  }
+
+  if (detail.status === 'pending') {
+    steps.push({
       label: 'PENDING APPROVAL',
-      detail: (
+      detail: detail.routedTo ? (
         <>
           Routed to <span className="text-fg font-mono">{detail.routedTo}</span>
         </>
+      ) : (
+        <span className="italic">Waiting on an administrator.</span>
       ),
       icon: CircleDot,
       tone: 'pending',
-    },
-  ]
-
-  if (detail.status !== 'pending') {
+    })
+  } else {
     const f = finalStep[detail.status]
     steps.push({
       label: f.label,
@@ -184,12 +198,20 @@ export function RequestDetailsModal({ detail, onClose }: RequestDetailsModalProp
             <SectionLabel>Target Resource</SectionLabel>
             <div className="border-line bg-input mt-3 flex items-center gap-3 rounded-lg border p-3">
               <Database className="text-fg-muted size-5 shrink-0" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-fg font-mono text-sm font-semibold">{detail.resource}</p>
                 <p className="text-primary-bright font-mono text-[11px] tracking-[0.06em] uppercase">
                   {detail.scope}
                 </p>
               </div>
+              {detail.duration && (
+                <div className="shrink-0 text-right">
+                  <p className="text-fg-subtle font-mono text-[10px] tracking-[0.08em] uppercase">
+                    Window
+                  </p>
+                  <p className="text-fg font-mono text-sm">{detail.duration}</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -200,6 +222,16 @@ export function RequestDetailsModal({ detail, onClose }: RequestDetailsModalProp
             </div>
           </div>
 
+          {detail.denialReason && (
+            <div>
+              <SectionLabel>Denial Reason</SectionLabel>
+              <div className="border-critical/30 bg-critical/5 mt-3 flex items-start gap-2.5 rounded-lg border p-3">
+                <AlertCircle className="text-critical-bright mt-0.5 size-4 shrink-0" />
+                <p className="text-fg text-sm leading-relaxed">{detail.denialReason}</p>
+              </div>
+            </div>
+          )}
+
           <div>
             <SectionLabel>Beneficiary</SectionLabel>
             <div className="mt-3 flex items-center gap-3">
@@ -207,8 +239,10 @@ export function RequestDetailsModal({ detail, onClose }: RequestDetailsModalProp
                 <Bot className="size-5" />
               </span>
               <div className="min-w-0">
-                <p className="text-fg text-sm font-semibold">{detail.beneficiaryName}</p>
-                <p className="text-fg-muted font-mono text-xs">{detail.beneficiaryId}</p>
+                <p className="text-fg truncate text-sm font-semibold">{detail.beneficiaryName}</p>
+                {detail.beneficiaryId && (
+                  <p className="text-fg-muted font-mono text-xs">{detail.beneficiaryId}</p>
+                )}
               </div>
             </div>
           </div>

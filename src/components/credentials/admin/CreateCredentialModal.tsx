@@ -1,132 +1,260 @@
-import { useState } from 'react'
-import { ChevronDown, KeyRound } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { ChevronDown, KeyRound, Loader2, TriangleAlert } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Field, controlClass } from '@/components/ui/Field'
 import { cn } from '@/lib/utils'
-import { twoFactorTypes } from '@/lib/admin-credentials-data'
+import { useCreateCredential } from '@/hooks/useCreateCredential'
+import { isEncryptionConfigured } from '@/lib/crypto/keys'
+import {
+  credentialLimits,
+  emptyCredentialDraft,
+  hasErrors,
+  twoFactorOptions,
+  validateCredentialDraft,
+} from '@/lib/api/credentials'
+import type {
+  CreatedCredential,
+  CredentialDraft,
+  CredentialErrors,
+  TwoFactorType,
+} from '@/lib/api/credentials'
 import { SecretInput } from './SecretInput'
 
 interface CreateCredentialModalProps {
   open: boolean
   onClose: () => void
-  onCreate: (name: string) => void
+  /** Fired once the service has accepted the record. */
+  onCreated?: (created: CreatedCredential, draft: CredentialDraft) => void
 }
 
-/** Form for registering a new credential record with an initial write-only secret. */
-export function CreateCredentialModal({ open, onClose, onCreate }: CreateCredentialModalProps) {
-  const [name, setName] = useState('')
-  const [username, setUsername] = useState('')
-  const [secret, setSecret] = useState('')
-  const [url, setUrl] = useState('')
-  const [notes, setNotes] = useState('')
-  const [twoFactorType, setTwoFactorType] = useState<string>(twoFactorTypes[0])
-  const [twoFactorApprover, setTwoFactorApprover] = useState('')
+/**
+ * Form for registering a new credential record with an initial write-only secret.
+ *
+ * The secret is encrypted in the browser before the request leaves — see
+ * `lib/crypto/secret-crypto.ts`. Nothing here ever holds the plaintext beyond the
+ * component's own state, which is dropped every time the dialog opens or closes.
+ *
+ * The payload also carries tags, an elevation window and an auto-grant flag; they
+ * have no control here and go out at their defaults (see `CredentialDraft`).
+ */
+export function CreateCredentialModal({ open, onClose, onCreated }: CreateCredentialModalProps) {
+  const [draft, setDraft] = useState<CredentialDraft>(emptyCredentialDraft)
+  // Errors stay hidden until the first submit, so the form does not scold anyone
+  // for fields they have not reached yet.
+  const [submitted, setSubmitted] = useState(false)
 
-  const canCreate = name.trim().length > 0 && secret.trim().length > 0
+  const mutation = useCreateCredential({
+    onSuccess: (result, submittedDraft) => {
+      onCreated?.(result.data ?? {}, submittedDraft)
+      onClose()
+    },
+  })
+
+  const { reset: resetMutation } = mutation
+
+  // Drop the draft — the plaintext secret above all — whenever the dialog opens
+  // or closes. The component itself is never unmounted by the page.
+  useEffect(() => {
+    setDraft(emptyCredentialDraft())
+    setSubmitted(false)
+    resetMutation()
+  }, [open, resetMutation])
+
+  const errors = validateCredentialDraft(draft)
+  const shown: CredentialErrors = submitted ? errors : {}
+  const encryptionReady = isEncryptionConfigured()
+  const busy = mutation.isPending
+
+  // Closing mid-flight would leave a request in the air with no UI attached, so
+  // the backdrop, Escape and Cancel all no-op while the create is running.
+  const requestClose = useCallback(() => {
+    if (!busy) onClose()
+  }, [busy, onClose])
+
+  const set = <K extends keyof CredentialDraft>(key: K, value: CredentialDraft[K]) =>
+    setDraft((d) => ({ ...d, [key]: value }))
+
+  const submit = () => {
+    setSubmitted(true)
+    if (hasErrors(errors) || busy || !encryptionReady) return
+    mutation.mutate(draft)
+  }
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={requestClose}
       title="Create New Credential"
       subtitle="Enter metadata and initial secret value. The secret will be write-only."
       className="max-w-2xl"
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={requestClose} disabled={busy}>
             Cancel
           </Button>
-          <Button onClick={() => canCreate && onCreate(name)} disabled={!canCreate}>
-            <KeyRound className="size-4" />
-            Create Credential
+          <Button onClick={submit} disabled={busy || !encryptionReady}>
+            {busy ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
+            {busy ? 'Encrypting & Creating…' : 'Create Credential'}
           </Button>
         </>
       }
     >
       <div className="space-y-5">
+        {/* A failed create is reported by a toast (see useCreateCredential). This
+            banner is not an event but a standing condition: the submit button is
+            disabled while it shows, so it has to stay on screen to explain why. */}
+        {!encryptionReady && (
+          <Banner>
+            No encryption key is configured, so secrets cannot be protected before sending. Run{' '}
+            <code className="font-mono">node scripts/gen-credential-keys.mjs</code> and add the
+            printed lines to your <code className="font-mono">.env</code>.
+          </Banner>
+        )}
+
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <Field label="Credential Name">
+          <Field label="Credential Name" htmlFor="cred-name">
             <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              id="cred-name"
+              value={draft.name}
+              onChange={(e) => set('name', e.target.value)}
               placeholder="e.g. Production DB Key"
+              maxLength={credentialLimits.nameMaxLength}
+              disabled={busy}
               className={cn(controlClass, 'h-11')}
             />
+            <FieldError message={shown.name} />
           </Field>
-          <Field label="Username">
+          <Field label="Username" htmlFor="cred-username">
             <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              id="cred-username"
+              value={draft.username}
+              onChange={(e) => set('username', e.target.value)}
               placeholder="admin_svc_prod"
+              autoComplete="off"
+              maxLength={credentialLimits.usernameMaxLength}
+              disabled={busy}
               className={cn(controlClass, 'h-11 font-mono')}
             />
+            <FieldError message={shown.username} />
           </Field>
         </div>
 
-        <Field label="Secret / Password">
-          <SecretInput value={secret} onChange={setSecret} placeholder="••••••••••••••••" />
+        <Field label="Secret / Password" htmlFor="cred-secret">
+          <SecretInput
+            id="cred-secret"
+            value={draft.secret}
+            onChange={(v) => set('secret', v)}
+            placeholder="••••••••••••••••"
+            disabled={busy}
+          />
+          <FieldError message={shown.secret} />
         </Field>
 
-        <Field label="URL">
+        <Field label="URL" htmlFor="cred-url">
           <input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            id="cred-url"
+            value={draft.url}
+            onChange={(e) => set('url', e.target.value)}
             placeholder="https://db-cluster-01.internal.net"
+            inputMode="url"
+            disabled={busy}
             className={cn(controlClass, 'h-11 font-mono')}
           />
+          <FieldError message={shown.url} />
         </Field>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <Field label="2FA Type">
-            <SelectControl value={twoFactorType} onChange={setTwoFactorType}>
-              {twoFactorTypes.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+          <Field label="2FA Type" htmlFor="cred-2fa">
+            <SelectControl
+              id="cred-2fa"
+              value={draft.twoFactorType}
+              onChange={(v) => set('twoFactorType', v as TwoFactorType)}
+              disabled={busy}
+            >
+              {twoFactorOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </SelectControl>
           </Field>
-          <Field label="2FA Approver">
+          <Field label="2FA Approver" htmlFor="cred-approver">
             <input
-              value={twoFactorApprover}
-              onChange={(e) => setTwoFactorApprover(e.target.value)}
-              placeholder="e.g. Sarah Jenkins"
-              className={cn(controlClass, 'h-11')}
+              id="cred-approver"
+              type="email"
+              value={draft.twoFactorApprover}
+              onChange={(e) => set('twoFactorApprover', e.target.value)}
+              // The contract stores the approver as an email, not a display name.
+              placeholder={
+                draft.twoFactorType === 'none' ? 'Not required' : 'e.g. raj@ourworldenergy.com'
+              }
+              disabled={busy || draft.twoFactorType === 'none'}
+              className={cn(controlClass, 'h-11 disabled:cursor-not-allowed disabled:opacity-50')}
             />
+            <FieldError message={shown.twoFactorApprover} />
           </Field>
         </div>
 
-        <Field label="Notes">
+        <Field label="Notes" htmlFor="cred-notes">
           <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            id="cred-notes"
+            value={draft.notes}
+            onChange={(e) => set('notes', e.target.value)}
             rows={3}
+            maxLength={credentialLimits.notesMaxLength}
             placeholder="Additional context regarding access rotation policies…"
+            disabled={busy}
             className={cn(controlClass, 'resize-none py-2.5')}
           />
+          <FieldError message={shown.notes} />
         </Field>
       </div>
     </Modal>
   )
 }
 
+/** Inline validation message. Renders nothing when the field is fine. */
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null
+  return <p className="text-critical-bright mt-1.5 font-mono text-xs">{message}</p>
+}
+
+/** Standing warning above the form, shown while the form cannot be submitted. */
+function Banner({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      role="alert"
+      className="border-degraded/40 bg-degraded/10 text-degraded flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-sm"
+    >
+      <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+      <p className="min-w-0">{children}</p>
+    </div>
+  )
+}
+
 /** Native select styled to match the dark form controls, with a chevron affordance. */
 function SelectControl({
+  id,
   value,
   onChange,
+  disabled,
   children,
 }: {
+  id?: string
   value: string
   onChange: (value: string) => void
+  disabled?: boolean
   children: React.ReactNode
 }) {
   return (
     <div className="relative">
       <select
+        id={id}
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className={cn(controlClass, 'h-11 appearance-none pr-10')}
+        className={cn(controlClass, 'h-11 appearance-none pr-10 disabled:cursor-not-allowed')}
       >
         {children}
       </select>

@@ -32,7 +32,8 @@ class MockEventSource implements EventSourceLike {
   }
 }
 
-const reset = () => useStatusStore.setState({ connection: 'connecting', hasEverConnected: false, systems: {} })
+const reset = () =>
+  useStatusStore.setState({ connection: 'connecting', hasEverConnected: false, systems: {} })
 const store = () => useStatusStore.getState()
 
 beforeEach(reset)
@@ -45,7 +46,10 @@ describe('attachStatusStream', () => {
 
     es.emit('initial_snapshot', {
       type: 'initial_snapshot',
-      systems: { aurora: { status: 'none', updated_at: 't', payload: { response_time_ms: 9 } }, cloudflare: null },
+      systems: {
+        aurora: { status: 'none', updated_at: 't', payload: { response_time_ms: 9 } },
+        cloudflare: null,
+      },
     })
     expect(store().systems.aurora.status).toBe('healthy')
     expect(store().systems.cloudflare.pending).toBe(true) // null → waiting
@@ -86,7 +90,11 @@ describe('attachStatusStream', () => {
     const es = new MockEventSource()
     attachStatusStream(es, store())
     const bad = { data: '{not json' } as MessageEvent
-    expect(() => (es as unknown as { listeners: Record<string, ((e: MessageEvent) => void)[]> }).listeners['status_update'][0](bad)).not.toThrow()
+    expect(() =>
+      (es as unknown as { listeners: Record<string, ((e: MessageEvent) => void)[]> }).listeners[
+        'status_update'
+      ][0](bad),
+    ).not.toThrow()
     expect(Object.keys(store().systems)).toHaveLength(0)
   })
 

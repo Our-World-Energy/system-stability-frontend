@@ -16,7 +16,10 @@ export interface StreamStore {
   markOpen(): void
   markClosed(): void
   applySnapshot(systems: unknown): void
-  applyUpdate(system: string, msg: { status?: unknown; updated_at?: string | null; payload?: unknown }): void
+  applyUpdate(
+    system: string,
+    msg: { status?: unknown; updated_at?: string | null; payload?: unknown },
+  ): void
 }
 
 const CLOSED = 2 // EventSource.CLOSED — reached only on a fatal (non-reconnecting) error.

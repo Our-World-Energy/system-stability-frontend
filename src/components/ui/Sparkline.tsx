@@ -35,7 +35,13 @@ const H = 36
  * it becomes interactive: hovering shows a crosshair, a marker on the nearest
  * point, and a small tooltip with that point's value + time.
  */
-export function Sparkline({ points, status = 'healthy', className, labels, markers }: SparklineProps) {
+export function Sparkline({
+  points,
+  status = 'healthy',
+  className,
+  labels,
+  markers,
+}: SparklineProps) {
   const gid = 'spark-' + useId().replace(/:/g, '')
   const [hover, setHover] = useState<number | null>(null)
   const n = points.length
@@ -49,7 +55,9 @@ export function Sparkline({ points, status = 'healthy', className, labels, marke
   const step = W / (n - 1)
 
   const pts = points.map((p, i) => ({ x: i * step, y: H - ((p - min) / range) * (H - 4) - 2 }))
-  const line = pts.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(' ')
+  const line = pts
+    .map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(2)},${c.y.toFixed(2)}`)
+    .join(' ')
   const area = `${line} L${W},${H} L0,${H} Z`
   const color = strokeColor[status]
 
@@ -62,7 +70,8 @@ export function Sparkline({ points, status = 'healthy', className, labels, marke
 
   const active = interactive && hover != null ? pts[hover] : null
   // Keep the tooltip inside the card: pin its edge on the first/last point.
-  const shift = hover === 0 ? 'translate-x-0' : hover === n - 1 ? '-translate-x-full' : '-translate-x-1/2'
+  const shift =
+    hover === 0 ? 'translate-x-0' : hover === n - 1 ? '-translate-x-full' : '-translate-x-1/2'
 
   return (
     <div
@@ -70,7 +79,13 @@ export function Sparkline({ points, status = 'healthy', className, labels, marke
       onMouseMove={interactive ? onMove : undefined}
       onMouseLeave={interactive ? () => setHover(null) : undefined}
     >
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-full w-full" fill="none" aria-hidden="true">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
+        className="h-full w-full"
+        fill="none"
+        aria-hidden="true"
+      >
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity="0.2" />
@@ -87,7 +102,16 @@ export function Sparkline({ points, status = 'healthy', className, labels, marke
           vectorEffect="non-scaling-stroke"
         />
         {active && (
-          <line x1={active.x} y1={0} x2={active.x} y2={H} stroke={color} strokeOpacity="0.35" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          <line
+            x1={active.x}
+            y1={0}
+            x2={active.x}
+            y2={H}
+            stroke={color}
+            strokeOpacity="0.35"
+            strokeWidth="1"
+            vectorEffect="non-scaling-stroke"
+          />
         )}
       </svg>
 
@@ -99,21 +123,29 @@ export function Sparkline({ points, status = 'healthy', className, labels, marke
         return (
           <span
             key={i}
-            className="pointer-events-none absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-surface"
-            style={{ left: `${(i / (n - 1)) * 100}%`, top: `${(pts[i].y / H) * 100}%`, backgroundColor: markerColor[m] }}
+            className="border-surface pointer-events-none absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border"
+            style={{
+              left: `${(i / (n - 1)) * 100}%`,
+              top: `${(pts[i].y / H) * 100}%`,
+              backgroundColor: markerColor[m],
+            }}
           />
         )
       })}
       {active && (
         <span
-          className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-surface"
-          style={{ left: `${(hover! / (n - 1)) * 100}%`, top: `${(active.y / H) * 100}%`, backgroundColor: color }}
+          className="border-surface pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2"
+          style={{
+            left: `${(hover! / (n - 1)) * 100}%`,
+            top: `${(active.y / H) * 100}%`,
+            backgroundColor: color,
+          }}
         />
       )}
       {active && labels && (
         <span
           className={cn(
-            'pointer-events-none absolute bottom-full z-20 mb-1 whitespace-nowrap rounded border border-line-bright bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] text-fg shadow-md',
+            'border-line-bright bg-surface-3 text-fg pointer-events-none absolute bottom-full z-20 mb-1 rounded border px-1.5 py-0.5 font-mono text-[10px] whitespace-nowrap shadow-md',
             shift,
           )}
           style={{ left: `${(hover! / (n - 1)) * 100}%` }}

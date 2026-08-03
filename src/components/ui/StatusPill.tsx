@@ -35,7 +35,7 @@ export function StatusPill({ status, className }: StatusPillProps) {
     <span
       className={cn(
         'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5',
-        'font-mono text-[10px] font-bold uppercase tracking-[0.05em]',
+        'font-mono text-[10px] font-bold tracking-[0.05em] uppercase',
         cls,
         className,
       )}

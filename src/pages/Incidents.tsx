@@ -1,9 +1,33 @@
 export function Incidents() {
   const incidents = [
-    { id: 'INC-001', severity: 'High', title: 'Memory leak in node-07', status: 'Open', time: '14m ago' },
-    { id: 'INC-002', severity: 'Medium', title: 'Elevated error rate on API v2', status: 'Investigating', time: '1h ago' },
-    { id: 'INC-003', severity: 'Low', title: 'SSL certificate expiring in 7 days', status: 'Open', time: '3h ago' },
-    { id: 'INC-004', severity: 'High', title: 'Database connection pool exhausted', status: 'Resolved', time: '1d ago' },
+    {
+      id: 'INC-001',
+      severity: 'High',
+      title: 'Memory leak in node-07',
+      status: 'Open',
+      time: '14m ago',
+    },
+    {
+      id: 'INC-002',
+      severity: 'Medium',
+      title: 'Elevated error rate on API v2',
+      status: 'Investigating',
+      time: '1h ago',
+    },
+    {
+      id: 'INC-003',
+      severity: 'Low',
+      title: 'SSL certificate expiring in 7 days',
+      status: 'Open',
+      time: '3h ago',
+    },
+    {
+      id: 'INC-004',
+      severity: 'High',
+      title: 'Database connection pool exhausted',
+      status: 'Resolved',
+      time: '1d ago',
+    },
   ]
 
   const severityColor: Record<string, string> = {
@@ -20,7 +44,7 @@ export function Incidents() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold text-slate-900">Incidents</h1>
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-sm">
           <thead className="border-b border-slate-200 bg-slate-50">
             <tr>
@@ -33,10 +57,12 @@ export function Incidents() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {incidents.map((inc) => (
-              <tr key={inc.id} className="hover:bg-slate-50 transition-colors">
+              <tr key={inc.id} className="transition-colors hover:bg-slate-50">
                 <td className="px-5 py-3 font-mono text-slate-600">{inc.id}</td>
                 <td className="px-5 py-3">
-                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${severityColor[inc.severity]}`}>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${severityColor[inc.severity]}`}
+                  >
                     {inc.severity}
                   </span>
                 </td>

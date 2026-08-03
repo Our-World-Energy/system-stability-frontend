@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useStatusStore } from './status'
 
-const reset = () => useStatusStore.setState({ connection: 'connecting', hasEverConnected: false, systems: {} })
+const reset = () =>
+  useStatusStore.setState({ connection: 'connecting', hasEverConnected: false, systems: {} })
 const sys = () => useStatusStore.getState().systems
 
 beforeEach(reset)
@@ -9,7 +10,11 @@ beforeEach(reset)
 describe('applySnapshot', () => {
   it('maps canonical statuses and marks null systems as pending', () => {
     useStatusStore.getState().applySnapshot({
-      aurora: { status: 'none', updated_at: '2026-07-07T14:53:11Z', payload: { response_time_ms: 12 } },
+      aurora: {
+        status: 'none',
+        updated_at: '2026-07-07T14:53:11Z',
+        payload: { response_time_ms: 12 },
+      },
       twilio: { status: 'minor', updated_at: '2026-07-07T14:53:11Z', payload: {} },
       ringcentral: { status: 'critical', updated_at: '2026-07-07T14:53:11Z', payload: {} },
       one_portal: null, // no first check yet
@@ -18,7 +23,13 @@ describe('applySnapshot', () => {
     expect(sys().twilio.status).toBe('degraded') // minor → degraded (amber)
     expect(sys().ringcentral.status).toBe('critical')
     // null → pending "waiting", never an error/red
-    expect(sys().one_portal).toEqual({ status: 'vendor_silent', updatedAt: null, payload: {}, pending: true, samples: [] })
+    expect(sys().one_portal).toEqual({
+      status: 'vendor_silent',
+      updatedAt: null,
+      payload: {},
+      pending: true,
+      samples: [],
+    })
   })
 
   it('preserves richer existing solo state over a webhook-only snapshot value', () => {
@@ -29,7 +40,10 @@ describe('applySnapshot', () => {
     })
     // Reconnect snapshot where solo is only a thin webhook payload.
     useStatusStore.getState().applySnapshot({
-      solo: { updated_at: 't2', payload: { event_type: 'incident.update', last_webhook_event_at: 't2' } },
+      solo: {
+        updated_at: 't2',
+        payload: { event_type: 'incident.update', last_webhook_event_at: 't2' },
+      },
     })
     expect(sys().solo.status).toBe('healthy') // kept from richer prior state
     expect(sys().solo.payload.page_status).toBe('UP') // probe data retained
@@ -106,8 +120,15 @@ describe('sparkline history (samples)', () => {
 
   it('does not add a point for a webhook-only update but keeps prior history', () => {
     const s = useStatusStore.getState()
-    s.applyUpdate('solo', { status: 'none', updated_at: 't1', payload: { status: 'none', http_status: 200, response_time_ms: 30 } })
-    s.applyUpdate('solo', { updated_at: 't2', payload: { event_type: 'x', last_webhook_event_at: 't2' } })
+    s.applyUpdate('solo', {
+      status: 'none',
+      updated_at: 't1',
+      payload: { status: 'none', http_status: 200, response_time_ms: 30 },
+    })
+    s.applyUpdate('solo', {
+      updated_at: 't2',
+      payload: { event_type: 'x', last_webhook_event_at: 't2' },
+    })
     expect(sys().solo.samples).toEqual([{ v: 30, t: 't1', status: 'healthy' }])
   })
 })

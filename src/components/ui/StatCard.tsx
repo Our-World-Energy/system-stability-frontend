@@ -17,12 +17,21 @@ const accentMap = {
   yellow: 'bg-yellow-50 text-yellow-600',
 }
 
-export function StatCard({ label, value, icon: Icon, trend, trendUp, accent = 'green' }: StatCardProps) {
+export function StatCard({
+  label,
+  value,
+  icon: Icon,
+  trend,
+  trendUp,
+  accent = 'green',
+}: StatCardProps) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-slate-500">{label}</p>
-        <div className={cn('flex size-9 items-center justify-center rounded-lg', accentMap[accent])}>
+        <div
+          className={cn('flex size-9 items-center justify-center rounded-lg', accentMap[accent])}
+        >
           <Icon className="size-5" />
         </div>
       </div>

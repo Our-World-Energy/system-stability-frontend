@@ -186,3 +186,59 @@
     animation: none;
   }
 }
+
+
+/*
+  Toast notifications (react-toastify) dressed in the design tokens.
+
+  `html:root` on purpose, not `:root`: main.tsx loads index.css before App.tsx
+  loads ReactToastify.css, so toastify's own `:root` block comes later in the
+  bundle and would win a specificity tie. The extra element selector settles it
+  without an !important.
+
+  Every value below points at a `--color-*` token, which flips with
+  <html data-theme>, so toasts follow the light/dark theme on their own — the
+  `theme` prop on <ToastContainer> only picks which of toastify's own classes it
+  applies, and both end up reading these.
+*/
+html:root {
+  --toastify-font-family: var(--font-sans);
+  --toastify-toast-bd-radius: 0.5rem;
+  --toastify-toast-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+  --toastify-toast-min-height: 56px;
+
+  /* Surfaces: one card colour for both toastify themes. */
+  --toastify-color-light: var(--color-surface);
+  --toastify-color-dark: var(--color-surface);
+  --toastify-toast-background: var(--color-surface);
+  --toastify-text-color-light: var(--color-fg);
+  --toastify-text-color-dark: var(--color-fg);
+
+  /* Status colours, shared with the pills and cards elsewhere in the app. */
+  --toastify-color-success: var(--color-healthy);
+  --toastify-color-error: var(--color-critical);
+  --toastify-color-warning: var(--color-degraded);
+  --toastify-color-info: var(--color-primary);
+  --toastify-icon-color-success: var(--color-healthy);
+  --toastify-icon-color-error: var(--color-critical);
+  --toastify-icon-color-warning: var(--color-degraded);
+  --toastify-icon-color-info: var(--color-primary);
+  --toastify-color-progress-success: var(--color-healthy);
+  --toastify-color-progress-error: var(--color-critical);
+  --toastify-color-progress-warning: var(--color-degraded);
+  --toastify-color-progress-info: var(--color-primary);
+}
+
+.Toastify__toast {
+  border: 1px solid var(--color-line);
+  font-size: 0.875rem;
+}
+
+.Toastify__close-button {
+  color: var(--color-fg-muted);
+  opacity: 1;
+}
+
+.Toastify__close-button:hover {
+  color: var(--color-fg);
+}

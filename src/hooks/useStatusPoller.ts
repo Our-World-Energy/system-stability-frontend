@@ -2,7 +2,6 @@ import { useEffect } from 'react'
 import { wiredSystemIds } from '@/lib/dashboard-data'
 import { useStatusStore } from '@/store/status'
 
-
 const REST_PATH_OVERRIDES: Record<string, string> = {}
 const SYSTEMS: { id: string; rest: string }[] = wiredSystemIds().map((id) => ({
   id,
@@ -49,7 +48,10 @@ export function useStatusPoller(enabled: boolean) {
     async function pollOnce() {
       const results = await Promise.allSettled(SYSTEMS.map(fetchSystem))
       if (stopped) return
-      const ok = results.filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof fetchSystem>>> => r.status === 'fulfilled')
+      const ok = results.filter(
+        (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof fetchSystem>>> =>
+          r.status === 'fulfilled',
+      )
       ok.forEach((r) => store().applyUpdate(r.value.id, r.value))
       if (ok.length > 0) store().markOpen()
       else store().markClosed()

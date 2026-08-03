@@ -1,5 +1,8 @@
 import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
+import { useThemeStore } from '@/store/theme'
 import { useStatusStream } from '@/hooks/useStatusStream'
 import { useStatusPoller } from '@/hooks/useStatusPoller'
 import { resolveSseUrl } from '@/lib/ws-status'
@@ -43,8 +46,18 @@ const REQUIRE_AUTH = import.meta.env.VITE_REQUIRE_AUTH !== 'false'
 export default function App() {
   useStatusStream(SSE_URL, !REST_DEBUG)
   useStatusPoller(REST_DEBUG)
+  // Toasts follow the app theme rather than defaulting to toastify's own light
+  // palette, which would flash white over the dark shell.
+  const theme = useThemeStore((s) => s.theme)
   return (
     <QueryClientProvider client={queryClient}>
+      <ToastContainer
+        theme={theme}
+        newestOnTop
+        limit={3}
+        // Modals sit at z-50; toasts must clear them to be readable at all.
+        style={{ zIndex: 9999 }}
+      />
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />

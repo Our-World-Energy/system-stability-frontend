@@ -2,20 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ScrollText } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import {
-  credentials,
-  GRANT_WINDOW_MS,
-  type CatalogFilter,
-  type Credential,
-} from '@/lib/credentials-data'
 import { CredentialTable } from '@/components/credentials/CredentialTable'
 import { CredentialSearchScreen } from '@/components/credentials/CredentialSearchScreen'
-import {
-  RequestAccessModal,
-  type AccessRequestDraft,
-} from '@/components/credentials/RequestAccessModal'
+import { RequestAccessModal } from '@/components/credentials/RequestAccessModal'
 import { RequestApprovedModal } from '@/components/credentials/RequestApprovedModal'
-import { RequestDeniedModal } from '@/components/credentials/RequestDeniedModal'
+import { useCredentialSearch } from '@/hooks/useCredentials'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { credentialErrorMessage } from '@/lib/api/credentials'
+import type { Credential, Grant } from '@/lib/api/types'
+
+/** Catalog filter presets shown as chips above the table. */
+type CatalogFilter = 'all' | 'auto_grants' | 'requires_approval'
 
 const filters: { id: CatalogFilter; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -23,18 +20,25 @@ const filters: { id: CatalogFilter; label: string }[] = [
   { id: 'requires_approval', label: 'Requires approval' },
 ]
 
+/** A live elevation window, kept alongside the credential it belongs to. */
+type ActiveGrant = { credential: Credential; grant: Grant }
+
 export function CredentialManager() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<CatalogFilter>('all')
 
-  // Which dialog is open, if any.
-  const [requestCred, setRequestCred] = useState<Credential | null>(null)
-  const [deniedCred, setDeniedCred] = useState<Credential | null>(null)
-  const [viewCred, setViewCred] = useState<Credential | null>(null)
+  const [requestFor, setRequestFor] = useState<Credential | null>(null)
+  const [viewing, setViewing] = useState<ActiveGrant | null>(null)
 
-  // Active grants (credential id → expiry epoch ms) and a 1s clock driving the
-  // countdowns in the table and the approved dialog.
-  const [grants, setGrants] = useState<Record<string, number>>({})
+  // Grants issued during this session, credential id → window. The service has no
+  // "my active grants" route, so this cannot survive a reload — a window opened
+  // in an earlier session is real on the backend but invisible here.
+  const [grants, setGrants] = useState<Record<string, ActiveGrant>>({})
+
+  const debounced = useDebouncedValue(query, 300)
+  const search = useCredentialSearch(debounced)
+
+  // 1s clock driving the countdowns in the table and the grant dialog.
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
@@ -42,26 +46,18 @@ export function CredentialManager() {
   }, [])
 
   const visible = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return credentials.filter((c) => {
-      const matchesFilter = filter === 'all' || c.eligibility === filter
-      const matchesQuery = c.name.toLowerCase().includes(q)
-      return matchesFilter && matchesQuery
-    })
-  }, [query, filter])
+    const rows = search.data ?? []
+    if (filter === 'all') return rows
+    return rows.filter((c) => (filter === 'auto_grants' ? c.auto_grant : !c.auto_grant))
+  }, [search.data, filter])
 
-  // Demo policy: auto-grant credentials are approved instantly (opening a copy
-  // window on the row); anything requiring approval is denied so both outcome
-  // dialogs stay reachable. This is where the provisioning API call will live.
-  const handleSubmit = (draft: AccessRequestDraft) => {
-    setRequestCred(null)
-    if (draft.credential.eligibility === 'auto_grants') {
-      setGrants((g) => ({ ...g, [draft.credential.id]: Date.now() + GRANT_WINDOW_MS }))
-      setViewCred(draft.credential)
-    } else {
-      setDeniedCred(draft.credential)
+  const expiryMap = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const [id, entry] of Object.entries(grants)) {
+      map[id] = new Date(entry.grant.expires_at).getTime()
     }
-  }
+    return map
+  }, [grants])
 
   return (
     <>
@@ -79,7 +75,7 @@ export function CredentialManager() {
               className="bg-primary text-canvas hover:bg-primary-bright inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
             >
               <ScrollText className="size-4" />
-              Request Log's
+              Request Log&rsquo;s
             </Link>
           </>
         }
@@ -103,32 +99,36 @@ export function CredentialManager() {
 
         <CredentialTable
           credentials={visible}
-          grants={grants}
+          grants={expiryMap}
           now={now}
-          onRequest={setRequestCred}
-          onViewKey={setViewCred}
+          loading={search.isFetching}
+          error={search.isError ? credentialErrorMessage(search.error, 'Search failed.') : null}
+          onRequest={setRequestFor}
+          onViewGrant={(cred) => {
+            const entry = grants[cred.id]
+            if (entry) setViewing(entry)
+          }}
         />
       </CredentialSearchScreen>
 
       <RequestAccessModal
-        credential={requestCred}
-        onClose={() => setRequestCred(null)}
-        onSubmit={handleSubmit}
+        credential={requestFor}
+        onClose={() => setRequestFor(null)}
+        onSubmitted={(outcome, credential) => {
+          // An auto-granting credential comes back already granted; anything else
+          // is queued, and the toast raised by the hook is the whole story.
+          if (!outcome?.grant) return
+          const entry = { credential, grant: outcome.grant }
+          setGrants((g) => ({ ...g, [credential.id]: entry }))
+          setViewing(entry)
+        }}
       />
 
-      {viewCred && (
+      {viewing && (
         <RequestApprovedModal
-          credential={viewCred}
-          expiresAt={grants[viewCred.id] ?? 0}
-          onClose={() => setViewCred(null)}
-        />
-      )}
-
-      {deniedCred && (
-        <RequestDeniedModal
-          credential={deniedCred}
-          onClose={() => setDeniedCred(null)}
-          onContactAdmin={() => setDeniedCred(null)}
+          credential={viewing.credential}
+          grant={viewing.grant}
+          onClose={() => setViewing(null)}
         />
       )}
     </>

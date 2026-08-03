@@ -3,11 +3,20 @@ import { cn } from '@/lib/utils'
 interface TemporalDistributionProps {
   /** Requests-per-hour buckets, left (earliest) to right (latest). */
   buckets: number[]
+  /** Left / middle / right axis captions. Defaults to a rolling 24-hour window. */
+  axis?: [string, string, string]
+  /** Per-bar tooltips, aligned with `buckets`. */
+  titles?: string[]
   className?: string
 }
 
 /** Minimal bar chart of request volume over time; the tallest bar is highlighted. */
-export function TemporalDistribution({ buckets, className }: TemporalDistributionProps) {
+export function TemporalDistribution({
+  buckets,
+  axis = ['24h ago', '12h ago', 'Now'],
+  titles,
+  className,
+}: TemporalDistributionProps) {
   const peak = Math.max(...buckets, 1)
 
   return (
@@ -21,12 +30,15 @@ export function TemporalDistribution({ buckets, className }: TemporalDistributio
 
       <div className="flex h-40 items-end gap-1.5">
         {buckets.map((value, i) => {
-          const isPeak = value === peak
+          // Only highlight a real peak — with an all-zero series every bar would
+          // otherwise light up as the maximum.
+          const isPeak = value > 0 && value === peak
           return (
             <div
               key={i}
-              title={`${value} requests`}
-              style={{ height: `${(value / peak) * 100}%` }}
+              title={titles?.[i] ?? `${value} requests`}
+              // A 2% floor keeps an empty hour visible as a baseline tick.
+              style={{ height: `${Math.max((value / peak) * 100, 2)}%` }}
               className={cn(
                 'flex-1 rounded-t transition-colors',
                 isPeak ? 'bg-primary-bright' : 'bg-primary/25 hover:bg-primary/40',
@@ -37,9 +49,9 @@ export function TemporalDistribution({ buckets, className }: TemporalDistributio
       </div>
 
       <div className="text-fg-subtle mt-2 flex justify-between font-mono text-[10px]">
-        <span>00:00</span>
-        <span>12:00</span>
-        <span>23:00</span>
+        {axis.map((label) => (
+          <span key={label}>{label}</span>
+        ))}
       </div>
     </section>
   )
