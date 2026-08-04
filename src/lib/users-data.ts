@@ -202,24 +202,6 @@ export interface User {
   status: 'Active' | 'Pending Review' | 'Offline'
 }
 
-/**
- * What this user's credential access actually resolves to — the role's scope
- * filled in with the user's own grant. Flags an unscoped account rather than
- * rendering a blank, since that reads as "everything" to whoever is auditing.
- */
-export function accessScopeOf(user: User): string {
-  switch (roleCapabilities[user.role].scope) {
-    case 'all':
-      return 'All credentials'
-    case 'assigned_platforms':
-      return user.platforms.length ? user.platforms.join(', ') : 'No platform assigned'
-    case 'development':
-      return 'Development credentials'
-    case 'department':
-      return user.department || 'No department assigned'
-  }
-}
-
 export const users: User[] = [
   {
     id: 'OWE-8821-K',

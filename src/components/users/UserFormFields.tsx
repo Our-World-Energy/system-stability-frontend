@@ -153,7 +153,7 @@ export function UserFormFields({ draft, onChange, variant }: UserFormFieldsProps
           <span id="user-platforms-label" className={captionClass}>
             {label('platform_access', 'platform access')}
             {creating && (
-              <span aria-hidden className="text-primary-bright ml-1.5">
+              <span aria-hidden className="text-critical ml-1.5">
                 *
               </span>
             )}

@@ -45,7 +45,7 @@ export function RoleAllocation() {
         ))}
       </ul>
 
-      <p className="text-fg-subtle mt-auto pt-6 text-right font-mono text-[10px] tracking-[0.08em] uppercase">
+      <p className="text-fg-subtle mt-auto pt-6 text-left font-mono text-[10px] tracking-[0.08em] uppercase">
         Last updated: {roleAllocationUpdatedAt}
       </p>
     </section>

@@ -31,7 +31,7 @@ export function Field({ label, children, accent, htmlFor, required, className }:
         {/* Decorative: a bare "*" read aloud is noise, and it would otherwise end up
             in the control's accessible name. */}
         {required && (
-          <span aria-hidden className="text-primary-bright ml-1.5">
+          <span aria-hidden className="text-critical ml-1.5">
             *
           </span>
         )}
