@@ -41,7 +41,9 @@ export function AddUserModal({ open, onClose, onCreate }: AddUserModalProps) {
     >
       <UserFormFields draft={draft} onChange={patch} variant="create" />
 
-      <p className="border-line-bright/70 text-fg-muted mt-6 rounded-lg border border-dashed px-3.5 py-3 text-[13px] leading-relaxed">
+      {/* `mt-5` and an even `p-3` keep the note on the form's own spacing scale —
+          20px between blocks, 12px inside a box — instead of 24px / 14px-by-12px. */}
+      <p className="border-line-bright/70 text-fg-muted mt-5 rounded-lg border border-dashed p-3 text-[13px] leading-relaxed">
         <span className="text-primary-bright font-semibold">NOTE:</span> Adding a new system user
         automatically triggers an invitation. The link will be sent to the registered email address.
       </p>

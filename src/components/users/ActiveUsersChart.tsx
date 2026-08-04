@@ -52,6 +52,8 @@ export function ActiveUsersChart() {
   // keeps exactly the same height in every range.
   const [pickerOpen, setPickerOpen] = useState(false)
   const rangeBar = useRef<HTMLDivElement>(null)
+  /** Index of the bucket under the cursor; null when the pointer is off the plot. */
+  const [hovered, setHovered] = useState<number | null>(null)
 
   useEffect(() => {
     if (!pickerOpen) return
@@ -73,6 +75,8 @@ export function ActiveUsersChart() {
     setRange(next)
     // Only the custom range has anything to pick; the others dismiss the panel.
     setPickerOpen(next === 'custom')
+    // The old readout described buckets that are about to be replaced.
+    setHovered(null)
   }
 
   const series = useMemo(() => activeUsersSeries(range, now, custom), [range, now, custom])
@@ -94,8 +98,24 @@ export function ActiveUsersChart() {
     }))
 
   const line = smoothPath(project(drawn))
+  // Marker coordinates for the real buckets (`drawn` may hold a padded duplicate).
+  const plotted = project(points)
 
-  const changeCustom = (patch: Partial<CustomRange>) =>
+  /**
+   * Nearest bucket to the cursor. Measured against the container's own width
+   * rather than the viewBox, since `preserveAspectRatio="none"` means the two
+   * don't share a scale.
+   */
+  const trackCursor = (e: React.MouseEvent<HTMLDivElement>) => {
+    const { left, width } = e.currentTarget.getBoundingClientRect()
+    if (!width || points.length === 0) return
+    const ratio = (e.clientX - left) / width
+    const index = Math.round(ratio * (points.length - 1))
+    setHovered(Math.min(Math.max(index, 0), points.length - 1))
+  }
+
+  const changeCustom = (patch: Partial<CustomRange>) => {
+    setHovered(null)
     setCustom((current) => {
       const next = { ...current, ...patch }
       // Keep the pair ordered, so dragging one end past the other can't invert it.
@@ -103,6 +123,15 @@ export function ActiveUsersChart() {
       if (patch.to && next.to < next.from) next.from = next.to
       return next
     })
+  }
+
+  /*
+    Remount key for the animated parts. Changing it restarts the CSS animations,
+    which is what makes a tab switch draw the new curve on instead of snapping to
+    it — a `d` transition can't do the job, since the ranges hold different
+    numbers of buckets and so produce paths with different command counts.
+  */
+  const animationKey = range === 'custom' ? `custom:${custom.from}:${custom.to}` : range
 
   return (
     <section className="border-line bg-surface flex flex-col rounded-lg border p-5">
@@ -159,7 +188,11 @@ export function ActiveUsersChart() {
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      {/* The figures swap wholesale with the range, so they cross-fade with the curve. */}
+      <div
+        key={`stats-${animationKey}`}
+        className="animate-fade-in mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1"
+      >
         <p className="text-fg font-mono text-4xl font-bold tracking-tight">
           {average.toLocaleString()}
         </p>
@@ -193,7 +226,11 @@ export function ActiveUsersChart() {
         </p>
       ) : (
         <div className="mt-auto pt-4">
-          <div className="h-52">
+          <div
+            className="relative h-52 cursor-crosshair"
+            onMouseMove={trackCursor}
+            onMouseLeave={() => setHovered(null)}
+          >
             <svg
               viewBox={`0 0 ${W} ${H}`}
               preserveAspectRatio="none"
@@ -209,29 +246,57 @@ export function ActiveUsersChart() {
                 </linearGradient>
               </defs>
 
-              <path d={`${line} L${W},${H} L0,${H} Z`} fill={`url(#${gradientId})`} />
+              {/* Keyed on the range: a switch remounts these, restarting the
+                  fill's fade and the line's draw-on. */}
+              <path
+                key={`area-${animationKey}`}
+                d={`${line} L${W},${H} L0,${H} Z`}
+                fill={`url(#${gradientId})`}
+                className="animate-fade-in"
+              />
               {previous.length > 1 && (
                 <path
+                  key={`previous-${animationKey}`}
                   d={smoothPath(project(previous))}
                   stroke="var(--color-fg-subtle)"
                   strokeWidth="1.5"
                   strokeDasharray="5 5"
                   strokeOpacity="0.55"
                   vectorEffect="non-scaling-stroke"
+                  className="animate-fade-in"
                 />
               )}
               <path
+                key={`line-${animationKey}`}
                 d={line}
+                // Normalised length, so one dash spans the curve at any width.
+                pathLength="1"
                 stroke="var(--color-primary-bright)"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 vectorEffect="non-scaling-stroke"
+                className="animate-draw-line"
               />
             </svg>
+
+            {/* Crosshair, marker and readout are HTML, not SVG: the stretched
+                viewBox would squash a <circle> into an ellipse. The chart's
+                aria-label already summarises the series, so this is decorative. */}
+            {hovered !== null && plotted[hovered] && (
+              <Cursor
+                point={points[hovered]}
+                previous={previous[hovered]}
+                x={plotted[hovered].x / W}
+                y={plotted[hovered].y / H}
+              />
+            )}
           </div>
 
-          <div className="text-fg-subtle mt-2 flex justify-between font-mono text-[10px] tracking-[0.08em] uppercase">
+          <div
+            key={`ticks-${animationKey}`}
+            className="text-fg-subtle animate-fade-in mt-2 flex justify-between font-mono text-[10px] tracking-[0.08em] uppercase"
+          >
             {axisTicks(points).map((tick, i) => (
               <span key={`${tick}-${i}`}>{tick}</span>
             ))}
@@ -239,6 +304,57 @@ export function ActiveUsersChart() {
         </div>
       )}
     </section>
+  )
+}
+
+/**
+ * Hover readout: a vertical guide, a dot on the curve, and the bucket's numbers.
+ *
+ * `x` and `y` arrive as 0..1 fractions of the plot, so the overlay tracks the
+ * curve at any card width. The tooltip flips side near the edges and drops below
+ * the dot near the top, so it can never be clipped out of view.
+ */
+function Cursor({
+  point,
+  previous,
+  x,
+  y,
+}: {
+  point: ActiveUsersPoint
+  /** Same bucket in the comparison window; absent for the shortest windows. */
+  previous?: ActiveUsersPoint
+  x: number
+  y: number
+}) {
+  const left = `${x * 100}%`
+  const alignX = x < 0.15 ? '0%' : x > 0.85 ? '-100%' : '-50%'
+  const alignY = y < 0.3 ? '0.75rem' : 'calc(-100% - 0.75rem)'
+
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0">
+      <div className="bg-line-bright absolute inset-y-0 w-px" style={{ left }} />
+      <div
+        className="bg-primary-bright ring-surface absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2"
+        style={{ left, top: `${y * 100}%` }}
+      />
+      <div
+        className="border-line bg-canvas absolute z-10 rounded-lg border px-2.5 py-1.5 whitespace-nowrap shadow-lg"
+        style={{ left, top: `${y * 100}%`, transform: `translate(${alignX}, ${alignY})` }}
+      >
+        <p className="text-fg-subtle font-mono text-[10px] tracking-[0.08em] uppercase">
+          {point.label}
+        </p>
+        <p className="text-fg font-mono text-sm font-semibold">
+          {point.value.toLocaleString()}
+          <span className="text-fg-muted ml-1 text-[11px] font-normal">active</span>
+        </p>
+        {previous && (
+          <p className="text-fg-subtle font-mono text-[10px]">
+            prev {previous.value.toLocaleString()}
+          </p>
+        )}
+      </div>
+    </div>
   )
 }
 
