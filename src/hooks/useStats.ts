@@ -1,23 +1,33 @@
 /*
-  The three dashboard-metric queries.
+  The dashboard-metric queries.
 
-  All poll on the same interval as the queues they sit above, so a header card
-  and the table beneath it never disagree about how many requests are pending.
+  Activity and request stats poll on the same interval as the queues they sit
+  above, so a header card and the table beneath it never disagree about how many
+  requests are pending. Pending-approval stats are different: the backend pushes
+  them over SSE (see `pending-stats-stream`), so those cards update the instant a
+  request is submitted, approved or denied — no polling, and every open tab moves
+  together.
 */
 
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getActivityStats, getPendingStats, getRequestStats } from '@/lib/api/stats'
+import { getActivityStats, getRequestStats } from '@/lib/api/stats'
+import { subscribePendingStats } from '@/lib/api/pending-stats-stream'
 import { statsKeys } from '@/lib/api/query-keys'
+import type { PendingStats } from '@/lib/api/types'
 
 const STATS_POLL_MS = 30_000
 
-/** Header cards on the admin Pending Approvals page. */
-export function usePendingStats() {
-  return useQuery({
-    queryKey: statsKeys.pending(),
-    queryFn: getPendingStats,
-    refetchInterval: STATS_POLL_MS,
-  })
+/**
+ * Header cards on the admin Pending Approvals page, fed by the live SSE stream.
+ * Returns the same `{ data, isLoading }` surface the query version did, so the
+ * cards read `data?.total_pending` and `isLoading` unchanged — `isLoading` stays
+ * true only until the first frame lands.
+ */
+export function usePendingStats(): { data: PendingStats | undefined; isLoading: boolean } {
+  const [data, setData] = useState<PendingStats>()
+  useEffect(() => subscribePendingStats(setData), [])
+  return { data, isLoading: data === undefined }
 }
 
 /** Org-wide last-24h metrics for the admin Activity Ledger. */

@@ -6,7 +6,9 @@
   and a backend rename is a one-line edit here.
 
   Every route is a POST, including the read-only ones — the payload carries the
-  query rather than the URL.
+  query rather than the URL. The one exception is `pendingStats`, which the
+  backend serves as a GET `text/event-stream`; it is consumed by
+  `pending-stats-stream`, not `stabilityCaller`.
 */
 
 export const endpoints = {
@@ -21,11 +23,7 @@ export const endpoints = {
     delete: 'credential-manager/delete-credential',
     /**
      * Return a credential's stored `encrypted_secret` so an admin can open it
-     * locally.
-     *
-     * NOT DEPLOYED YET — every documented route strips the secret, and this path
-     * currently answers 404. The name is a guess; when the backend lands the
-     * route, correcting this string is the only change needed on the frontend.
+     * locally. POST `{ id }` → `{ data: { credential_id, encrypted_secret } }`.
      */
     secret: 'credential-manager/get-credential-secret',
 
@@ -38,7 +36,7 @@ export const endpoints = {
     /** Request history — all users for an admin, own requests otherwise. */
     requestLogs: 'credential-manager/get-request-logs',
 
-    /** Header metrics for the approval queue. */
+    /** Header metrics for the approval queue. GET SSE stream, not a POST. */
     pendingStats: 'credential-manager/get-pending-stats',
     /** Org-wide last-24h metrics for the activity ledger. */
     activityStats: 'credential-manager/get-activity-stats',

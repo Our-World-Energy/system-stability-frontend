@@ -113,9 +113,9 @@ export function CredentialRecordTable({
  * it in the browser and puts the plaintext straight on the clipboard, so it
  * exists on screen at no point and in memory only for the length of the copy.
  *
- * This depends on a backend route that returns `encrypted_secret`, which does
- * not exist yet (see `endpoints.credentialManager.secret`). Until it does, the
- * click fails with the service's own 404 wording rather than doing nothing.
+ * This relies on the `get-credential-secret` route returning `encrypted_secret`
+ * (see `endpoints.credentialManager.secret`) and on the RSA private key being
+ * present to decrypt it; either gap fails the click with a plain sentence.
  */
 function SecretCell({ record }: { record: Credential }) {
   const [copied, setCopied] = useState(false)

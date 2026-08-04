@@ -1,6 +1,7 @@
 /*
-  Dashboard metrics. Three read-only routes, each taking an empty payload and
-  answering with a flat object.
+  Dashboard metrics. Two read-only REST routes, each taking an empty payload and
+  answering with a flat object. (Pending-approval stats used to live here too,
+  but the backend moved them to an SSE stream — see `pending-stats-stream`.)
 
   Each getter fills in zeros for anything the service omits, so a card renders
   "0" rather than "undefined" on a quiet day or a partial response.
@@ -8,20 +9,7 @@
 
 import { stabilityCaller } from './caller'
 import { endpoints } from './endpoints'
-import type { ActivityStats, PendingStats, RequestStats } from './types'
-
-/** Header cards on the admin Pending Approvals page. */
-export async function getPendingStats(): Promise<PendingStats> {
-  const { data } = await stabilityCaller<PendingStats | null>(
-    endpoints.credentialManager.pendingStats,
-    {},
-  )
-  return {
-    total_pending: data?.total_pending ?? 0,
-    avg_wait_minutes: data?.avg_wait_minutes ?? 0,
-    sla_compliance_percent: data?.sla_compliance_percent ?? 0,
-  }
-}
+import type { ActivityStats, RequestStats } from './types'
 
 /** Org-wide last-24h metrics for the admin Activity Ledger. */
 export async function getActivityStats(): Promise<ActivityStats> {
