@@ -376,11 +376,12 @@ export async function rotateCredential(
 /* ── Reveal ───────────────────────────────────────────────────────────────── */
 
 /**
- * Pull the stored envelope out of whatever the reveal route answers with.
+ * Pull the stored envelope out of the reveal route's response.
  *
- * The route does not exist yet, so its exact response shape is unknown — this
- * accepts the three plausible ones (a bare envelope string, `{encrypted_secret}`,
- * or a full credential object carrying the field) rather than betting on one.
+ * The route answers with `{ credential_id, encrypted_secret }`, but this stays
+ * tolerant of the three shapes it might take (a bare envelope string,
+ * `{encrypted_secret}`, or a full credential object carrying the field) so a
+ * harmless backend tweak to the wrapper can't break the copy button.
  */
 export function extractSecretEnvelope(data: unknown): string | null {
   if (typeof data === 'string') return data.trim() || null
@@ -399,13 +400,10 @@ export function extractSecretEnvelope(data: unknown): string | null {
  * The plaintext is returned to the caller and never cached: the copy button is
  * expected to hand it straight to the clipboard and drop it.
  *
- * Two things have to be true for this to work, and neither is today's default:
- *   1. the backend must expose a route that returns `encrypted_secret` — every
- *      documented route strips it, and `endpoints.credentialManager.secret`
- *      currently 404s;
- *   2. the RSA private key must be present, which is the case in local
- *      development and deliberately not in a production build.
- * Both failures surface as a plain sentence rather than a silent no-op.
+ * The one remaining precondition is the RSA private key: it must be present to
+ * decrypt the envelope, which is the case in local development and deliberately
+ * not in a production build. That failure surfaces as a plain sentence rather
+ * than a silent no-op.
  */
 export async function revealCredentialSecret(id: string): Promise<string> {
   if (!id) throw new Error('No credential selected.')
