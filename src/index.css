@@ -17,6 +17,10 @@
   --color-surface-2: #1d2025; /* raised module */
   --color-surface-3: #272a30; /* hover / inputs lighter */
   --color-input: #0b0e12; /* input fields, darker than card */
+  /* Destructive-dialog body. Translucent navy so the blurred backdrop reads
+     through it — spec'd as a flat hex in the Figma export. Overridden opaque
+     under the light theme, where this navy would swallow the dark body text. */
+  --color-modal-veil: #060d20cc;
 
   /* Borders / outlines */
   --color-line: #262b33; /* default card border */
@@ -68,6 +72,7 @@
   --color-surface-2: #eceff4;
   --color-surface-3: #e0e5ec; /* hover / chips */
   --color-input: #eef1f6;
+  --color-modal-veil: #f7f9fc; /* matches --color-surface, so dark body text stays legible */
 
   /* Borders */
   --color-line: #d7dde6;
