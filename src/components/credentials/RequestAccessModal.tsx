@@ -96,7 +96,7 @@ export function RequestAccessModal({ credential, onClose, onSubmit }: RequestAcc
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-fg-muted mb-1.5 block text-xs">
-                  Name <span className="text-critical-bright">*</span>
+                  Name <span className="text-critical">*</span>
                 </label>
                 <div className="relative">
                   <User className="text-fg-subtle pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />

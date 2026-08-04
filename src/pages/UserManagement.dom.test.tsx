@@ -198,6 +198,15 @@ describe('User Management page', () => {
     fireEvent.change(from, { target: { value: to.value } })
     expect(from.value).toBe(to.value)
 
+    // The panel floats, so dismissing it leaves the custom range selected.
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByLabelText('from')).toBeNull()
+    expect(pill('Custom range')).toHaveProperty('ariaPressed', 'true')
+
+    // Clicking the pill again brings it back.
+    fireEvent.click(pill('Custom range'))
+    expect(screen.getByLabelText('from')).toBeTruthy()
+
     fireEvent.click(pill('This month'))
     expect(screen.queryByLabelText('from')).toBeNull()
   })

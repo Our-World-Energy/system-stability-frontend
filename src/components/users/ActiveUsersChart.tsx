@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import {
   activeUsersRanges,
@@ -48,6 +48,32 @@ export function ActiveUsersChart() {
 
   const [range, setRange] = useState<ActiveUsersRange>('last_7_days')
   const [custom, setCustom] = useState<CustomRange>(() => defaultCustomRange(now))
+  // The custom pickers float over the card rather than sitting in it, so the plot
+  // keeps exactly the same height in every range.
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const rangeBar = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!pickerOpen) return
+    const onPointerDown = (e: MouseEvent) => {
+      if (!rangeBar.current?.contains(e.target as Node)) setPickerOpen(false)
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPickerOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [pickerOpen])
+
+  const chooseRange = (next: ActiveUsersRange) => {
+    setRange(next)
+    // Only the custom range has anything to pick; the others dismiss the panel.
+    setPickerOpen(next === 'custom')
+  }
 
   const series = useMemo(() => activeUsersSeries(range, now, custom), [range, now, custom])
   const { points, previous, average, peak, changePercent, caption } = series
@@ -89,44 +115,49 @@ export function ActiveUsersChart() {
             {caption}
           </p>
         </div>
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Active users range">
-          {activeUsersRanges.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              aria-pressed={range === option.id}
-              onClick={() => setRange(option.id)}
-              className={cn(
-                'rounded-full border px-2.5 py-1 font-mono text-[11px] transition-colors',
-                range === option.id
-                  ? 'border-primary/50 bg-primary/10 text-primary-bright'
-                  : 'border-line text-fg-muted hover:border-line-bright hover:text-fg',
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
+        <div ref={rangeBar} className="relative">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Active users range">
+            {activeUsersRanges.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                aria-pressed={range === option.id}
+                aria-expanded={option.id === 'custom' ? pickerOpen : undefined}
+                onClick={() => chooseRange(option.id)}
+                className={cn(
+                  'rounded-full border px-2.5 py-1 font-mono text-[11px] transition-colors',
+                  range === option.id
+                    ? 'border-primary/50 bg-primary/10 text-primary-bright'
+                    : 'border-line text-fg-muted hover:border-line-bright hover:text-fg',
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Absolutely positioned: the panel overlays the card instead of adding a
+              row to it, which is what made the plot shorter in the custom range. */}
+          {pickerOpen && (
+            <div className="border-line bg-surface absolute top-full right-0 z-20 mt-2 flex flex-wrap items-center gap-3 rounded-lg border p-3 shadow-lg">
+              <DateField
+                id="active-users-from"
+                label="from"
+                value={custom.from}
+                max={custom.to}
+                onChange={(from) => changeCustom({ from })}
+              />
+              <DateField
+                id="active-users-to"
+                label="to"
+                value={custom.to}
+                max={isoDay(now)}
+                onChange={(to) => changeCustom({ to })}
+              />
+            </div>
+          )}
         </div>
       </div>
-
-      {range === 'custom' && (
-        <div className="border-line-bright/70 mt-4 flex flex-wrap items-end gap-4 rounded-lg border border-dashed px-3.5 py-3">
-          <DateField
-            id="active-users-from"
-            label="from"
-            value={custom.from}
-            max={custom.to}
-            onChange={(from) => changeCustom({ from })}
-          />
-          <DateField
-            id="active-users-to"
-            label="to"
-            value={custom.to}
-            max={isoDay(now)}
-            onChange={(to) => changeCustom({ to })}
-          />
-        </div>
-      )}
 
       <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <p className="text-fg font-mono text-4xl font-bold tracking-tight">
@@ -153,13 +184,16 @@ export function ActiveUsersChart() {
         <Legend tone="bg-fg-subtle" label="Previous period" />
       </div>
 
+      {/* `mt-auto` pins the plot to the bottom of the card, so it sits at the same
+          height whether or not the custom-range pickers are taking up space above
+          — and whatever slack the neighbouring card's height leaves stays above it. */}
       {points.length === 0 ? (
-        <p className="text-fg-muted mt-4 grid h-52 place-items-center font-mono text-sm">
+        <p className="text-fg-muted mt-auto grid h-52 place-items-center pt-4 font-mono text-sm">
           No activity in this range
         </p>
       ) : (
-        <>
-          <div className="mt-4 h-52">
+        <div className="mt-auto pt-4">
+          <div className="h-52">
             <svg
               viewBox={`0 0 ${W} ${H}`}
               preserveAspectRatio="none"
@@ -202,7 +236,7 @@ export function ActiveUsersChart() {
               <span key={`${tick}-${i}`}>{tick}</span>
             ))}
           </div>
-        </>
+        </div>
       )}
     </section>
   )
@@ -229,10 +263,11 @@ function DateField({
   onChange: (value: string) => void
 }) {
   return (
-    <div>
+    // Label beside the field rather than above it, so the panel stays one row tall.
+    <div className="flex items-center gap-2">
       <label
         htmlFor={id}
-        className="text-fg-muted mb-1.5 block font-mono text-[10px] font-semibold tracking-[0.08em] uppercase"
+        className="text-fg-muted font-mono text-[10px] font-semibold tracking-[0.08em] uppercase"
       >
         {label}
       </label>
@@ -242,7 +277,7 @@ function DateField({
         value={value}
         max={max}
         onChange={(e) => onChange(e.target.value)}
-        className="border-line bg-input text-fg focus:border-primary focus:ring-primary/20 h-9 rounded-lg border px-2.5 font-mono text-[13px] transition-colors outline-none focus:ring-2"
+        className="border-line bg-input text-fg focus:border-primary focus:ring-primary/20 h-8 rounded-lg border px-2.5 font-mono text-[13px] transition-colors outline-none focus:ring-2"
       />
     </div>
   )

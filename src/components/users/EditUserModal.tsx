@@ -34,18 +34,14 @@ export function EditUserModal({ user, onClose, onSave }: EditUserModalProps) {
       // The emerald outline is the design's cue that this dialog mutates a record.
       className="border-primary/70 max-w-2xl"
       footer={
-        <>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant="cta"
-            onClick={() => isUserDraftComplete(draft) && onSave(draft)}
-            disabled={!isUserDraftComplete(draft)}
-          >
-            Save Changes
-          </Button>
-        </>
+        // No Cancel — the dialog's own close control (and Escape) backs out.
+        <Button
+          variant="cta"
+          onClick={() => isUserDraftComplete(draft) && onSave(draft)}
+          disabled={!isUserDraftComplete(draft)}
+        >
+          Save Changes
+        </Button>
       }
     >
       <UserFormFields draft={draft} onChange={patch} variant="edit" />
