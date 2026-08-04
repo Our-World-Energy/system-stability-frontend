@@ -1,15 +1,24 @@
 import { useState } from 'react'
-import { AlertTriangle, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, Clock } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { Pagination } from '@/components/ui/Pagination'
+import { ReviewRequestDialog } from '@/components/credentials/admin/ReviewRequestDialog'
+import { usePendingRequests } from '@/hooks/useRequests'
+import { usePendingStats } from '@/hooks/useStats'
+import { DEFAULT_PAGE_SIZE, requestErrorMessage } from '@/lib/api/requests'
+import type { ReviewAction } from '@/lib/api/requests'
 import {
-  approvalQueue,
-  approvalStats,
-  approvalTotals,
-  type ApprovalRequest,
+  formatMinutes,
+  formatPercent,
+  formatTimestamp,
+  formatUserRef,
+  formatWait,
+  initialsFrom,
+  waitSeverity,
   type WaitSeverity,
-} from '@/lib/pending-approvals-data'
+} from '@/lib/format'
+import type { PendingRequestItem } from '@/lib/api/types'
 
 const columns = [
   'Request ID',
@@ -26,19 +35,23 @@ const severityColor: Record<WaitSeverity, string> = {
   critical: 'text-critical-bright',
 }
 
-/** A pending Approve/Deny awaiting the admin's confirmation. */
-type PendingDecision = { request: ApprovalRequest; decision: 'approve' | 'deny' }
+/** SLA target the compliance card is measured against. A policy value, not an API one. */
+const SLA_TARGET_PERCENT = 95
+
+/** A request awaiting the admin's confirmation of an approve/deny. */
+type PendingDecision = { request: PendingRequestItem; action: ReviewAction }
 
 export function PendingApprovals() {
-  // Local queue copy so Approve/Deny visibly clears the row; the real actions
-  // will POST to the authorization API once integrated.
-  const [queue, setQueue] = useState<ApprovalRequest[]>(approvalQueue)
-  const [pending, setPending] = useState<PendingDecision | null>(null)
+  const [page, setPage] = useState(1)
+  const [decision, setDecision] = useState<PendingDecision | null>(null)
 
-  const confirmDecision = () => {
-    if (pending) setQueue((q) => q.filter((r) => r.id !== pending.request.id))
-    setPending(null)
-  }
+  const stats = usePendingStats()
+  const queue = usePendingRequests(page, DEFAULT_PAGE_SIZE)
+
+  const items = queue.data?.items ?? []
+  const total = queue.data?.total ?? 0
+  const from = total === 0 ? 0 : (page - 1) * DEFAULT_PAGE_SIZE + 1
+  const to = Math.min(page * DEFAULT_PAGE_SIZE, total)
 
   return (
     <div className="space-y-6 pb-4">
@@ -59,24 +72,29 @@ export function PendingApprovals() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           label="Total Pending"
-          value={approvalStats.totalPending}
-          hint={approvalStats.totalDelta}
+          value={stats.data?.total_pending ?? 0}
+          hint="awaiting review"
           tone="pending"
           hintTone="pending"
+          loading={stats.isLoading}
         />
         <StatCard
           label="Avg. Wait Time"
-          value={approvalStats.avgWaitTime}
-          hint={approvalStats.avgWaitTrend}
+          value={formatMinutes(stats.data?.avg_wait_minutes ?? 0)}
+          hint="across the queue"
           tone="default"
-          hintTone="granted"
+          hintTone="muted"
+          loading={stats.isLoading}
         />
         <StatCard
           label="SLA Compliance"
-          value={approvalStats.slaCompliance}
-          hint={approvalStats.slaTarget}
-          tone="granted"
+          value={formatPercent(stats.data?.sla_compliance_percent ?? 0)}
+          hint={`Target: ${SLA_TARGET_PERCENT}%`}
+          tone={
+            (stats.data?.sla_compliance_percent ?? 0) >= SLA_TARGET_PERCENT ? 'granted' : 'pending'
+          }
           hintTone="muted"
+          loading={stats.isLoading}
         />
       </div>
 
@@ -92,7 +110,7 @@ export function PendingApprovals() {
             </span>
           </div>
           <span className="text-fg-muted font-mono text-xs">
-            Showing: {approvalTotals.from}-{approvalTotals.to} of {approvalTotals.total}
+            Showing: {from}-{to} of {total}
           </span>
         </div>
 
@@ -114,81 +132,31 @@ export function PendingApprovals() {
               </tr>
             </thead>
             <tbody>
-              {queue.map((req) => (
-                <tr
+              {items.map((req) => (
+                <QueueRow
                   key={req.id}
-                  className="border-line hover:bg-surface-2 border-b transition-colors last:border-0"
-                >
-                  <td className="text-primary-bright px-4 py-3.5 font-mono font-medium">
-                    {req.id}
-                  </td>
-                  <td className="text-fg-muted px-4 py-3.5 font-mono">{req.timestamp}</td>
-                  <td className="px-4 py-3.5">
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className={cn(
-                          'grid size-7 shrink-0 place-items-center rounded-full font-mono text-[10px] font-bold',
-                          req.emergency
-                            ? 'bg-critical/20 text-critical-bright'
-                            : 'bg-primary/15 text-primary-bright',
-                        )}
-                      >
-                        {req.initials}
-                      </span>
-                      <span
-                        className={cn(
-                          'font-medium',
-                          req.emergency ? 'text-critical-bright' : 'text-fg',
-                        )}
-                      >
-                        {req.userName}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <p className="text-fg font-mono text-xs font-semibold">{req.resource}</p>
-                    <p className="text-fg-subtle mt-0.5 font-mono text-[10px] tracking-[0.06em] uppercase">
-                      {req.scope}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <span
-                      className={cn(
-                        'inline-flex items-center gap-1.5 font-mono text-xs',
-                        severityColor[req.waitSeverity],
-                      )}
-                    >
-                      {req.slaBreach ? (
-                        <AlertTriangle className="size-3.5" />
-                      ) : (
-                        <Clock className="size-3.5" />
-                      )}
-                      {req.waitTime}
-                      {req.slaBreach && <span className="text-[10px]">(SLA Breach)</span>}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => setPending({ request: req, decision: 'approve' })}
-                        className="bg-primary text-canvas hover:bg-primary-bright rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => setPending({ request: req, decision: 'deny' })}
-                        className="border-critical/40 text-critical-bright hover:bg-critical/10 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors"
-                      >
-                        Deny
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                  request={req}
+                  onDecide={(action) => setDecision({ request: req, action })}
+                />
               ))}
-              {queue.length === 0 && (
+              {items.length === 0 && (
                 <tr>
                   <td colSpan={columns.length} className="px-4 py-16 text-center">
-                    <p className="text-fg-muted font-mono text-sm">Approval queue is clear</p>
+                    <p
+                      className={cn(
+                        'font-mono text-sm',
+                        queue.isError ? 'text-critical-bright' : 'text-fg-muted',
+                      )}
+                    >
+                      {queue.isError
+                        ? requestErrorMessage(
+                            queue.error,
+                            'The approval queue could not be loaded.',
+                          )
+                        : queue.isLoading
+                          ? 'Loading approval queue…'
+                          : 'Approval queue is clear'}
+                    </p>
                   </td>
                 </tr>
               )}
@@ -198,33 +166,130 @@ export function PendingApprovals() {
 
         <div className="border-line flex flex-wrap items-center justify-between gap-3 border-t px-5 py-4">
           <Legend />
-          <Pagination />
+          <Pagination
+            page={page}
+            pageSize={queue.data?.page_size ?? DEFAULT_PAGE_SIZE}
+            total={total}
+            onPageChange={setPage}
+            className="font-mono text-xs"
+          />
         </div>
       </section>
 
-      <ConfirmDialog
-        open={pending !== null}
-        tone={pending?.decision === 'deny' ? 'danger' : 'primary'}
-        title={pending?.decision === 'deny' ? 'Deny request?' : 'Approve request?'}
-        confirmLabel={pending?.decision === 'deny' ? 'Deny' : 'Approve'}
-        description={
-          pending && (
-            <>
-              You're about to {pending.decision}{' '}
-              <span className="text-primary-bright font-mono">{pending.request.id}</span> —{' '}
-              <span className="text-fg">{pending.request.userName}</span>'s request for{' '}
-              <span className="text-fg font-mono">{pending.request.resource}</span>.
-            </>
-          )
-        }
-        onConfirm={confirmDecision}
-        onClose={() => setPending(null)}
-      />
+      {decision && (
+        <ReviewRequestDialog
+          request={decision.request}
+          action={decision.action}
+          onClose={() => setDecision(null)}
+        />
+      )}
     </div>
   )
 }
 
 // ── Sub-components ───────────────────────────────────────────────────────────
+
+/**
+ * One queue row.
+ *
+ * The service identifies people by numeric id only — there is no user lookup on
+ * this API — so the requester is shown in the directory style (`USR_1`) rather
+ * than a name invented on the frontend. A beneficiary email, when present, says
+ * far more, so it rides underneath.
+ */
+function QueueRow({
+  request,
+  onDecide,
+}: {
+  request: PendingRequestItem
+  onDecide: (action: ReviewAction) => void
+}) {
+  const requester = formatUserRef(request.requested_by)
+  const severity = request.is_sla_breach ? 'critical' : waitSeverity(request.wait_minutes)
+
+  return (
+    <tr className="border-line hover:bg-surface-2 border-b transition-colors last:border-0">
+      <td className="text-primary-bright px-4 py-3.5 font-mono font-medium">
+        <span title={request.id}>{shortId(request.id)}</span>
+      </td>
+      <td className="text-fg-muted px-4 py-3.5 font-mono">
+        {formatTimestamp(request.requested_at)}
+      </td>
+      <td className="px-4 py-3.5">
+        <div className="flex items-center gap-2.5">
+          <span
+            className={cn(
+              'grid size-7 shrink-0 place-items-center rounded-full font-mono text-[10px] font-bold',
+              request.is_sla_breach
+                ? 'bg-critical/20 text-critical-bright'
+                : 'bg-primary/15 text-primary-bright',
+            )}
+          >
+            {initialsFrom(requester)}
+          </span>
+          <div className="min-w-0">
+            <p
+              className={cn(
+                'truncate font-medium',
+                request.is_sla_breach ? 'text-critical-bright' : 'text-fg',
+              )}
+            >
+              {requester}
+            </p>
+            {request.beneficiary_email && (
+              <p className="text-fg-subtle truncate font-mono text-[10px]">
+                for {request.beneficiary_email}
+              </p>
+            )}
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-3.5">
+        <p className="text-fg font-mono text-xs font-semibold">{request.credential_name}</p>
+        <p className="text-fg-subtle mt-0.5 font-mono text-[10px] tracking-[0.06em] uppercase">
+          {request.reason_category.replace(/_/g, ' ')}
+        </p>
+      </td>
+      <td className="px-4 py-3.5">
+        <span
+          className={cn(
+            'inline-flex items-center gap-1.5 font-mono text-xs',
+            severityColor[severity],
+          )}
+        >
+          {request.is_sla_breach ? (
+            <AlertTriangle className="size-3.5" />
+          ) : (
+            <Clock className="size-3.5" />
+          )}
+          {formatWait(request.wait_minutes)}
+          {request.is_sla_breach && <span className="text-[10px]">(SLA Breach)</span>}
+        </span>
+      </td>
+      <td className="px-4 py-3.5">
+        <div className="flex items-center justify-end gap-2">
+          <button
+            onClick={() => onDecide('approve')}
+            className="bg-primary text-canvas hover:bg-primary-bright rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
+          >
+            Approve
+          </button>
+          <button
+            onClick={() => onDecide('deny')}
+            className="border-critical/40 text-critical-bright hover:bg-critical/10 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors"
+          >
+            Deny
+          </button>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+/** Requests are identified by uuid; the first block is enough to tell rows apart. */
+function shortId(id: string): string {
+  return id.split('-')[0]?.toUpperCase() ?? id
+}
 
 const valueTone = { default: 'text-fg', pending: 'text-degraded', granted: 'text-healthy' } as const
 const hintTones = {
@@ -239,12 +304,14 @@ function StatCard({
   hint,
   tone,
   hintTone,
+  loading,
 }: {
   label: string
   value: number | string
   hint: string
   tone: keyof typeof valueTone
   hintTone: keyof typeof hintTones
+  loading?: boolean
 }) {
   return (
     <div className="border-line bg-surface rounded-lg border p-4">
@@ -252,7 +319,9 @@ function StatCard({
         {label}
       </p>
       <div className="mt-3 flex items-baseline gap-2">
-        <span className={cn('font-mono text-3xl font-semibold', valueTone[tone])}>{value}</span>
+        <span className={cn('font-mono text-3xl font-semibold', valueTone[tone])}>
+          {loading ? '—' : value}
+        </span>
         <span className={cn('font-mono text-xs', hintTones[hintTone])}>{hint}</span>
       </div>
     </div>
@@ -277,53 +346,5 @@ function Legend() {
         </span>
       ))}
     </div>
-  )
-}
-
-function Pagination() {
-  return (
-    <div className="flex flex-wrap items-center justify-center gap-1 font-mono text-xs sm:justify-end">
-      {/* First/Last are hidden on small screens to keep the control from overflowing. */}
-      <PageButton className="hidden sm:inline-flex">First</PageButton>
-      <PageButton>
-        <ChevronLeft className="size-3.5" />
-        Prev
-      </PageButton>
-      {[1, 2, 3].map((p) => (
-        <button
-          key={p}
-          className={cn(
-            'grid size-8 place-items-center rounded-lg border transition-colors',
-            p === 1
-              ? 'border-primary/40 bg-primary/10 text-primary-bright'
-              : 'border-line text-fg-muted hover:border-line-bright hover:text-fg',
-          )}
-        >
-          {p}
-        </button>
-      ))}
-      <span className="text-fg-subtle px-1">…</span>
-      <button className="border-line text-fg-muted hover:border-line-bright hover:text-fg grid size-8 place-items-center rounded-lg border transition-colors">
-        6
-      </button>
-      <PageButton>
-        Next
-        <ChevronRight className="size-3.5" />
-      </PageButton>
-      <PageButton className="hidden sm:inline-flex">Last</PageButton>
-    </div>
-  )
-}
-
-function PageButton({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <button
-      className={cn(
-        'border-line text-fg-muted hover:border-line-bright hover:text-fg inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 transition-colors',
-        className,
-      )}
-    >
-      {children}
-    </button>
   )
 }

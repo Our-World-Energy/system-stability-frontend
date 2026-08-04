@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { MoreVertical, RotateCw, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { CredentialRecord } from '@/lib/admin-credentials-data'
+import type { Credential } from '@/lib/api/types'
 
 export type RecordAction = 'rotate' | 'purge'
 
 interface RowActionsProps {
-  record: CredentialRecord
-  onAction: (action: RecordAction, record: CredentialRecord) => void
+  record: Credential
+  onAction: (action: RecordAction, record: Credential) => void
 }
 
 /** Per-row controls: an inline rotate icon plus an overflow menu. */

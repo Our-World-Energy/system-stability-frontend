@@ -3,8 +3,24 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+
+  // Refuse to ship the RSA private key.
+  //
+  // Every VITE_-prefixed variable is compiled into the JavaScript bundle in
+  // plaintext, and .env is loaded underneath .env.production — so a developer's
+  // local private key rides into a production build unless it is explicitly
+  // blanked. That failure is silent and unrecoverable once published, which is
+  // why it stops the build rather than warning.
+  if (command === 'build' && mode === 'production' && env.VITE_CREDENTIAL_PRIVATE_KEY?.trim()) {
+    throw new Error(
+      'VITE_CREDENTIAL_PRIVATE_KEY is set for this production build. It would be readable by ' +
+        'anyone who opens the bundle. Set it empty in .env.production (or unset it in the host ' +
+        "environment) — production has no legitimate use for the private half, and decryption " +
+        'belongs behind an authenticated service.',
+    )
+  }
 
   // Dev proxy target: the Go stability service origin (derived from
   // VITE_API_BASE_URL). Serves both /api/* (REST) and /sse/status (stream), so
@@ -15,6 +31,19 @@ export default defineConfig(({ mode }) => {
     if (env.VITE_API_BASE_URL) apiOrigin = new URL(env.VITE_API_BASE_URL).origin
   } catch {
     /* keep default */
+  }
+
+  // The credential manager (owe-stability-service) is a different service on a
+  // different port, and it sends no CORS headers — so the browser must reach it
+  // same-origin. `/stability/*` is proxied to `<origin>/api/owe-stability-service/*`,
+  // which is the prefix lib/api/client.ts posts to.
+  const stabilityOrigin = env.VITE_STABILITY_SERVICE_ORIGIN || 'http://149.28.112.32:28753'
+  const stabilityProxy = {
+    '/stability': {
+      target: stabilityOrigin,
+      changeOrigin: true,
+      rewrite: (p: string) => p.replace(/^\/stability/, '/api/owe-stability-service'),
+    },
   }
 
   return {
@@ -44,6 +73,7 @@ export default defineConfig(({ mode }) => {
         '/api': { target: apiOrigin, changeOrigin: true },
         // Plain HTTP streaming (SSE), not a WebSocket upgrade → ws: false.
         '/sse': { target: apiOrigin, changeOrigin: true, ws: false },
+        ...stabilityProxy,
       },
     },
     preview: {
@@ -51,6 +81,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/api': { target: apiOrigin, changeOrigin: true },
         '/sse': { target: apiOrigin, changeOrigin: true, ws: false },
+        ...stabilityProxy,
       },
     },
   }

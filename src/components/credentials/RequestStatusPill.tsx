@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import type { RequestStatus } from '@/lib/credentials-data'
+import type { RequestStatus } from '@/lib/api/types'
 
 const map: Record<RequestStatus, string> = {
   pending: 'text-degraded border-degraded/30 bg-degraded/10',

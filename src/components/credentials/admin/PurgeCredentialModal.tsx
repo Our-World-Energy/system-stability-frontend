@@ -1,39 +1,56 @@
 import { useState } from 'react'
-import { AlertTriangle, Database } from 'lucide-react'
+import { AlertTriangle, Database, Loader2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Field, controlClass } from '@/components/ui/Field'
 import { cn } from '@/lib/utils'
-import { ENCRYPTION_SCHEME, type CredentialRecord } from '@/lib/admin-credentials-data'
+import { ENCRYPTION_SCHEME } from '@/lib/admin-credentials-data'
+import { useDeleteCredential } from '@/hooks/useCredentials'
+import type { Credential } from '@/lib/api/types'
 
 interface PurgeCredentialModalProps {
-  record: CredentialRecord
+  record: Credential
   onClose: () => void
-  onPurge: () => void
+  /** Fired once the service confirms the delete. */
+  onPurged?: () => void
 }
 
-/** Irreversible deletion, gated behind typing the exact record name. */
-export function PurgeCredentialModal({ record, onClose, onPurge }: PurgeCredentialModalProps) {
+/**
+ * Irreversible deletion, gated behind typing the exact record name.
+ *
+ * The backend hard-deletes: there is no archived state to fall back on and no
+ * undo, which is what the typed confirmation is protecting against.
+ */
+export function PurgeCredentialModal({ record, onClose, onPurged }: PurgeCredentialModalProps) {
   const [confirmation, setConfirmation] = useState('')
   const confirmed = confirmation === record.name
+
+  const mutation = useDeleteCredential({
+    onSuccess: () => {
+      onPurged?.()
+      onClose()
+    },
+  })
+  const busy = mutation.isPending
 
   return (
     <Modal
       open
-      onClose={onClose}
+      onClose={busy ? () => {} : onClose}
       title="Permanently Purge Record"
       icon={<AlertTriangle className="text-critical-bright mt-0.5 size-5 shrink-0" />}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
           <Button
-            onClick={() => confirmed && onPurge()}
-            disabled={!confirmed}
+            onClick={() => confirmed && !busy && mutation.mutate(record.id)}
+            disabled={!confirmed || busy}
             className="bg-critical/80 text-fg hover:bg-critical active:bg-critical"
           >
-            Confirm Purge
+            {busy && <Loader2 className="size-4 animate-spin" />}
+            {busy ? 'Purging…' : 'Confirm Purge'}
           </Button>
         </>
       }
@@ -58,7 +75,8 @@ export function PurgeCredentialModal({ record, onClose, onPurge }: PurgeCredenti
             value={confirmation}
             onChange={(e) => setConfirmation(e.target.value)}
             placeholder="Enter credential name"
-            className={cn(controlClass, 'h-11 font-mono')}
+            disabled={busy}
+            className={cn(controlClass, 'h-11 font-mono disabled:cursor-not-allowed')}
           />
         </Field>
 

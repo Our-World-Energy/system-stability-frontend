@@ -44,22 +44,22 @@ export function TierFilter() {
         <SlidersHorizontal className="size-4" />
         <span className="hidden sm:inline">Tier / Phase</span>
         {!allOn && (
-          <span className="grid size-4 place-items-center rounded-full bg-primary/20 font-mono text-[10px] font-bold text-primary-bright">
+          <span className="bg-primary/20 text-primary-bright grid size-4 place-items-center rounded-full font-mono text-[10px] font-bold">
             {selected.length}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-2 w-60 rounded-lg border border-line bg-surface p-1.5 shadow-xl">
+        <div className="border-line bg-surface absolute right-0 z-30 mt-2 w-60 rounded-lg border p-1.5 shadow-xl">
           <div className="flex items-center justify-between px-2 py-1">
-            <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
+            <span className="text-fg-subtle font-mono text-[10px] font-bold tracking-wider uppercase">
               Filter by tier
             </span>
             <button
               onClick={() => setTiers(ALL_TIER_IDS)}
               disabled={allOn}
-              className="font-mono text-[11px] text-primary-bright transition-opacity hover:opacity-80 disabled:opacity-30"
+              className="text-primary-bright font-mono text-[11px] transition-opacity hover:opacity-80 disabled:opacity-30"
             >
               All
             </button>
@@ -71,17 +71,21 @@ export function TierFilter() {
                 <li key={t.id}>
                   <button
                     onClick={() => toggleTier(t.id)}
-                    className="flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left transition-colors hover:bg-surface-3"
+                    className="hover:bg-surface-3 flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left transition-colors"
                   >
                     <span
                       className={cn(
                         'grid size-4 shrink-0 place-items-center rounded border transition-colors',
-                        on ? 'border-primary bg-primary/20 text-primary-bright' : 'border-line-bright',
+                        on
+                          ? 'border-primary bg-primary/20 text-primary-bright'
+                          : 'border-line-bright',
                       )}
                     >
                       {on && <Check className="size-3" strokeWidth={3} />}
                     </span>
-                    <span className={cn('truncate text-sm', on ? 'text-fg' : 'text-fg-muted')}>{t.label}</span>
+                    <span className={cn('truncate text-sm', on ? 'text-fg' : 'text-fg-muted')}>
+                      {t.label}
+                    </span>
                   </button>
                 </li>
               )

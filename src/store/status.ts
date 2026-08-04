@@ -66,7 +66,11 @@ const WEBHOOK_META_KEYS = ['event_type', 'last_webhook_event_at']
 function isWebhookOnly(payload: Record<string, unknown>): boolean {
   const hasMeta = WEBHOOK_META_KEYS.some((k) => k in payload)
   if (!hasMeta) return false
-  return payload.status === undefined && payload.page_status === undefined && payload.http_status === undefined
+  return (
+    payload.status === undefined &&
+    payload.page_status === undefined &&
+    payload.http_status === undefined
+  )
 }
 
 /** Build the LiveSystem for one incoming frame, merging webhook-only payloads into prior state. */
@@ -103,7 +107,8 @@ export const useStatusStore = create<StatusState>((set) => ({
   hasEverConnected: false,
   systems: {},
 
-  setConnecting: () => set((s) => ({ connection: s.hasEverConnected ? 'reconnecting' : 'connecting' })),
+  setConnecting: () =>
+    set((s) => ({ connection: s.hasEverConnected ? 'reconnecting' : 'connecting' })),
   markOpen: () => set({ connection: 'open', hasEverConnected: true }),
   // First-ever failure → "failed"; a drop after a successful connect → "reconnecting".
   markClosed: () => set((s) => ({ connection: s.hasEverConnected ? 'reconnecting' : 'failed' })),
@@ -119,7 +124,13 @@ export const useStatusStore = create<StatusState>((set) => ({
         for (const [rawKey, val] of Object.entries(systems as Record<string, unknown>)) {
           const key = rawKey.toLowerCase()
           if (val == null) {
-            next[key] = { status: 'vendor_silent', updatedAt: null, payload: {}, pending: true, samples: [] }
+            next[key] = {
+              status: 'vendor_silent',
+              updatedAt: null,
+              payload: {},
+              pending: true,
+              samples: [],
+            }
             continue
           }
           if (typeof val !== 'object') continue // malformed → skip safely

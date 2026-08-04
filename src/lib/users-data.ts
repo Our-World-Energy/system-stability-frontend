@@ -6,8 +6,6 @@
   add/edit/delete mutate the visible list without persisting anywhere.
 */
 
-import { credentials } from './credentials-data'
-
 /** System role. Drives the role pill and the allocation card. */
 export type UserRole =
   | 'Organizational Admin'
@@ -139,14 +137,8 @@ export function roleNeedsPlatforms(role: string): boolean {
   return capabilityFor(role)?.requires === 'platforms'
 }
 
-/**
- * Platforms a Platform Admin can be scoped to — derived from the credential
- * catalog ("GitHub — Org Admin" → "GitHub") so a grant always names a platform
- * that actually holds credentials.
- */
-export const platforms: readonly string[] = Array.from(
-  new Set(credentials.map((c) => c.name.split('—')[0].trim())),
-).sort()
+/** Platforms offered by the frontend-only user-management fixture. */
+export const platforms = ['AWS', 'Datadog', 'GitHub', 'Slack', 'Snowflake', 'Veracode'] as const
 
 /**
  * The department → sub-department tree. A sub-department name can repeat across

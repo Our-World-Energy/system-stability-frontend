@@ -1,24 +1,42 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Hourglass, History, ShieldCheck, ShieldX } from 'lucide-react'
+import { ChevronLeft, Hourglass, History, ShieldCheck, ShieldX } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import {
-  accessRequests,
-  accessRequestToDetail,
-  requestSummary,
-  temporalDistribution,
-  totalRequests,
-  type AccessRequest,
-} from '@/lib/credentials-data'
+import { Pagination } from '@/components/ui/Pagination'
 import { RequestStatusPill } from '@/components/credentials/RequestStatusPill'
 import { RequestStatTile } from '@/components/credentials/RequestStatTile'
 import { RequestDetailsModal } from '@/components/credentials/RequestDetailsModal'
 import { TemporalDistribution } from '@/components/credentials/TemporalDistribution'
+import { useRequestLogs } from '@/hooks/useRequests'
+import { useRequestStats } from '@/hooks/useStats'
+import { DEFAULT_PAGE_SIZE, requestErrorMessage } from '@/lib/api/requests'
+import { requestLogToDetail } from '@/lib/request-detail'
+import { densifyHourly, formatDuration, formatHourLabel, formatTimestamp } from '@/lib/format'
+import type { RequestLogItem } from '@/lib/api/types'
 
 const columns = ['Credential', 'Requested At', 'Status', 'Duration', 'Actions']
 
 export function RequestLogs() {
-  const [selected, setSelected] = useState<AccessRequest | null>(null)
+  const [selected, setSelected] = useState<RequestLogItem | null>(null)
+  const [page, setPage] = useState(1)
+
+  // The service scopes this route by role on its own: a non-admin only ever
+  // receives their own requests, so no user filter is sent from here.
+  const logs = useRequestLogs({ page, pageSize: DEFAULT_PAGE_SIZE })
+  const stats = useRequestStats()
+
+  const items = logs.data?.items ?? []
+  const total = logs.data?.total ?? 0
+
+  const counts = stats.data
+  const resolved =
+    (counts?.granted_count ?? 0) + (counts?.denied_count ?? 0) + (counts?.expired_count ?? 0)
+  const successRate = resolved > 0 ? Math.round(((counts?.granted_count ?? 0) / resolved) * 100) : 0
+
+  const volume = useMemo(
+    () => densifyHourly(counts?.volume_by_hour ?? []),
+    [counts?.volume_by_hour],
+  )
 
   return (
     <div className="space-y-6 pb-4">
@@ -31,7 +49,7 @@ export function RequestLogs() {
             <ChevronLeft className="size-4" />
             Credential Catalog
           </Link>
-          <h1 className="text-fg text-2xl font-semibold tracking-tight">Request Log's</h1>
+          <h1 className="text-fg text-2xl font-semibold tracking-tight">Request Log&rsquo;s</h1>
           <p className="text-fg-muted mt-1 text-sm">
             Track and manage your temporary elevation history.
           </p>
@@ -41,28 +59,28 @@ export function RequestLogs() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <RequestStatTile
           label="Pending Requests"
-          value={requestSummary.pending}
-          hint={`+${requestSummary.pendingDelta} since last sync`}
+          value={counts?.pending_count ?? 0}
+          hint="awaiting a decision"
           icon={Hourglass}
           accent="pending"
         />
         <RequestStatTile
           label="Granted"
-          value={requestSummary.granted}
-          hint={`${requestSummary.successRate}% success rate`}
+          value={counts?.granted_count ?? 0}
+          hint={resolved > 0 ? `${successRate}% success rate` : 'No resolved requests yet'}
           icon={ShieldCheck}
           accent="granted"
         />
         <RequestStatTile
           label="Denied"
-          value={String(requestSummary.denied).padStart(2, '0')}
+          value={counts?.denied_count ?? 0}
           hint="Policy enforcement"
           icon={ShieldX}
           accent="denied"
         />
         <RequestStatTile
           label="Expired"
-          value={requestSummary.expired}
+          value={counts?.expired_count ?? 0}
           hint="Auto-revoked"
           icon={History}
         />
@@ -91,22 +109,28 @@ export function RequestLogs() {
               </tr>
             </thead>
             <tbody>
-              {accessRequests.map((req) => (
+              {items.map((req) => (
                 <tr
                   key={req.id}
                   className="border-line hover:bg-surface-2 border-b transition-colors last:border-0"
                 >
                   <td className="px-5 py-3.5">
-                    <p className="text-fg font-medium">{req.credential}</p>
-                    <p className="text-fg-subtle mt-0.5 font-mono text-[10px] tracking-[0.06em] uppercase">
-                      {req.scope}
-                    </p>
+                    <p className="text-fg font-medium">{req.credential_name}</p>
+                    {req.credential_tags?.length ? (
+                      <p className="text-fg-subtle mt-0.5 font-mono text-[10px] tracking-[0.06em] uppercase">
+                        {req.credential_tags.join(' • ')}
+                      </p>
+                    ) : null}
                   </td>
-                  <td className="text-fg-muted px-5 py-3.5 font-mono">{req.requestedAt}</td>
+                  <td className="text-fg-muted px-5 py-3.5 font-mono">
+                    {formatTimestamp(req.requested_at)}
+                  </td>
                   <td className="px-5 py-3.5">
                     <RequestStatusPill status={req.status} />
                   </td>
-                  <td className="text-fg-muted px-5 py-3.5 font-mono">{req.duration}</td>
+                  <td className="text-fg-muted px-5 py-3.5 font-mono">
+                    {formatDuration(req.elevation_duration_seconds)}
+                  </td>
                   <td className="px-5 py-3.5 text-right">
                     <button
                       onClick={() => setSelected(req)}
@@ -117,58 +141,53 @@ export function RequestLogs() {
                   </td>
                 </tr>
               ))}
+              {items.length === 0 && (
+                <tr>
+                  <td colSpan={columns.length} className="px-5 py-16 text-center">
+                    <p
+                      className={cn(
+                        'font-mono text-sm',
+                        logs.isError ? 'text-critical-bright' : 'text-fg-muted',
+                      )}
+                    >
+                      {logs.isError
+                        ? requestErrorMessage(
+                            logs.error,
+                            'Your request history could not be loaded.',
+                          )
+                        : logs.isLoading
+                          ? 'Loading your requests…'
+                          : 'You have not requested any credentials yet'}
+                    </p>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
 
         <div className="border-line flex flex-wrap items-center justify-between gap-3 border-t px-5 py-4">
           <p className="text-fg-muted font-mono text-xs">
-            Showing {accessRequests.length} of {totalRequests} requests
+            Showing {items.length} of {total} requests
           </p>
-          <Pagination />
+          <Pagination
+            page={page}
+            pageSize={logs.data?.page_size ?? DEFAULT_PAGE_SIZE}
+            total={total}
+            onPageChange={setPage}
+          />
         </div>
       </section>
 
-      <TemporalDistribution buckets={temporalDistribution} />
+      <TemporalDistribution
+        buckets={volume.map((bucket) => bucket.count)}
+        titles={volume.map((b) => `${formatHourLabel(b.hour)} — ${b.count} requests`)}
+      />
 
       <RequestDetailsModal
-        detail={selected ? accessRequestToDetail(selected) : null}
+        detail={selected ? requestLogToDetail(selected) : null}
         onClose={() => setSelected(null)}
       />
-    </div>
-  )
-}
-
-/** Static demo pagination — page state will be driven by the API query later. */
-function Pagination() {
-  const pages = [1, 2, 3]
-  return (
-    <div className="flex items-center gap-1">
-      <button
-        aria-label="Previous page"
-        className="border-line text-fg-muted hover:border-line-bright hover:text-fg grid size-8 place-items-center rounded-lg border transition-colors"
-      >
-        <ChevronLeft className="size-4" />
-      </button>
-      {pages.map((p) => (
-        <button
-          key={p}
-          className={cn(
-            'grid size-8 place-items-center rounded-lg border font-mono text-xs transition-colors',
-            p === 1
-              ? 'border-primary/40 bg-primary/10 text-primary-bright'
-              : 'border-line text-fg-muted hover:border-line-bright hover:text-fg',
-          )}
-        >
-          {p}
-        </button>
-      ))}
-      <button
-        aria-label="Next page"
-        className="border-line text-fg-muted hover:border-line-bright hover:text-fg grid size-8 place-items-center rounded-lg border transition-colors"
-      >
-        <ChevronRight className="size-4" />
-      </button>
     </div>
   )
 }
