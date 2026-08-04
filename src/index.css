@@ -181,12 +181,50 @@
 .animate-rise-in {
   animation: rise-in 0.3s ease-out both;
 }
-@media (prefers-reduced-motion: reduce) {
-  .animate-rise-in {
-    animation: none;
+
+/* Plain opacity ramp, for content that swaps in place (chart captions, fills). */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
 
+/*
+  Draws a stroked path on from its start. Pairs with pathLength="1" on the path,
+  which normalises the dash units so one dash always spans the whole line —
+  otherwise the offset would depend on the path's geometric length, which differs
+  per range and per card width.
+*/
+@keyframes draw-line {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.animate-draw-line {
+  stroke-dasharray: 1;
+  animation: draw-line 0.55s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise-in,
+  .animate-fade-in,
+  .animate-draw-line {
+    animation: none;
+  }
+  /* Without the animation the dash would leave the line hidden. */
+  .animate-draw-line {
+    stroke-dasharray: none;
+  }
+}
 
 /*
   Toast notifications (react-toastify) dressed in the design tokens.

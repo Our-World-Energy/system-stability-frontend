@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { UserManagement } from './UserManagement'
 import { userRoles, users as seedUsers } from '@/lib/users-data'
+import { activeUsersSeries } from '@/lib/active-users-data'
 
 afterEach(cleanup)
 
@@ -209,6 +210,51 @@ describe('User Management page', () => {
 
     fireEvent.click(pill('This month'))
     expect(screen.queryByLabelText('from')).toBeNull()
+  })
+
+  it('reads out the hovered bucket on the active-users chart', () => {
+    render(<UserManagement />)
+
+    const plot = screen.getByRole('img', { name: /Active users/i }).parentElement!
+    // jsdom has no layout, so the cursor maths needs a box to measure against.
+    plot.getBoundingClientRect = () => ({ left: 0, width: 600, top: 0, height: 208 }) as DOMRect
+
+    // Queried within the plot, since the axis captions repeat the same labels.
+    const readout = within(plot)
+    const week = activeUsersSeries('last_7_days', new Date()).points
+
+    // Far right of a 7-day window is today; far left is six days back.
+    fireEvent.mouseMove(plot, { clientX: 600 })
+    expect(readout.getByText(week.at(-1)!.label)).toBeTruthy()
+    expect(readout.getByText(week.at(-1)!.value.toLocaleString())).toBeTruthy()
+
+    fireEvent.mouseMove(plot, { clientX: 0 })
+    expect(readout.getByText(week[0].label)).toBeTruthy()
+    expect(readout.getByText(week[0].value.toLocaleString())).toBeTruthy()
+
+    // Leaving the plot clears the readout.
+    fireEvent.mouseLeave(plot)
+    expect(readout.queryByText(week[0].value.toLocaleString())).toBeNull()
+  })
+
+  it('re-runs the draw animation on a range switch, dropping a stale readout', () => {
+    render(<UserManagement />)
+
+    const plot = screen.getByRole('img', { name: /Active users/i }).parentElement!
+    plot.getBoundingClientRect = () => ({ left: 0, width: 600, top: 0, height: 208 }) as DOMRect
+    const drawnLine = () => plot.querySelector('.animate-draw-line')!
+
+    fireEvent.mouseMove(plot, { clientX: 600 })
+    const week = activeUsersSeries('last_7_days', new Date()).points
+    expect(within(plot).getByText(week.at(-1)!.value.toLocaleString())).toBeTruthy()
+
+    const before = drawnLine()
+    fireEvent.click(screen.getByRole('button', { name: 'This month' }))
+
+    // A fresh node means the CSS animation starts over rather than being skipped.
+    expect(drawnLine()).not.toBe(before)
+    // The readout described buckets that no longer exist, so it is gone.
+    expect(within(plot).queryByText(week.at(-1)!.value.toLocaleString())).toBeNull()
   })
 
   it('lists every role and its rotation rights in the access matrix', () => {
