@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Trash2, TriangleAlert, X } from 'lucide-react'
+import { Trash2, TriangleAlert } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
@@ -28,15 +28,21 @@ export function DeleteUserModal({ user, onClose, onConfirm }: DeleteUserModalPro
       ariaLabel="Delete user"
       className="bg-modal-veil max-w-lg border-[#93000A]"
       footer={
-        // No Cancel — the header's close control (and Escape) backs out.
-        <Button
-          onClick={() => armed && onConfirm()}
-          disabled={!armed}
-          className="bg-critical text-white hover:bg-critical/90 active:bg-critical/80 font-semibold"
-        >
-          <Trash2 className="size-4" />
-          Delete
-        </Button>
+        // Cancel sits to the right of Delete, and is now the only visible way to
+        // back out (alongside Escape and the backdrop).
+        <>
+          <Button
+            onClick={() => armed && onConfirm()}
+            disabled={!armed}
+            className="bg-critical hover:bg-critical/90 active:bg-critical/80 font-semibold text-white"
+          >
+            <Trash2 className="size-4" />
+            Delete
+          </Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+        </>
       }
     >
       {/* Bled past the body padding so the header band reaches the card edges. */}
@@ -44,24 +50,17 @@ export function DeleteUserModal({ user, onClose, onConfirm }: DeleteUserModalPro
         <span className="bg-critical/20 text-critical-bright grid size-10 shrink-0 place-items-center rounded-full">
           <TriangleAlert className="size-5" />
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0">
           <h2 className="text-critical-bright text-lg leading-tight font-semibold">Delete User</h2>
           <p className="text-critical-bright/80 mt-0.5 text-[13px] font-semibold">
             Security protocol confirmation required
           </p>
         </div>
-        <button
-          onClick={onClose}
-          aria-label="Close"
-          className="text-critical-bright/70 hover:bg-critical/20 hover:text-critical-bright grid size-8 shrink-0 place-items-center rounded-lg transition-colors"
-        >
-          <X className="size-5" />
-        </button>
       </header>
 
       <p className="text-fg text-[15px] leading-relaxed">
-        Are you sure you want to remove this user? This action will immediately revoke all
-        credential access and archive the identity profile.
+        Are you sure you want to remove this user? This will immediately revoke their access to all
+        credentials and archive their identity profile. This action cannot be undone.
       </p>
 
       {/* Two columns, two rows. Row 1 is pinned to leading-5 on both sides despite the
