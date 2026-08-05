@@ -7,8 +7,9 @@ import { useStatusStream } from '@/hooks/useStatusStream'
 import { useStatusPoller } from '@/hooks/useStatusPoller'
 import { resolveSseUrl } from '@/lib/ws-status'
 import { AppLayout } from '@/components/layout/AppLayout'
-import { RequireAuth } from '@/components/auth/RequireAuth'
+import { RequireAuth, RequireSession } from '@/components/auth/RequireAuth'
 import { Login } from '@/pages/auth/Login'
+import { ChangePassword } from '@/pages/auth/ChangePassword'
 import { ForgotPassword } from '@/pages/auth/ForgotPassword'
 import { VerifyOtp } from '@/pages/auth/VerifyOtp'
 import { ResetPassword } from '@/pages/auth/ResetPassword'
@@ -38,9 +39,10 @@ const SSE_URL = resolveSseUrl()
 // a debugging escape hatch (e.g. hosts that can't hold a long-lived SSE stream).
 const REST_DEBUG = import.meta.env.VITE_STATUS_TRANSPORT === 'rest'
 
-// The dashboard sits behind the login screen. Sign-in is stubbed in lib/auth-api
-// for now (any credentials pass), so this is safe to leave on — set
-// VITE_REQUIRE_AUTH=false to open the dashboard directly while working on it.
+// The dashboard sits behind the login screen. Sign-in is real now — it posts to
+// the user-management service and needs a provisioned account — so
+// VITE_REQUIRE_AUTH=false is the way to open the dashboard without one (note the
+// user registry still needs a real org_admin token, since the API enforces that).
 const REQUIRE_AUTH = import.meta.env.VITE_REQUIRE_AUTH !== 'false'
 
 export default function App() {
@@ -64,6 +66,12 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/verify-otp" element={<VerifyOtp />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+
+          {/* Signed in but still on the temporary password. Guarded by session
+              only — RequireAuth redirects *to* here, so using it would loop. */}
+          <Route element={REQUIRE_AUTH ? <RequireSession /> : <Outlet />}>
+            <Route path="/change-password" element={<ChangePassword />} />
+          </Route>
 
           <Route element={REQUIRE_AUTH ? <RequireAuth /> : <Outlet />}>
             <Route element={<AppLayout />}>

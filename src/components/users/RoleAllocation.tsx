@@ -1,15 +1,17 @@
 import { cn } from '@/lib/utils'
-import { formatCount, roleAllocation } from '@/lib/users-data'
+import { allocationTone, byRankDescending, formatCount } from '@/lib/role-display'
+import type { Role } from '@/lib/api/user-management.types'
 
-const barTone: Record<string, string> = {
-  primary: 'bg-primary-bright',
-  accent: 'bg-indigo-400',
-  pending: 'bg-degraded',
-}
-
-/** Headcount per clearance level, as proportional bars against the largest role. */
-export function RoleAllocation() {
-  const peak = Math.max(...roleAllocation.map((r) => r.count), 1)
+/**
+ * Headcount per clearance level, as proportional bars against the largest role.
+ *
+ * The counts are `roles[].user_count` from get-metadata — live counts of active
+ * (non-deleted) users — so the card moves whenever a user is created, re-roled or
+ * removed, which is why every registry mutation invalidates the metadata query.
+ */
+export function RoleAllocation({ roles }: { roles: Role[] }) {
+  const rows = byRankDescending(roles)
+  const peak = Math.max(...rows.map((r) => r.user_count ?? 0), 1)
 
   return (
     <section className="border-line bg-surface flex flex-col rounded-lg border p-5">
@@ -18,32 +20,40 @@ export function RoleAllocation() {
         User distribution per clearance level
       </p>
 
-      <ul className="mt-6 space-y-5">
-        {roleAllocation.map((row) => (
-          <li key={row.label}>
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="text-fg-muted font-mono text-[11px] font-semibold tracking-[0.08em] uppercase">
-                {row.label}
-              </span>
-              <span
-                className={cn(
-                  'font-mono text-sm font-semibold',
-                  row.tone === 'pending' ? 'text-degraded' : 'text-fg',
-                )}
-              >
-                {formatCount(row.count)}
-              </span>
-            </div>
-            <div className="bg-surface-3 mt-2 h-1.5 overflow-hidden rounded-full">
-              <div
-                className={cn('h-full rounded-full', barTone[row.tone])}
-                // Floor at 1% so single-digit roles stay visible rather than vanishing.
-                style={{ width: `${Math.max((row.count / peak) * 100, 1)}%` }}
-              />
-            </div>
-          </li>
-        ))}
-      </ul>
+      {rows.length === 0 ? (
+        <p className="text-fg-subtle mt-6 font-mono text-sm">No role data available</p>
+      ) : (
+        <ul className="mt-6 space-y-5">
+          {rows.map((role) => {
+            const count = role.user_count ?? 0
+            return (
+              <li key={role.key}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-fg-muted font-mono text-[11px] font-semibold tracking-[0.08em] uppercase">
+                    {role.name}
+                  </span>
+                  <span
+                    className={cn(
+                      'font-mono text-sm font-semibold',
+                      role.key === 'org_admin' ? 'text-degraded' : 'text-fg',
+                    )}
+                  >
+                    {formatCount(count)}
+                  </span>
+                </div>
+                <div className="bg-surface-3 mt-2 h-1.5 overflow-hidden rounded-full">
+                  <div
+                    className={cn('h-full rounded-full', allocationTone(role))}
+                    // Floor at 1% so single-digit roles stay visible rather than
+                    // vanishing; a genuinely empty role gets no bar at all.
+                    style={{ width: count === 0 ? 0 : `${Math.max((count / peak) * 100, 1)}%` }}
+                  />
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </section>
   )
 }

@@ -41,19 +41,16 @@ export interface LoginResult {
 }
 
 /**
- * Exchange credentials for a bearer token.
+ * NOT the app's sign-in — that is `login` in lib/api/user-management.ts, wired to
+ * POST /user-management/login. This is the demo-account check the stubbed
+ * forgot-password flow is verified against: it is what proves `resetPassword`
+ * below actually applied a new password.
  *
- * Stubbed: only the accounts in lib/auth-demo.ts are accepted, so the rejection
- * path is testable too.
- *
- * Real call — POST /auth/login  { email, password } -> { token, user? }:
- *   const { data } = await api.post(authEndpoints.login, { email, password })
- *   if (typeof data?.token !== 'string' || !data.token) {
- *     throw new Error('The sign-in response did not include a token.')
- *   }
- *   return { token: data.token, user: data.user ?? null }
+ * Named apart from the real thing on purpose, so neither can be imported by
+ * mistake. It goes away with the rest of lib/auth-demo.ts once real /auth/*
+ * password-reset endpoints exist.
  */
-export async function login(email: string, password: string): Promise<LoginResult> {
+export async function demoSignIn(email: string, password: string): Promise<LoginResult> {
   await wait()
   const account = findDemoAccount(email, password)
   if (!account) throw new Error('Invalid email or password.')

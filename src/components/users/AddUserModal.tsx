@@ -2,27 +2,50 @@ import { useState } from 'react'
 import { Plus, UserPlus } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
-import { emptyUserDraft, isUserDraftComplete, type UserDraft } from '@/lib/user-draft'
+import {
+  buildCreateUserPayload,
+  describeUserFormGap,
+  emptyUserForm,
+  type UserFormValues,
+} from '@/lib/api/user-payload'
+import type { CreateUserRequest, MetadataData } from '@/lib/api/user-management.types'
 import { UserFormFields } from './UserFormFields'
 
 interface AddUserModalProps {
   open: boolean
   onClose: () => void
-  onCreate: (draft: UserDraft) => void
+  onCreate: (payload: CreateUserRequest) => void
+  metadata: MetadataData
+  /** True while create-user is in flight. */
+  pending?: boolean
 }
 
-/** Provisioning form for a brand-new system user. */
-export function AddUserModal({ open, onClose, onCreate }: AddUserModalProps) {
-  const [draft, setDraft] = useState<UserDraft>(emptyUserDraft)
+/**
+ * Provisioning form for a brand-new system user.
+ *
+ * Hands its parent a finished create-user payload rather than raw form state, so
+ * the role-driven scope rules are applied in exactly one place. There is no
+ * password field: the backend generates the initial one and the account comes back
+ * with `must_change_password: true`.
+ */
+export function AddUserModal({
+  open,
+  onClose,
+  onCreate,
+  metadata,
+  pending = false,
+}: AddUserModalProps) {
+  const [form, setForm] = useState<UserFormValues>(emptyUserForm)
 
   if (!open) return null
 
-  const patch = (next: Partial<UserDraft>) => setDraft((d) => ({ ...d, ...next }))
+  const patch = (next: Partial<UserFormValues>) => setForm((f) => ({ ...f, ...next }))
+  const gap = describeUserFormGap(form)
 
   const submit = () => {
-    if (!isUserDraftComplete(draft)) return
-    onCreate(draft)
-    setDraft(emptyUserDraft) // Reset, so reopening starts blank.
+    if (gap || pending) return
+    onCreate(buildCreateUserPayload(form))
+    setForm(emptyUserForm) // Reset, so reopening starts blank.
   }
 
   return (
@@ -33,19 +56,23 @@ export function AddUserModal({ open, onClose, onCreate }: AddUserModalProps) {
       className="max-w-2xl"
       icon={<UserPlus className="text-primary-bright mt-0.5 size-5 shrink-0" />}
       footer={
-        <Button variant="cta" onClick={submit} disabled={!isUserDraftComplete(draft)}>
+        <Button variant="cta" onClick={submit} disabled={Boolean(gap) || pending}>
           <Plus className="size-4" />
-          Create User
+          {pending ? 'Creating…' : 'Create User'}
         </Button>
       }
     >
-      <UserFormFields draft={draft} onChange={patch} variant="create" />
+      <UserFormFields form={form} onChange={patch} metadata={metadata} variant="create" />
+
+      {/* Says what is still missing instead of leaving a disabled button unexplained. */}
+      {gap && <p className="text-fg-subtle mt-4 text-[13px]">{gap}</p>}
 
       {/* `mt-5` and an even `p-3` keep the note on the form's own spacing scale —
           20px between blocks, 12px inside a box — instead of 24px / 14px-by-12px. */}
       <p className="border-line-bright/70 text-fg-muted mt-5 rounded-lg border border-dashed p-3 text-[13px] leading-relaxed">
-        <span className="text-primary-bright font-semibold">NOTE:</span> Adding a new system user
-        automatically triggers an invitation. The link will be sent to the registered email address.
+        <span className="text-primary-bright font-semibold">NOTE:</span> The account is created with
+        a temporary password and must be changed on first sign-in. Outside production no welcome
+        email is sent, so the password has to be shared directly.
       </p>
     </Modal>
   )

@@ -6,7 +6,7 @@ import { AuthInput, PasswordInput } from '@/components/auth/AuthInput'
 import { AuthLink, AuthSubmit } from '@/components/auth/AuthActions'
 import { AuthAlert } from '@/components/auth/AuthFeedback'
 import { Field } from '@/components/ui/Field'
-import { authErrorMessage, login } from '@/lib/auth-api'
+import { toApiError } from '@/lib/api/caller'
 import { useAuthStore } from '@/store/auth'
 
 /** Location state set by RequireAuth (where to return to) and by ResetPassword. */
@@ -18,7 +18,7 @@ interface LoginRouteState {
 export function Login() {
   const navigate = useNavigate()
   const location = useLocation()
-  const signIn = useAuthStore((s) => s.signIn)
+  const logIn = useAuthStore((s) => s.logIn)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -35,12 +35,21 @@ export function Login() {
     setPending(true)
     setError(null)
     try {
-      const { token, user } = await login(email.trim(), password)
-      signIn(token, user)
-      // Return the user to the page that bounced them here, if any.
+      const { must_change_password } = await logIn(email.trim(), password)
+
+      // An account created by an admin starts on a backend-generated password, and
+      // stays flagged until change-password runs. Send it straight to the forced
+      // screen instead of the app — RequireAuth would bounce it back here anyway.
+      if (must_change_password) {
+        navigate('/change-password', { replace: true, state: { from: state?.from } })
+        return
+      }
+      // Otherwise return the user to the page that bounced them here, if any.
       navigate(state?.from ?? '/', { replace: true })
     } catch (err) {
-      setError(authErrorMessage(err, 'Could not sign you in. Check your email and password.'))
+      // The backend's own wording — "invalid email or password", "account is
+      // disabled" — is written to be shown as-is, so it goes straight in.
+      setError(toApiError(err).message)
       setPending(false)
     }
   }

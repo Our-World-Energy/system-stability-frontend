@@ -75,9 +75,11 @@ function UserChip({ collapsed }: { collapsed: boolean }) {
   const navigate = useNavigate()
   const { token, user, signOut } = useAuthStore()
 
-  // Placeholder identity until a session exists — the auth backend isn't wired yet.
-  const name = user?.name ?? user?.email ?? 'Alex Chan'
-  const role = user?.role ?? 'Grid Operations'
+  // The login response carries no profile, so the session's identity is whatever
+  // the JWT's claims held: an email and a role key. Falls back to a placeholder
+  // when the app is running with VITE_REQUIRE_AUTH=false and there is no session.
+  const name = user?.email ?? 'Alex Chan'
+  const role = user ? user.roleLabel : 'Grid Operations'
 
   const handleSignOut = () => {
     signOut()

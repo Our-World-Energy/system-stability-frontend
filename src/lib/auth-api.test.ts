@@ -2,7 +2,7 @@ import { AxiosError, AxiosHeaders } from 'axios'
 import { describe, expect, it } from 'vitest'
 import {
   authErrorMessage,
-  login,
+  demoSignIn,
   requestPasswordOtp,
   resetPassword,
   verifyPasswordOtp,
@@ -12,8 +12,8 @@ import { DEMO_OTP, demoAccounts } from './auth-demo'
 const DEMO = demoAccounts[0]
 
 describe('auth stubs', () => {
-  it('login accepts a demo account and returns its profile', async () => {
-    const result = await login(DEMO.email, DEMO.password)
+  it('demoSignIn accepts a demo account and returns its profile', async () => {
+    const result = await demoSignIn(DEMO.email, DEMO.password)
     expect(result.token).toMatch(/^stub\./)
     expect(result.user).toMatchObject({
       email: DEMO.email,
@@ -22,18 +22,18 @@ describe('auth stubs', () => {
     })
   })
 
-  it('login matches the email case-insensitively', async () => {
-    await expect(login(DEMO.email.toUpperCase(), DEMO.password)).resolves.toMatchObject({
+  it('demoSignIn matches the email case-insensitively', async () => {
+    await expect(demoSignIn(DEMO.email.toUpperCase(), DEMO.password)).resolves.toMatchObject({
       user: { email: DEMO.email },
     })
   })
 
-  it('login rejects a wrong password, an unknown address, and blanks', async () => {
-    await expect(login(DEMO.email, 'wrong')).rejects.toThrow(/invalid email or password/i)
-    await expect(login('nobody@ourworldenergy.com', DEMO.password)).rejects.toThrow(
+  it('demoSignIn rejects a wrong password, an unknown address, and blanks', async () => {
+    await expect(demoSignIn(DEMO.email, 'wrong')).rejects.toThrow(/invalid email or password/i)
+    await expect(demoSignIn('nobody@ourworldenergy.com', DEMO.password)).rejects.toThrow(
       /invalid email or password/i,
     )
-    await expect(login('', '')).rejects.toThrow(/invalid email or password/i)
+    await expect(demoSignIn('', '')).rejects.toThrow(/invalid email or password/i)
   })
 
   it('requesting a code needs an address, but accepts any', async () => {
@@ -64,10 +64,10 @@ describe('auth stubs', () => {
       const resetToken = await verifyPasswordOtp(target.email, DEMO_OTP)
       await resetPassword(resetToken, 'Brand@New9')
 
-      await expect(login(target.email, 'Brand@New9')).resolves.toMatchObject({
+      await expect(demoSignIn(target.email, 'Brand@New9')).resolves.toMatchObject({
         user: { email: target.email },
       })
-      await expect(login(target.email, original)).rejects.toThrow(/invalid email or password/i)
+      await expect(demoSignIn(target.email, original)).rejects.toThrow(/invalid email or password/i)
     } finally {
       target.password = original
     }
