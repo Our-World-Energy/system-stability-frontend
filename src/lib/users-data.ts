@@ -393,8 +393,6 @@ export const roleAllocation: RoleAllocation[] = [
   { label: 'Organizational Admin', count: 6, tone: 'pending' },
 ]
 
-export const roleAllocationUpdatedAt = '14:22:01 UTC'
-
 /** Zero-pad small counts, as the design does for "08". */
 export function formatCount(n: number): string {
   return n < 10 ? String(n).padStart(2, '0') : n.toLocaleString()

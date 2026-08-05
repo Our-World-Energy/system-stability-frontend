@@ -52,13 +52,18 @@ export function ActiveUsersChart() {
   // keeps exactly the same height in every range.
   const [pickerOpen, setPickerOpen] = useState(false)
   const rangeBar = useRef<HTMLDivElement>(null)
+  // The panel is centred on the figures rather than nested under the range bar, so
+  // dismissing on outside-click has to spare both elements.
+  const picker = useRef<HTMLDivElement>(null)
   /** Index of the bucket under the cursor; null when the pointer is off the plot. */
   const [hovered, setHovered] = useState<number | null>(null)
 
   useEffect(() => {
     if (!pickerOpen) return
     const onPointerDown = (e: MouseEvent) => {
-      if (!rangeBar.current?.contains(e.target as Node)) setPickerOpen(false)
+      const target = e.target as Node
+      if (rangeBar.current?.contains(target) || picker.current?.contains(target)) return
+      setPickerOpen(false)
     }
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setPickerOpen(false)
@@ -144,77 +149,88 @@ export function ActiveUsersChart() {
             {caption}
           </p>
         </div>
-        <div ref={rangeBar} className="relative">
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Active users range">
-            {activeUsersRanges.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                aria-pressed={range === option.id}
-                aria-expanded={option.id === 'custom' ? pickerOpen : undefined}
-                onClick={() => chooseRange(option.id)}
-                className={cn(
-                  'rounded-full border px-2.5 py-1 font-mono text-[11px] transition-colors',
-                  range === option.id
-                    ? 'border-primary/50 bg-primary/10 text-primary-bright'
-                    : 'border-line text-fg-muted hover:border-line-bright hover:text-fg',
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Absolutely positioned: the panel overlays the card instead of adding a
-              row to it, which is what made the plot shorter in the custom range. */}
-          {pickerOpen && (
-            <div className="border-line bg-surface absolute top-full right-0 z-20 mt-2 flex flex-wrap items-center gap-3 rounded-lg border p-3 shadow-lg">
-              <DateField
-                id="active-users-from"
-                label="from"
-                value={custom.from}
-                max={custom.to}
-                onChange={(from) => changeCustom({ from })}
-              />
-              <DateField
-                id="active-users-to"
-                label="to"
-                value={custom.to}
-                max={isoDay(now)}
-                onChange={(to) => changeCustom({ to })}
-              />
-            </div>
-          )}
+        <div
+          ref={rangeBar}
+          className="flex flex-wrap gap-1.5"
+          role="group"
+          aria-label="Active users range"
+        >
+          {activeUsersRanges.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              aria-pressed={range === option.id}
+              aria-expanded={option.id === 'custom' ? pickerOpen : undefined}
+              onClick={() => chooseRange(option.id)}
+              className={cn(
+                'rounded-full border px-2.5 py-1 font-mono text-[11px] transition-colors',
+                range === option.id
+                  ? 'border-primary/50 bg-primary/10 text-primary-bright'
+                  : 'border-line text-fg-muted hover:border-line-bright hover:text-fg',
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* The figures swap wholesale with the range, so they cross-fade with the curve. */}
-      <div
-        key={`stats-${animationKey}`}
-        className="animate-fade-in mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1"
-      >
-        <p className="text-fg font-mono text-4xl font-bold tracking-tight">
-          {average.toLocaleString()}
-        </p>
-        {changePercent !== null && (
-          <p
-            className={cn(
-              'font-mono text-sm font-semibold',
-              changePercent >= 0 ? 'text-primary-bright' : 'text-critical',
-            )}
-          >
-            {changePercent >= 0 ? '+' : ''}
-            {changePercent}%
+      {/* `relative` so the custom-range panel can centre itself against these two
+          rows — the figures and the legend — instead of hanging off the range bar. */}
+      <div className="relative">
+        {/* The figures swap wholesale with the range, so they cross-fade with the curve. */}
+        <div
+          key={`stats-${animationKey}`}
+          className="animate-fade-in mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1"
+        >
+          <p className="text-fg font-mono text-4xl font-bold tracking-tight">
+            {average.toLocaleString()}
           </p>
-        )}
-        <p className="text-fg-subtle font-mono text-[10px] tracking-[0.08em] uppercase">
-          avg · peak {peak.toLocaleString()}
-        </p>
-      </div>
+          {changePercent !== null && (
+            <p
+              className={cn(
+                'font-mono text-sm font-semibold',
+                changePercent >= 0 ? 'text-primary-bright' : 'text-critical',
+              )}
+            >
+              {changePercent >= 0 ? '+' : ''}
+              {changePercent}%
+            </p>
+          )}
+          <p className="text-fg-subtle font-mono text-[10px] tracking-[0.08em] uppercase">
+            avg · peak {peak.toLocaleString()}
+          </p>
+        </div>
 
-      <div className="mt-4 flex items-center gap-4">
-        <Legend tone="bg-primary-bright" label="Active users" />
-        <Legend tone="bg-fg-subtle" label="Previous period" />
+        <div className="mt-4 flex items-center gap-4">
+          <Legend tone="bg-primary-bright" label="Active users" />
+          <Legend tone="bg-fg-subtle" label="Previous period" />
+        </div>
+
+        {/* Overlays the card rather than adding a row to it, which is what made the
+            plot shorter in the custom range. Vertically centred on this block, so it
+            sits level with the average and the legend. */}
+        {pickerOpen && (
+          <div
+            ref={picker}
+            className="border-line bg-surface absolute top-1/2 right-0 z-20 flex -translate-y-1/2 flex-wrap items-center gap-3 rounded-lg border p-3"
+          >
+            <DateField
+              id="active-users-from"
+              label="from"
+              value={custom.from}
+              max={custom.to}
+              onChange={(from) => changeCustom({ from })}
+            />
+            <DateField
+              id="active-users-to"
+              label="to"
+              value={custom.to}
+              max={isoDay(now)}
+              onChange={(to) => changeCustom({ to })}
+            />
+          </div>
+        )}
       </div>
 
       {/* `mt-auto` pins the plot to the bottom of the card, so it sits at the same

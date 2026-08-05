@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import { formatCount, roleAllocation, roleAllocationUpdatedAt } from '@/lib/users-data'
+import { formatCount, roleAllocation } from '@/lib/users-data'
 
 const barTone: Record<string, string> = {
   primary: 'bg-primary-bright',
@@ -44,10 +44,6 @@ export function RoleAllocation() {
           </li>
         ))}
       </ul>
-
-      <p className="text-fg-subtle mt-auto pt-6 text-left font-mono text-[10px] tracking-[0.08em] uppercase">
-        Last updated: {roleAllocationUpdatedAt}
-      </p>
     </section>
   )
 }

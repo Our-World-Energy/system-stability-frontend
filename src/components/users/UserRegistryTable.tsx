@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { ListFilter, Pencil, Search, Trash2, X } from 'lucide-react'
+import { Pencil, Search, SlidersHorizontal, Trash2, UserPlus, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/Button'
 import { userRoles, type User, type UserRole } from '@/lib/users-data'
 import { RolePill } from './RolePill'
 
@@ -9,6 +10,8 @@ export type UserAction = 'delete' | 'edit'
 interface UserRegistryTableProps {
   users: User[]
   onAction: (action: UserAction, user: User) => void
+  /** Opens the Add User modal — the registry header owns the create entry point. */
+  onAddUser: () => void
   /** Rows matching the current search and role filter, across every page. */
   totalCount: number
   /** Rows in the registry before filtering, for the "filtered from" caption. */
@@ -30,6 +33,7 @@ const columns = ['User', 'Emails', 'Role', 'Department', 'Actions']
 export function UserRegistryTable({
   users,
   onAction,
+  onAddUser,
   totalCount,
   unfilteredCount,
   query,
@@ -52,6 +56,12 @@ export function UserRegistryTable({
             onToggleRole={onToggleRole}
             onClearRoleFilter={onClearRoleFilter}
           />
+          {/* `font-medium` overrides the cta variant's bold, via twMerge in `cn`;
+              `h-9` matches the search box and filter button beside it. */}
+          <Button variant="cta" onClick={onAddUser} className="h-9 shrink-0 font-medium">
+            <UserPlus className="size-4" />
+            Add User
+          </Button>
         </div>
       </header>
 
@@ -210,23 +220,25 @@ function RoleFilter({
 
   return (
     <div ref={root} className="relative">
+      {/* Labeled pill matching the navbar's Tier / Phase filter, down to the
+          inline count badge — same control, so it should read the same. */}
       <button
         type="button"
         aria-label="Filter registry by role"
-        title="Filter registry by role"
         aria-expanded={open}
         aria-haspopup="true"
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          'relative grid size-9 place-items-center rounded-lg border transition-colors',
+          'flex h-9 shrink-0 items-center gap-2 rounded-lg border bg-transparent px-3 text-sm font-medium transition-colors',
           active || open
-            ? 'border-primary/50 bg-primary/10 text-primary-bright'
-            : 'text-fg-muted hover:bg-surface-3 hover:text-fg border-transparent',
+            ? 'border-line-bright text-fg'
+            : 'border-line text-fg-muted hover:border-line-bright hover:text-fg',
         )}
       >
-        <ListFilter className="size-4" />
+        <SlidersHorizontal className="size-4" />
+        Filter
         {active && (
-          <span className="bg-primary text-on-primary ring-surface absolute -top-1.5 -right-1.5 grid size-4 place-items-center rounded-full font-mono text-[10px] font-bold ring-2">
+          <span className="bg-primary/20 text-primary-bright grid size-4 place-items-center rounded-full font-mono text-[10px] font-bold">
             {roleFilter.length}
           </span>
         )}

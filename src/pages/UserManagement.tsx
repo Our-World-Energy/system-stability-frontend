@@ -1,6 +1,4 @@
 import { useMemo, useState } from 'react'
-import { UserPlus } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
 import { ActiveUsersChart } from '@/components/users/ActiveUsersChart'
 import { RoleAllocation } from '@/components/users/RoleAllocation'
 import { RoleCapabilityMatrix } from '@/components/users/RoleCapabilityMatrix'
@@ -115,15 +113,8 @@ export function UserManagement() {
 
   return (
     <div className="space-y-6 pb-4">
-      {/* No page heading here — the navbar already renders "User Management". */}
-      <header className="flex justify-end">
-        {/* `font-medium` overrides the cta variant's bold, via twMerge in `cn`. */}
-        <Button variant="cta" onClick={() => setModal({ kind: 'add' })} className="font-medium">
-          <UserPlus className="size-4" />
-          Add User
-        </Button>
-      </header>
-
+      {/* No page heading here — the navbar already renders "User Management", and
+          Add User lives in the registry table's own header. */}
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
         <ActiveUsersChart />
         <RoleAllocation />
@@ -132,6 +123,7 @@ export function UserManagement() {
       <UserRegistryTable
         users={visible}
         onAction={(action, user) => setModal({ kind: action, user })}
+        onAddUser={() => setModal({ kind: 'add' })}
         totalCount={filtered.length}
         unfilteredCount={registry.length}
         query={query}
