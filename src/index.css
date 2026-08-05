@@ -128,6 +128,24 @@
     display: flex;
     flex-direction: column;
   }
+
+  /*
+    Hand cursor on interactive controls. Tailwind v4's preflight resets buttons to
+    `cursor: default`, which made every button in the app feel inert on hover.
+    Restored here rather than per-component, so new buttons get it for free.
+
+    `:not(:disabled)` leaves the plain arrow on disabled controls, and because this
+    sits in @layer base, any explicit cursor-* utility (notably the
+    disabled:cursor-not-allowed on Button and the paginators) still overrides it.
+  */
+  button:not(:disabled),
+  select:not(:disabled),
+  summary,
+  [role='button']:not([aria-disabled='true']),
+  input:where([type='button'], [type='reset'], [type='submit']):not(:disabled),
+  input:where([type='checkbox'], [type='radio']):not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 /*
