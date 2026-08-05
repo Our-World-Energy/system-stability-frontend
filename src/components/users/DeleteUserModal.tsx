@@ -3,23 +3,30 @@ import { Trash2, TriangleAlert } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
-import type { User } from '@/lib/users-data'
+import type { UserRecord } from '@/lib/api/user-management.types'
 
 const CONFIRM_WORD = 'DELETE'
 
 interface DeleteUserModalProps {
-  user: User
+  user: UserRecord
   onClose: () => void
   onConfirm: () => void
+  /** True while delete-user is in flight. */
+  pending?: boolean
 }
 
 /**
  * Destructive confirmation. De-provisioning stays disabled until the admin types
  * DELETE, so the action can't be triggered by a stray click.
+ *
+ * The backend does a *soft* delete: the row stays so past credential actions
+ * (created_by, requested_by, granted_to, reviewed_by) remain attributed to whoever
+ * actually did them. The copy says so rather than claiming the record is gone —
+ * adding the same email back later revives this exact account.
  */
-export function DeleteUserModal({ user, onClose, onConfirm }: DeleteUserModalProps) {
+export function DeleteUserModal({ user, onClose, onConfirm, pending = false }: DeleteUserModalProps) {
   const [confirmation, setConfirmation] = useState('')
-  const armed = confirmation.trim().toUpperCase() === CONFIRM_WORD
+  const armed = confirmation.trim().toUpperCase() === CONFIRM_WORD && !pending
 
   return (
     <Modal
@@ -37,7 +44,7 @@ export function DeleteUserModal({ user, onClose, onConfirm }: DeleteUserModalPro
             className="bg-critical hover:bg-critical/90 active:bg-critical/80 font-semibold text-white"
           >
             <Trash2 className="size-4" />
-            Delete
+            {pending ? 'Removing…' : 'Delete'}
           </Button>
           <Button variant="ghost" onClick={onClose}>
             Cancel
@@ -59,34 +66,35 @@ export function DeleteUserModal({ user, onClose, onConfirm }: DeleteUserModalPro
       </header>
 
       <p className="text-fg text-[15px] leading-relaxed">
-        Are you sure you want to remove this user? This will immediately revoke their access to all
-        credentials and archive their identity profile. This action cannot be undone.
+        Are you sure you want to remove this user? This immediately revokes their access to all
+        credentials and stops them signing in. Their past credential activity stays on the audit
+        trail, and adding the same email again would restore this account.
       </p>
 
       {/* Two columns, two rows. Row 1 is pinned to leading-5 on both sides despite the
-          differing type sizes, so row 2 (id / status) lands on a shared baseline. */}
+          differing type sizes, so row 2 (email / status) lands on a shared baseline. */}
       <div className="border-line-bright/70 mt-5 flex items-start justify-between gap-4 rounded-lg border border-dashed p-3">
         <div className="min-w-0">
-          <p className="text-fg truncate text-sm leading-5 font-semibold">{user.name}</p>
-          <p className="text-fg-muted mt-0.5 font-mono text-xs leading-4">{user.id}</p>
+          <p className="text-fg truncate text-sm leading-5 font-semibold">{user.full_name}</p>
+          <p className="text-fg-muted mt-0.5 truncate font-mono text-xs leading-4">{user.email}</p>
         </div>
         <div className="shrink-0 text-right">
           <p className="text-fg-subtle font-mono text-[10px] leading-5 tracking-[0.08em] uppercase">
-            Status
+            Role
           </p>
           <p
             className={cn(
               'mt-0.5 font-mono text-xs leading-4 font-bold uppercase',
-              user.status === 'Active' ? 'text-primary-bright' : 'text-degraded',
+              user.status === 'active' ? 'text-primary-bright' : 'text-degraded',
             )}
           >
-            {user.status}
+            {user.role.name}
           </p>
         </div>
       </div>
 
       <label htmlFor="delete-confirm" className="text-fg mt-5 block text-[13px] font-semibold">
-        Type <span className="text-critical-bright">{CONFIRM_WORD}</span> to confirm permanent
+        Type <span className="text-critical-bright">{CONFIRM_WORD}</span> to confirm
         de-provisioning
       </label>
       <input

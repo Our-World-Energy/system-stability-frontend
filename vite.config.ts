@@ -37,6 +37,11 @@ export default defineConfig(({ command, mode }) => {
   // different port, and it sends no CORS headers — so the browser must reach it
   // same-origin. `/stability/*` is proxied to `<origin>/api/owe-stability-service/*`,
   // which is the prefix lib/api/client.ts posts to.
+  // One prefix covers the whole service: `/stability/*` is proxied to
+  // `<origin>/api/owe-stability-service/*`, which serves both credential-manager/*
+  // and user-management/*. Only one rewrite is needed because both halves are on
+  // this origin — if user management ever moves to a host of its own again, give it
+  // its own prefix here and point VITE_USER_MANAGEMENT_URL at it.
   const stabilityOrigin = env.VITE_STABILITY_SERVICE_ORIGIN || 'http://149.28.112.32:28753'
   const stabilityProxy = {
     '/stability': {

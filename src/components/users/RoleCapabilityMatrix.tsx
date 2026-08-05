@@ -1,34 +1,21 @@
 import { cn } from '@/lib/utils'
-import {
-  roleCapabilities,
-  userRoles,
-  type CredentialScope,
-  type RotationRight,
-} from '@/lib/users-data'
+import { byRankDescending, rotationLabel, rotationTone, scopeLabel } from '@/lib/role-display'
+import type { Role } from '@/lib/api/user-management.types'
 import { RolePill } from './RolePill'
-
-/** What decides a role's reach — the scoping input its provisioning form collects. */
-const scopedByText: Record<CredentialScope, string> = {
-  all: 'Organization-wide',
-  assigned_platforms: 'Assigned platform(s)',
-  development: 'Development environment',
-  department: 'Department',
-}
-
-const rotationTone: Record<RotationRight, string> = {
-  rotate: 'text-primary-bright',
-  request: 'text-degraded',
-  none: 'text-fg-subtle',
-}
 
 const columns = ['Role', 'Credential Access', 'Scoped By', 'Rotation Rights']
 
 /**
  * The access process per role, in one place — the reference behind every scoping
- * decision the add/edit dialogs make. Read straight from `roleCapabilities`, so
- * changing the policy there changes this card and the enforced form together.
+ * decision the add/edit dialogs make.
+ *
+ * Every cell comes from get-metadata: the description the backend stores against
+ * the role, its `scope_type`, and the two rotation booleans. So the policy this
+ * card describes and the policy the API enforces cannot drift apart.
  */
-export function RoleCapabilityMatrix() {
+export function RoleCapabilityMatrix({ roles }: { roles: Role[] }) {
+  if (!roles.length) return null
+
   return (
     <section className="border-line bg-surface overflow-hidden rounded-lg border">
       <header className="border-line border-b px-5 py-4">
@@ -56,36 +43,32 @@ export function RoleCapabilityMatrix() {
             </tr>
           </thead>
           <tbody>
-            {userRoles.map((role) => {
-              const capability = roleCapabilities[role]
-              return (
-                <tr
-                  key={role}
-                  className="border-line hover:bg-surface-2 border-b align-top transition-colors last:border-0"
+            {byRankDescending(roles).map((role) => (
+              <tr
+                key={role.key}
+                className="border-line hover:bg-surface-2 border-b align-top transition-colors last:border-0"
+              >
+                <td className="px-5 py-4">
+                  <RolePill role={role} />
+                </td>
+                <td className="px-5 py-4">
+                  <p className="text-fg-muted max-w-[46ch] text-[13px] leading-relaxed">
+                    {role.description}
+                  </p>
+                </td>
+                <td className="text-fg-muted px-5 py-4 whitespace-nowrap">
+                  {scopeLabel(String(role.scope_type))}
+                </td>
+                <td
+                  className={cn(
+                    'px-5 py-4 font-mono text-[11px] font-bold tracking-[0.08em] uppercase',
+                    rotationTone(role),
+                  )}
                 >
-                  <td className="px-5 py-4">
-                    <RolePill role={role} />
-                  </td>
-                  <td className="px-5 py-4">
-                    <p className="text-fg">{capability.accessLabel}</p>
-                    <p className="text-fg-muted mt-1 max-w-[38ch] text-[13px] leading-relaxed">
-                      {capability.process}
-                    </p>
-                  </td>
-                  <td className="text-fg-muted px-5 py-4 whitespace-nowrap">
-                    {scopedByText[capability.scope]}
-                  </td>
-                  <td
-                    className={cn(
-                      'px-5 py-4 font-mono text-[11px] font-bold tracking-[0.08em] uppercase',
-                      rotationTone[capability.rotation],
-                    )}
-                  >
-                    {capability.rotationLabel}
-                  </td>
-                </tr>
-              )
-            })}
+                  {rotationLabel(role)}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

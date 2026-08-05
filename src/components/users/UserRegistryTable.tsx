@@ -2,49 +2,68 @@ import { useEffect, useRef, useState } from 'react'
 import { Pencil, Search, SlidersHorizontal, Trash2, UserPlus, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
-import { userRoles, type User, type UserRole } from '@/lib/users-data'
+import { byRankDescending } from '@/lib/role-display'
+import { needsPlatforms } from '@/lib/api/user-payload'
+import type { Role, RoleKey, UserRecord } from '@/lib/api/user-management.types'
 import { RolePill } from './RolePill'
 
 export type UserAction = 'delete' | 'edit'
 
 interface UserRegistryTableProps {
-  users: User[]
-  onAction: (action: UserAction, user: User) => void
+  users: UserRecord[]
+  onAction: (action: UserAction, user: UserRecord) => void
   /** Opens the Add User modal — the registry header owns the create entry point. */
   onAddUser: () => void
-  /** Rows matching the current search and role filter, across every page. */
-  totalCount: number
-  /** Rows in the registry before filtering, for the "filtered from" caption. */
-  unfilteredCount: number
+  /**
+   * get-users' `total`: the count *after* search and role filters are applied, so
+   * it drives the pagination controls directly.
+   */
+  total: number
+  /** Roles offered by the filter dropdown, from get-metadata. */
+  roles: Role[]
   query: string
   onQueryChange: (query: string) => void
-  /** Roles the filter is narrowed to; empty means every role. */
-  roleFilter: UserRole[]
-  onToggleRole: (role: UserRole) => void
+  /** Role keys the filter is narrowed to; empty means every role. */
+  roleFilter: RoleKey[]
+  onToggleRole: (role: RoleKey) => void
   onClearRoleFilter: () => void
   page: number
-  pageCount: number
+  pageSize: number
   onPageChange: (page: number) => void
+  /** True while get-users is in flight, so the table can say so. */
+  loading?: boolean
+  /**
+   * The signed-in admin's email. The delete control is hidden on that row: the
+   * backend refuses a self-delete with a 400, and offering a button that cannot
+   * work is worse than not offering it. Email rather than id because the login JWT
+   * carries no user id.
+   */
+  currentUserEmail?: string
 }
 
-const columns = ['User', 'Emails', 'Role', 'Department', 'Actions']
+const columns = ['User', 'Emails', 'Role', 'Scope', 'Actions']
 
 /** The user registry: one row per account, with edit/delete per row. */
 export function UserRegistryTable({
   users,
   onAction,
   onAddUser,
-  totalCount,
-  unfilteredCount,
+  total,
+  roles,
   query,
   onQueryChange,
   roleFilter,
   onToggleRole,
   onClearRoleFilter,
   page,
-  pageCount,
+  pageSize,
   onPageChange,
+  loading = false,
+  currentUserEmail,
 }: UserRegistryTableProps) {
+  const pageCount = Math.max(Math.ceil(total / pageSize), 1)
+  const filtering = Boolean(query.trim()) || roleFilter.length > 0
+
   return (
     <section className="border-line bg-surface overflow-hidden rounded-lg border">
       <header className="border-line flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
@@ -52,6 +71,7 @@ export function UserRegistryTable({
         <div className="flex items-center gap-2">
           <SearchBox query={query} onQueryChange={onQueryChange} />
           <RoleFilter
+            roles={roles}
             roleFilter={roleFilter}
             onToggleRole={onToggleRole}
             onClearRoleFilter={onClearRoleFilter}
@@ -87,57 +107,62 @@ export function UserRegistryTable({
               <tr>
                 <td colSpan={columns.length} className="px-5 py-16 text-center">
                   <p className="text-fg-muted font-mono text-sm">
-                    No users match this search or filter
+                    {loading
+                      ? 'Loading users…'
+                      : filtering
+                        ? 'No users match this search or filter'
+                        : 'No users have been provisioned yet'}
                   </p>
                 </td>
               </tr>
             ) : (
-              users.map((user) => (
-                <tr
-                  key={user.id}
-                  className="border-line hover:bg-surface-2 border-b transition-colors last:border-0"
-                >
-                  <td className="text-fg px-5 py-4 font-medium">{user.name}</td>
-                  <td className="text-primary-bright px-5 py-4 font-mono text-[13px]">
-                    {user.email}
-                  </td>
-                  <td className="px-5 py-4">
-                    <RolePill role={user.role} />
-                  </td>
-                  <td className="px-5 py-4">
-                    {user.department ? (
-                      <>
-                        <p className="text-fg-muted">{user.department}</p>
-                        {user.subDepartment && (
-                          <p className="text-fg-subtle mt-0.5 font-mono text-xs">
-                            {user.subDepartment}
-                          </p>
+              users.map((user) => {
+                const isSelf =
+                  Boolean(currentUserEmail) &&
+                  user.email.toLowerCase() === currentUserEmail!.toLowerCase()
+
+                return (
+                  <tr
+                    key={user.id}
+                    className="border-line hover:bg-surface-2 border-b transition-colors last:border-0"
+                  >
+                    <td className="text-fg px-5 py-4 font-medium">
+                      {user.full_name}
+                      {isSelf && <span className="text-fg-subtle ml-2 text-xs">(you)</span>}
+                    </td>
+                    <td className="text-primary-bright px-5 py-4 font-mono text-[13px]">
+                      {user.email}
+                    </td>
+                    <td className="px-5 py-4">
+                      <RolePill role={user.role} />
+                    </td>
+                    <td className="px-5 py-4">
+                      <ScopeCell user={user} />
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center justify-end gap-1">
+                        {/* Hidden rather than disabled on the admin's own row —
+                            the backend rejects a self-delete outright. */}
+                        {!isSelf && (
+                          <IconButton
+                            label={`Delete ${user.full_name}`}
+                            destructive
+                            onClick={() => onAction('delete', user)}
+                          >
+                            <Trash2 className="size-4" />
+                          </IconButton>
                         )}
-                      </>
-                    ) : (
-                      // Org-wide and platform-scoped roles sit outside the department tree.
-                      <span className="text-fg-subtle">—</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center justify-end gap-1">
-                      <IconButton
-                        label={`Delete ${user.name}`}
-                        destructive
-                        onClick={() => onAction('delete', user)}
-                      >
-                        <Trash2 className="size-4" />
-                      </IconButton>
-                      <IconButton
-                        label={`Edit ${user.name}`}
-                        onClick={() => onAction('edit', user)}
-                      >
-                        <Pencil className="size-4" />
-                      </IconButton>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                        <IconButton
+                          label={`Edit ${user.full_name}`}
+                          onClick={() => onAction('edit', user)}
+                        >
+                          <Pencil className="size-4" />
+                        </IconButton>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>
@@ -145,13 +170,8 @@ export function UserRegistryTable({
 
       <footer className="border-line flex flex-wrap items-center justify-between gap-3 border-t px-5 py-4">
         <p className="text-fg-muted text-[13px]">
-          Showing {users.length} of {totalCount.toLocaleString()} users
-          {totalCount !== unfilteredCount && (
-            <span className="text-fg-subtle">
-              {' '}
-              (filtered from {unfilteredCount.toLocaleString()})
-            </span>
-          )}
+          Showing {users.length} of {total.toLocaleString()} users
+          {filtering && <span className="text-fg-subtle"> (filtered)</span>}
         </p>
         <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} />
       </footer>
@@ -159,7 +179,40 @@ export function UserRegistryTable({
   )
 }
 
-/** Free-text search over the registry — name, email, ID, department, platforms. */
+/**
+ * What the account's access is scoped to, which depends on its role: a department
+ * (with any sub-departments beneath it), named platforms, or nothing at all for the
+ * org-wide roles.
+ */
+function ScopeCell({ user }: { user: UserRecord }) {
+  if (needsPlatforms(user.role.key)) {
+    const platforms = user.platforms ?? []
+    return platforms.length ? (
+      <p className="text-fg-muted font-mono text-xs">{platforms.join(', ')}</p>
+    ) : (
+      <span className="text-fg-subtle">—</span>
+    )
+  }
+
+  if (user.department) {
+    const subs = user.sub_departments ?? []
+    return (
+      <>
+        <p className="text-fg-muted">{user.department.name}</p>
+        {subs.length > 0 && (
+          <p className="text-fg-subtle mt-0.5 font-mono text-xs">
+            {subs.map((s) => s.name).join(', ')}
+          </p>
+        )}
+      </>
+    )
+  }
+
+  // Org-wide and development-wide roles sit outside both scoping trees.
+  return <span className="text-fg-subtle">—</span>
+}
+
+/** Free-text search over the registry — matched server-side on name or email. */
 function SearchBox({
   query,
   onQueryChange,
@@ -174,7 +227,7 @@ function SearchBox({
         type="search"
         value={query}
         aria-label="Search registry"
-        placeholder="Search users…"
+        placeholder="Search name or email…"
         onChange={(e) => onQueryChange(e.target.value)}
         className="border-line bg-input text-fg placeholder:text-fg-subtle focus:border-primary focus:ring-primary/20 h-9 w-52 rounded-lg border pr-3 pl-9 text-sm transition-colors outline-none focus:ring-2 sm:w-64"
       />
@@ -184,16 +237,18 @@ function SearchBox({
 
 /**
  * Role filter behind the header's filter icon — a checkbox dropdown, since the
- * registry mixes six clearance levels and narrowing to more than one at a time
- * is the normal case (e.g. "show me every admin tier").
+ * registry mixes six clearance levels and narrowing to more than one at a time is
+ * the normal case (e.g. "show me every admin tier"). Sent to get-users as `roles`.
  */
 function RoleFilter({
+  roles,
   roleFilter,
   onToggleRole,
   onClearRoleFilter,
 }: {
-  roleFilter: UserRole[]
-  onToggleRole: (role: UserRole) => void
+  roles: Role[]
+  roleFilter: RoleKey[]
+  onToggleRole: (role: RoleKey) => void
   onClearRoleFilter: () => void
 }) {
   const [open, setOpen] = useState(false)
@@ -249,18 +304,18 @@ function RoleFilter({
           <p className="text-fg-subtle px-2.5 pt-2 pb-1.5 font-mono text-[10px] font-semibold tracking-[0.08em] uppercase">
             Filter by role
           </p>
-          {userRoles.map((role) => (
+          {byRankDescending(roles).map((role) => (
             <label
-              key={role}
+              key={role.key}
               className="hover:bg-surface-3 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2"
             >
               <input
                 type="checkbox"
-                checked={roleFilter.includes(role)}
-                onChange={() => onToggleRole(role)}
+                checked={roleFilter.includes(role.key)}
+                onChange={() => onToggleRole(role.key)}
                 className="accent-primary-bright size-4"
               />
-              <span className="text-fg text-[13px]">{role}</span>
+              <span className="text-fg text-[13px]">{role.name}</span>
             </label>
           ))}
           {active && (
@@ -316,7 +371,7 @@ function Pagination({
           {n}
         </button>
       ))}
-      <PageButton disabled={page === pageCount} onClick={() => onPageChange(page + 1)}>
+      <PageButton disabled={page >= pageCount} onClick={() => onPageChange(page + 1)}>
         Next
       </PageButton>
     </nav>

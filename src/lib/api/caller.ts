@@ -11,7 +11,7 @@
 */
 
 import { isAxiosError } from 'axios'
-import type { AxiosRequestConfig } from 'axios'
+import type { AxiosInstance, AxiosRequestConfig } from 'axios'
 import { stabilityApi } from './client'
 import type { StabilityEndpoint } from './endpoints'
 
@@ -61,8 +61,26 @@ export async function stabilityCaller<TData = unknown>(
   payload?: unknown,
   config?: AxiosRequestConfig,
 ): Promise<ApiEnvelope<TData>> {
+  return postApi<TData>(stabilityApi, endpoint, payload, config)
+}
+
+/**
+ * The same POST-and-unwrap for any instance in `lib/api/client.ts`.
+ *
+ * Every route on this backend is a POST that answers with the shared envelope, so
+ * `stabilityCaller` and the user-management functions differ only in which axios
+ * instance (and therefore which host) they go through.
+ *
+ * @throws ApiError on any transport, HTTP or envelope-level failure.
+ */
+export async function postApi<TData = unknown>(
+  instance: AxiosInstance,
+  path: string,
+  payload?: unknown,
+  config?: AxiosRequestConfig,
+): Promise<ApiEnvelope<TData>> {
   try {
-    const res = await stabilityApi.post(endpoint, payload, config)
+    const res = await instance.post(path, payload, config)
     return unwrap<TData>(res.data)
   } catch (err) {
     throw toApiError(err)

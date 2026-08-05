@@ -52,3 +52,32 @@ type Leaf<T> = T extends string ? T : T extends object ? Leaf<T[keyof T]> : neve
 
 /** Union of every path above — the vocabulary `stabilityCaller` accepts. */
 export type StabilityEndpoint = Leaf<typeof endpoints>
+
+/*
+  User management sits on its own axios instance (a different host until the
+  dev_ashish branch merges), and `userManagementBaseUrl` already ends in
+  `/user-management` — so these paths are bare segments, not prefixed ones.
+
+  Kept out of `endpoints` above so the two vocabularies stay distinct: a
+  user-management path passed to `stabilityCaller` would be sent to the wrong host,
+  and separate unions make that a type error rather than a 404.
+*/
+export const userManagementEndpoints = {
+  /** Exchange email/password for an 8-hour JWT. The only unprotected route. */
+  login: 'login',
+  /** Live roles, departments (sub-departments nested) and platforms. org_admin. */
+  getMetadata: 'get-metadata',
+  /** The registry: search, role filter, pagination. org_admin. Send `{}` for defaults. */
+  getUsers: 'get-users',
+  /** Provision a user — or reactivate a soft-deleted one with the same email. 201. */
+  createUser: 'create-user',
+  /** Full replace of profile, role and scope. org_admin. */
+  updateUser: 'update-user',
+  /** Acts on the caller's own account only — no user_id. Any authenticated role. */
+  changePassword: 'change-password',
+  /** Soft delete. org_admin. Self-delete is refused with a 400. */
+  deleteUser: 'delete-user',
+} as const
+
+/** Union of every user-management path — what `postApi` is given for that host. */
+export type UserManagementEndpoint = Leaf<typeof userManagementEndpoints>

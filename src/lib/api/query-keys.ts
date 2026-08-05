@@ -8,6 +8,7 @@
 */
 
 import type { RequestLogFilters } from './requests'
+import type { GetUsersRequest } from './user-management.types'
 
 export const credentialKeys = {
   all: ['credentials'] as const,
@@ -19,6 +20,17 @@ export const requestKeys = {
   pending: (page: number, pageSize: number) =>
     [...requestKeys.all, 'pending', page, pageSize] as const,
   logs: (filters: RequestLogFilters) => [...requestKeys.all, 'logs', filters] as const,
+}
+
+export const userKeys = {
+  all: ['users'] as const,
+  /** The registry slice for one set of filters — the server does the filtering. */
+  list: (params: GetUsersRequest) => [...userKeys.all, 'list', params] as const,
+  /**
+   * Roles, departments and platforms. Separate from `all` so a create/update can
+   * invalidate both the list and the role counts without refetching one twice.
+   */
+  metadata: () => [...userKeys.all, 'metadata'] as const,
 }
 
 export const statsKeys = {
