@@ -20,6 +20,10 @@ function validDraft(overrides: Partial<CredentialDraft> = {}): CredentialDraft {
     username: 'admin@ourworldenergy.com',
     secret: 'correct-horse-battery',
     url: 'https://console.aws.amazon.com',
+    platformId: 2,
+    platformOther: '',
+    departmentId: 3,
+    isDev: false,
     tags: ['aws', 'production'],
     twoFactorType: 'totp',
     twoFactorApprover: 'raj@ourworldenergy.com',
@@ -84,6 +88,10 @@ describe('buildCreateCredentialPayload', () => {
       username: 'admin@ourworldenergy.com',
       encrypted_secret: 'owe.v1.k.i.c',
       url: 'https://console.aws.amazon.com',
+      platform_id: 2,
+      platform_other: '',
+      department_id: 3,
+      is_dev: false,
       tags: ['aws', 'production'],
       two_factor_type: 'totp',
       two_factor_approver: 'raj@ourworldenergy.com',
@@ -106,6 +114,32 @@ describe('buildCreateCredentialPayload', () => {
     expect(payload.tags).toEqual([])
     expect(payload.elevation_duration_seconds).toBe(3600)
     expect(payload.auto_grant).toBe(false)
+    // The new optional fields ride along at their empty defaults, so an untouched
+    // form reproduces the original create exactly.
+    expect(payload.platform_id).toBeNull()
+    expect(payload.platform_other).toBe('')
+    expect(payload.department_id).toBeNull()
+    expect(payload.is_dev).toBe(false)
+  })
+
+  it('sends platform_id and blanks platform_other for a catalog pick', () => {
+    const payload = buildCreateCredentialPayload(
+      // A stale free-text value must not leak once a catalog id is chosen.
+      validDraft({ platformId: 5, platformOther: 'ignored' }),
+      'owe.v1.k.i.c',
+    )
+    expect(payload.platform_id).toBe(5)
+    expect(payload.platform_other).toBe('')
+  })
+
+  it('sends a trimmed platform_other with a null platform_id for "Other"', () => {
+    const payload = buildCreateCredentialPayload(
+      validDraft({ platformId: null, platformOther: '  Internal DevOps  ', isDev: true }),
+      'owe.v1.k.i.c',
+    )
+    expect(payload.platform_id).toBeNull()
+    expect(payload.platform_other).toBe('Internal DevOps')
+    expect(payload.is_dev).toBe(true)
   })
 
   it('trims free text and normalises tags', () => {

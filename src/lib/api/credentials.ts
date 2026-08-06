@@ -61,6 +61,18 @@ export interface CredentialDraft {
   username: string
   secret: string
   url: string
+  /**
+   * Owning platform, chosen one of two mutually exclusive ways:
+   *   - a get-metadata catalog id in `platformId` (then `platformOther` is unused), or
+   *   - "Other" with a free-text name in `platformOther` (then `platformId` is null).
+   * Both unset (null / '') means no platform was chosen.
+   */
+  platformId: number | null
+  platformOther: string
+  /** Owning department — a get-metadata catalog id, or null when unset. */
+  departmentId: number | null
+  /** Marks a development-only credential. */
+  isDev: boolean
   tags: string[]
   twoFactorType: TwoFactorType
   twoFactorApprover: string
@@ -76,6 +88,16 @@ export interface CreateCredentialPayload {
   /** Encrypted client-side. A plaintext value must never appear here. */
   encrypted_secret: string
   url: string
+  /**
+   * Platform reference: exactly one of these carries a value. A catalog pick sends
+   * `platform_id` (with `platform_other` blank); "Other" sends `platform_id: null`
+   * and the typed name in `platform_other`, which the backend resolves to an id.
+   */
+  platform_id: number | null
+  platform_other: string
+  /** Department reference — a catalog id, or null when unset. */
+  department_id: number | null
+  is_dev: boolean
   tags: string[]
   two_factor_type: TwoFactorType
   two_factor_approver: string
@@ -93,6 +115,10 @@ export function emptyCredentialDraft(): CredentialDraft {
     username: '',
     secret: '',
     url: '',
+    platformId: null,
+    platformOther: '',
+    departmentId: null,
+    isDev: false,
     // Not on the form — see the note on CredentialDraft.
     tags: [],
     twoFactorType: 'totp',
@@ -195,6 +221,12 @@ export function buildCreateCredentialPayload(
     username: draft.username.trim(),
     encrypted_secret: encryptedSecret,
     url: draft.url.trim(),
+    // Exactly one of platform_id / platform_other is populated: a catalog pick
+    // blanks the free text, and "Other" nulls the id (see the field docs).
+    platform_id: draft.platformId,
+    platform_other: draft.platformId == null ? draft.platformOther.trim() : '',
+    department_id: draft.departmentId,
+    is_dev: draft.isDev,
     tags: dedupeTags(draft.tags),
     two_factor_type: draft.twoFactorType,
     two_factor_approver: usesTwoFactor ? draft.twoFactorApprover.trim() : '',

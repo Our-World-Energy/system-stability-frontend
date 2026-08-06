@@ -115,7 +115,12 @@ function emit(stats: PendingStats): void {
 function start(): void {
   running = true
   backoffMs = INITIAL_BACKOFF_MS
-  void connect()
+  // Defer the first connect by a tick rather than opening the stream inline.
+  // React StrictMode (dev) mounts, unmounts and remounts a component in
+  // immediate succession; the intervening stop() clears this timer, so the
+  // throwaway mount never opens a request that would then be aborted — no
+  // "failed"/cancelled get-pending-stats flashing in the network panel.
+  scheduleConnect(0)
 }
 
 function stop(): void {
@@ -130,12 +135,18 @@ function stop(): void {
   backoffMs = INITIAL_BACKOFF_MS
 }
 
-function scheduleReconnect(): void {
+/** Open a connection after `delayMs`, unless one is already pending or we stopped. */
+function scheduleConnect(delayMs: number): void {
   if (!running || reconnectTimer) return
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null
     void connect()
-  }, backoffMs)
+  }, delayMs)
+}
+
+function scheduleReconnect(): void {
+  if (!running || reconnectTimer) return
+  scheduleConnect(backoffMs)
   backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS)
 }
 
