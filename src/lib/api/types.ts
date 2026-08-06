@@ -41,6 +41,33 @@ export interface Credential {
   last_rotated_at?: string | null
   created_at: string
   updated_at: string
+
+  /*
+    Requester-search extras. These appear on the search-credentials response seen
+    by a non-admin requester, and are absent from the admin record shape above.
+    The service drops nulls, so every one is optional.
+  */
+  /** The requester's own view of eligibility: true when access is automatic. */
+  has_auto_access?: boolean
+  platform_id?: number | null
+  department_id?: number | null
+  is_dev?: boolean
+  /** The requester's outstanding request against this credential, if any. */
+  request_status?: RequestStatus | null
+  request_id?: string | null
+  /** The live grant, present when `request_status` is 'granted'. */
+  grant?: CredentialAccessGrant | null
+}
+
+/**
+ * The slim grant summary embedded in a requester's search row (`Credential.grant`).
+ * Narrower than `Grant`: only what the catalog needs to show a countdown.
+ */
+export interface CredentialAccessGrant {
+  id: string
+  status: GrantStatus
+  granted_at: string
+  expires_at: string
 }
 
 /** An access request as returned by submit-request / review-request. */

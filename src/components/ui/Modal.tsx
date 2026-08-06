@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -42,7 +43,11 @@ export function Modal({
 
   if (!open) return null
 
-  return (
+  // Portal to <body>: a dialog can be opened from deep inside a table cell or a
+  // scroll container (e.g. the admin secret cell), and a bare `fixed` overlay
+  // would be clipped by any ancestor that establishes a containing block. The
+  // portal keeps the overlay relative to the viewport wherever it is mounted.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 overflow-y-auto"
       role="dialog"
@@ -86,6 +91,7 @@ export function Modal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

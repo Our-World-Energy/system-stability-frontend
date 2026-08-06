@@ -448,6 +448,53 @@ export async function revealCredentialSecret(id: string): Promise<string> {
   return decryptSecret(envelope)
 }
 
+/** A credential's details plus its decrypted secret, for the requester reveal dialog. */
+export interface RevealedCredential {
+  credential_id: string
+  name?: string
+  username?: string
+  url?: string
+  notes?: string
+  /** Decrypted plaintext. Produced on demand and never cached — see `revealCredentialDetails`. */
+  secret: string
+}
+
+/**
+ * Fetch a credential's stored secret *and* the descriptive fields the reveal
+ * route returns alongside it (name, username, url, notes), decrypting the secret
+ * in the browser.
+ *
+ * Same guarantee and same precondition as `revealCredentialSecret`: the plaintext
+ * is handed back once and never cached, and decryption needs the RSA private key
+ * that only local development carries — a missing key surfaces as a plain
+ * sentence, not a silent failure.
+ */
+export async function revealCredentialDetails(id: string): Promise<RevealedCredential> {
+  if (!id) throw new Error('No credential selected.')
+
+  const { data } = await stabilityCaller<Record<string, unknown> | null>(
+    endpoints.credentialManager.secret,
+    { id },
+  )
+  const envelope = extractSecretEnvelope(data)
+  if (!envelope) {
+    throw new Error('The service did not return a stored secret for this credential.')
+  }
+  const secret = await decryptSecret(envelope)
+
+  const body = (data ?? {}) as Record<string, unknown>
+  const text = (value: unknown) =>
+    typeof value === 'string' && value.trim() ? value : undefined
+  return {
+    credential_id: text(body.credential_id) ?? id,
+    name: text(body.name),
+    username: text(body.username),
+    url: text(body.url),
+    notes: text(body.notes),
+    secret,
+  }
+}
+
 /* ── Delete ───────────────────────────────────────────────────────────────── */
 
 /** Permanently remove a credential. Hard delete — the record cannot be restored. */
