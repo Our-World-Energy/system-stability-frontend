@@ -12,11 +12,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   credentialErrorMessage,
   deleteCredential,
+  revealCredentialDetails,
   revealCredentialSecret,
   rotateCredential,
   searchCredentials,
 } from '@/lib/api/credentials'
-import type { RotateCredentialDraft } from '@/lib/api/credentials'
+import type { RevealedCredential, RotateCredentialDraft } from '@/lib/api/credentials'
 import { credentialKeys } from '@/lib/api/query-keys'
 import { notify } from '@/lib/notify'
 import type { Credential } from '@/lib/api/types'
@@ -81,6 +82,28 @@ export function useRevealSecret({ onSuccess }: RevealOptions = {}) {
     mutationFn: (id: string) => revealCredentialSecret(id),
     retry: false,
     onSuccess: (plaintext) => onSuccess?.(plaintext),
+    onError: (err) =>
+      notify.error(credentialErrorMessage(err, 'The secret could not be retrieved.')),
+  })
+}
+
+interface RevealDetailsOptions {
+  onSuccess?: (details: RevealedCredential) => void
+}
+
+/**
+ * Fetch and decrypt a credential's secret *with* its descriptive fields, for the
+ * requester's reveal dialog (auto-access or a granted request).
+ *
+ * A mutation for the same reason as `useRevealSecret`: the plaintext is produced
+ * on demand and handed to `onSuccess` rather than parked in the query cache. The
+ * caller holds it only while the dialog is open and drops it on close.
+ */
+export function useRevealCredentialDetails({ onSuccess }: RevealDetailsOptions = {}) {
+  return useMutation({
+    mutationFn: (id: string) => revealCredentialDetails(id),
+    retry: false,
+    onSuccess: (details) => onSuccess?.(details),
     onError: (err) =>
       notify.error(credentialErrorMessage(err, 'The secret could not be retrieved.')),
   })

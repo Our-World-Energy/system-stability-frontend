@@ -92,7 +92,7 @@ export function RequestAccessModal({ credential, onClose, onSubmitted }: Request
             </span>
           </div>
           <p className="text-fg-subtle mt-1.5 text-xs">
-            {credential.auto_grant
+            {(credential.has_auto_access ?? credential.auto_grant)
               ? 'This credential auto-grants — access opens as soon as you submit.'
               : 'This credential requires an administrator to approve your request.'}
           </p>

@@ -6,10 +6,30 @@ import { CredentialTable } from '@/components/credentials/CredentialTable'
 import { CredentialSearchScreen } from '@/components/credentials/CredentialSearchScreen'
 import { RequestAccessModal } from '@/components/credentials/RequestAccessModal'
 import { RequestApprovedModal } from '@/components/credentials/RequestApprovedModal'
-import { useCredentialSearch } from '@/hooks/useCredentials'
+import { CredentialSecretModal } from '@/components/credentials/CredentialSecretModal'
+import { useCredentialSearch, useRevealCredentialDetails } from '@/hooks/useCredentials'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { credentialErrorMessage } from '@/lib/api/credentials'
+import type { RevealedCredential } from '@/lib/api/credentials'
 import type { Credential, Grant } from '@/lib/api/types'
+
+/** A requester has automatic access when the search row says so (falls back to the record flag). */
+function hasAutoAccess(cred: Credential): boolean {
+  return cred.has_auto_access ?? cred.auto_grant ?? false
+}
+
+/**
+ * Epoch ms this credential's access window closes, or null when it has no limit
+ * (auto-access). The row's own grant wins; a just-submitted session grant is the
+ * fallback until the search refetches.
+ */
+function accessExpiry(cred: Credential, session: Record<string, ActiveGrant>): number | null {
+  if (cred.request_status === 'granted' && cred.grant) {
+    return new Date(cred.grant.expires_at).getTime()
+  }
+  const entry = session[cred.id]
+  return entry ? new Date(entry.grant.expires_at).getTime() : null
+}
 
 /** Catalog filter presets shown as chips above the table. */
 type CatalogFilter = 'all' | 'auto_grants' | 'requires_approval'
@@ -30,6 +50,13 @@ export function CredentialManager() {
   const [requestFor, setRequestFor] = useState<Credential | null>(null)
   const [viewing, setViewing] = useState<ActiveGrant | null>(null)
 
+  // Reveal dialog: the credential whose secret is being shown, and the decrypted
+  // details once they arrive. Both are cleared on close so the plaintext never
+  // outlives the dialog.
+  const [revealFor, setRevealFor] = useState<Credential | null>(null)
+  const [revealed, setRevealed] = useState<RevealedCredential | null>(null)
+  const revealSecret = useRevealCredentialDetails({ onSuccess: setRevealed })
+
   // Grants issued during this session, credential id → window. The service has no
   // "my active grants" route, so this cannot survive a reload — a window opened
   // in an earlier session is real on the backend but invisible here.
@@ -48,8 +75,24 @@ export function CredentialManager() {
   const visible = useMemo(() => {
     const rows = search.data ?? []
     if (filter === 'all') return rows
-    return rows.filter((c) => (filter === 'auto_grants' ? c.auto_grant : !c.auto_grant))
+    return rows.filter((c) => (filter === 'auto_grants' ? hasAutoAccess(c) : !hasAutoAccess(c)))
   }, [search.data, filter])
+
+  const openReveal = (credential: Credential) => {
+    setRevealed(null)
+    setRevealFor(credential)
+    revealSecret.mutate(credential.id, {
+      // A fetch/decrypt failure toasts via the hook; drop the dialog rather than
+      // leaving it spinning.
+      onError: () => setRevealFor(null),
+    })
+  }
+
+  const closeReveal = () => {
+    setRevealFor(null)
+    setRevealed(null)
+    revealSecret.reset()
+  }
 
   const expiryMap = useMemo(() => {
     const map: Record<string, number> = {}
@@ -104,10 +147,7 @@ export function CredentialManager() {
           loading={search.isFetching}
           error={search.isError ? credentialErrorMessage(search.error, 'Search failed.') : null}
           onRequest={setRequestFor}
-          onViewGrant={(cred) => {
-            const entry = grants[cred.id]
-            if (entry) setViewing(entry)
-          }}
+          onReveal={openReveal}
         />
       </CredentialSearchScreen>
 
@@ -131,6 +171,15 @@ export function CredentialManager() {
           onClose={() => setViewing(null)}
         />
       )}
+
+      <CredentialSecretModal
+        open={revealFor !== null}
+        loading={revealSecret.isPending}
+        details={revealed}
+        credentialName={revealFor?.name}
+        expiresAt={revealFor ? accessExpiry(revealFor, grants) : null}
+        onClose={closeReveal}
+      />
     </>
   )
 }

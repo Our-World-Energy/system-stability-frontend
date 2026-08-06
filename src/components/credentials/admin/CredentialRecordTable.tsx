@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { Check, Copy, Loader2 } from 'lucide-react'
+import { KeyRound, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatDuration, formatTimestamp } from '@/lib/format'
-import { copyText } from '@/lib/clipboard'
-import { useRevealSecret } from '@/hooks/useCredentials'
-import { notify } from '@/lib/notify'
+import { useRevealCredentialDetails } from '@/hooks/useCredentials'
+import type { RevealedCredential } from '@/lib/api/credentials'
 import type { Credential } from '@/lib/api/types'
+import { CredentialSecretModal } from '@/components/credentials/CredentialSecretModal'
 import { RowActions, type RecordAction } from './RowActions'
 
 interface CredentialRecordTableProps {
@@ -107,64 +107,67 @@ export function CredentialRecordTable({
 }
 
 /**
- * Masked secret with a copy action.
+ * Masked secret that opens the shared reveal dialog.
  *
- * The value is never rendered — clicking fetches the stored envelope, decrypts
- * it in the browser and puts the plaintext straight on the clipboard, so it
- * exists on screen at no point and in memory only for the length of the copy.
+ * The value is never rendered here or in the dialog — it can only be copied — so
+ * it exists on screen at no point and in memory only while the dialog is open.
  *
  * This relies on the `get-credential-secret` route returning `encrypted_secret`
  * (see `endpoints.credentialManager.secret`) and on the RSA private key being
  * present to decrypt it; either gap fails the click with a plain sentence.
  */
 function SecretCell({ record }: { record: Credential }) {
-  const [copied, setCopied] = useState(false)
-  const reveal = useRevealSecret()
-  const { reset } = reveal
+  const [open, setOpen] = useState(false)
+  const [details, setDetails] = useState<RevealedCredential | null>(null)
+  const reveal = useRevealCredentialDetails({ onSuccess: setDetails })
 
-  const copy = () => {
+  const openModal = () => {
     if (reveal.isPending) return
-    reveal.mutate(record.id, {
-      onSuccess: async (plaintext) => {
-        const ok = await copyText(plaintext)
-        // Drop the plaintext from the mutation's state now it has been used.
-        reset()
-        if (!ok) {
-          notify.error('The secret could not be copied to your clipboard.')
-          return
-        }
-        setCopied(true)
-        setTimeout(() => setCopied(false), 1500)
-      },
-    })
+    setDetails(null)
+    setOpen(true)
+    // A fetch/decrypt failure toasts via the hook; drop the dialog rather than
+    // leaving it spinning.
+    reveal.mutate(record.id, { onError: () => setOpen(false) })
+  }
+
+  const close = () => {
+    setOpen(false)
+    setDetails(null)
+    reveal.reset()
   }
 
   return (
     <div className="flex items-center gap-2">
       <span
-        title="Stored encrypted. Copy to decrypt it locally."
+        title="Stored encrypted. Open to copy it."
         className="text-fg-subtle font-mono text-xs tracking-widest"
       >
         ••••••••••••••••
       </span>
       <button
-        onClick={copy}
+        onClick={openModal}
         disabled={reveal.isPending}
-        aria-label={`Copy secret for ${record.name}`}
-        title="Copy secret to clipboard"
+        aria-label={`View secret for ${record.name}`}
+        title="View & copy secret"
         className={cn(
-          'hover:bg-surface-3 grid size-7 shrink-0 place-items-center rounded-md transition-colors disabled:cursor-not-allowed',
-          copied ? 'text-healthy' : 'text-fg-subtle hover:text-fg',
+          'hover:bg-surface-3 text-fg-subtle hover:text-fg grid size-7 shrink-0 place-items-center rounded-md transition-colors disabled:cursor-not-allowed',
         )}
       >
         {reveal.isPending ? (
           <Loader2 className="size-4 animate-spin" />
-        ) : copied ? (
-          <Check className="size-4" />
         ) : (
-          <Copy className="size-4" />
+          <KeyRound className="size-4" />
         )}
       </button>
+
+      {/* Admin access is not time-boxed, so no `expiresAt` — copy stays available. */}
+      <CredentialSecretModal
+        open={open}
+        loading={reveal.isPending}
+        details={details}
+        credentialName={record.name}
+        onClose={close}
+      />
     </div>
   )
 }

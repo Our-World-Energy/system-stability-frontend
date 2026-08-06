@@ -1,4 +1,4 @@
-import { Clock, ShieldCheck } from 'lucide-react'
+import { Clock, KeyRound } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import { formatCountdown, formatDuration } from '@/lib/format'
@@ -8,14 +8,23 @@ import { EligibilityBadge } from './EligibilityBadge'
 interface CredentialTableProps {
   credentials: Credential[]
   onRequest: (credential: Credential) => void
-  /** Active grants: credential id → epoch ms the elevation window closes. */
+  /** Reveal the secret for a credential the requester may access. */
+  onReveal: (credential: Credential) => void
+  /**
+   * Grants opened in this session: credential id → epoch ms the window closes.
+   * A fallback for a just-submitted auto-grant the search has not refetched yet;
+   * the row's own `grant` (from the API) takes precedence when present.
+   */
   grants: Record<string, number>
   /** Current time (epoch ms), ticked once a second by the page. */
   now: number
-  /** Reopen the grant dialog for a credential whose window is still open. */
-  onViewGrant: (credential: Credential) => void
   loading?: boolean
   error?: string | null
+}
+
+/** True when the requester can open the secret: automatic access or a granted request. */
+function canReveal(cred: Credential): boolean {
+  return cred.has_auto_access === true || cred.request_status === 'granted'
 }
 
 const columns = ['Credential', 'Eligibility', 'Description', 'Elevation', 'Action']
@@ -24,9 +33,9 @@ const columns = ['Credential', 'Eligibility', 'Description', 'Elevation', 'Actio
 export function CredentialTable({
   credentials,
   onRequest,
+  onReveal,
   grants,
   now,
-  onViewGrant,
   loading,
   error,
 }: CredentialTableProps) {
@@ -54,9 +63,15 @@ export function CredentialTable({
         </thead>
         <tbody>
           {credentials.map((cred) => {
-            const expiresAt = grants[cred.id]
-            const remaining = expiresAt ? expiresAt - now : 0
-            const granted = remaining > 0
+            // The API grant (survives reload) wins over a session grant fallback.
+            const grantExpiry =
+              cred.request_status === 'granted' && cred.grant
+                ? new Date(cred.grant.expires_at).getTime()
+                : grants[cred.id]
+            const remaining = grantExpiry ? grantExpiry - now : 0
+            const timerActive = remaining > 0
+            const revealable = canReveal(cred) || timerActive
+            const isPending = cred.request_status === 'pending'
             return (
               <tr
                 key={cred.id}
@@ -76,7 +91,7 @@ export function CredentialTable({
                   </div>
                 </td>
                 <td className="px-4 py-3.5">
-                  <EligibilityBadge autoGrant={cred.auto_grant} />
+                  <EligibilityBadge autoGrant={cred.has_auto_access ?? cred.auto_grant ?? false} />
                 </td>
                 <td className="max-w-xs px-4 py-3.5">
                   <p className="text-fg-muted truncate" title={cred.notes}>
@@ -87,20 +102,29 @@ export function CredentialTable({
                   {formatDuration(cred.elevation_duration_seconds)}
                 </td>
                 <td className="px-4 py-3.5">
-                  {granted ? (
+                  {revealable ? (
+                    // Access the requester already has (auto-access or a granted
+                    // request): reveal the secret, and count down the window when
+                    // the grant carries one.
                     <div className="flex items-center justify-end gap-2">
-                      <span className="border-primary/25 bg-primary/10 text-primary-bright inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[11px] font-semibold">
-                        <Clock className="size-3" />
-                        {formatCountdown(remaining)}
-                      </span>
-                      {/*
-                        Not "Copy Key": no route on this service returns a secret,
-                        so the dialog shows the granted window, not a value.
-                      */}
-                      <Button onClick={() => onViewGrant(cred)} className="py-1.5 text-xs">
-                        <ShieldCheck className="size-3.5" />
-                        View Access
+                      {timerActive && (
+                        <span className="border-primary/25 bg-primary/10 text-primary-bright inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[11px] font-semibold">
+                          <Clock className="size-3" />
+                          {formatCountdown(remaining)}
+                        </span>
+                      )}
+                      <Button onClick={() => onReveal(cred)} className="py-1.5 text-xs">
+                        <KeyRound className="size-3.5" />
+                        View Password
                       </Button>
+                    </div>
+                  ) : isPending ? (
+                    // A request is already in the queue — nothing to do but wait.
+                    <div className="flex justify-end">
+                      <span className="border-degraded/30 bg-degraded/10 text-degraded inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[11px] font-semibold">
+                        <Clock className="size-3" />
+                        Pending Approval
+                      </span>
                     </div>
                   ) : (
                     <div className="text-right">
