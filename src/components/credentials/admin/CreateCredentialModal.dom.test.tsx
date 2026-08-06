@@ -17,6 +17,16 @@ vi.mock('@/lib/api/caller', async (importOriginal) => ({
   stabilityCaller,
 }))
 
+// The platform/department dropdowns read the get-metadata catalog through this
+// hook (a different host). Stub it so the DOM test stays off the network; each
+// test can point `metadata.current` at whatever catalog it needs.
+const metadata = vi.hoisted(() => ({
+  current: undefined as import('@/lib/api/user-management.types').MetadataData | undefined,
+}))
+vi.mock('@/hooks/useUserManagement', () => ({
+  useUserMetadata: () => ({ data: metadata.current, isLoading: false }),
+}))
+
 // Outcomes are announced by toast, and the container lives in App.tsx — so the
 // assertions here are on what would be shown, not on toastify's own DOM.
 const notify = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }))
@@ -54,6 +64,7 @@ const submit = () => fireEvent.click(screen.getByRole('button', { name: /create 
 
 beforeEach(() => {
   vi.stubEnv('VITE_CREDENTIAL_PUBLIC_KEY', 'test-public-key')
+  metadata.current = undefined
   stabilityCaller.mockResolvedValue({
     status: 200,
     message: 'Credential created',
@@ -68,7 +79,7 @@ afterEach(() => {
 })
 
 describe('CreateCredentialModal', () => {
-  it('shows exactly the seven fields the form is specified to have', () => {
+  it('shows exactly the fields the form is specified to have', () => {
     renderModal()
 
     const labels = [
@@ -76,6 +87,9 @@ describe('CreateCredentialModal', () => {
       'Username',
       'Secret / Password',
       'URL',
+      'Platform',
+      'Department',
+      'This is a development credential',
       '2FA Type',
       '2FA Approver',
       'Notes',
@@ -84,6 +98,7 @@ describe('CreateCredentialModal', () => {
 
     // Anything beyond that list is a regression — tags, elevation, auto-grant and
     // a confirm-secret box all belong to the payload or to nothing, not the form.
+    // The custom-platform text box is not counted: it only appears in "add new" mode.
     const controls = document.querySelectorAll('input, select, textarea')
     expect(controls).toHaveLength(labels.length)
   })
@@ -116,6 +131,65 @@ describe('CreateCredentialModal', () => {
     expect(onClose).toHaveBeenCalled()
     // The service's own wording is preferred over a generic "created".
     expect(notify.success).toHaveBeenCalledWith('Credential created')
+  })
+
+  it('sends platform_id, department_id and the dev flag for catalog picks', async () => {
+    metadata.current = {
+      roles: [],
+      departments: [{ id: 3, name: 'Engineering' }],
+      platforms: [{ id: 10, key: 'aws', name: 'AWS' }],
+    }
+    renderModal()
+    fillValidForm()
+    // Native selects carry the ids, not the display names.
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: '10' } })
+    fireEvent.change(screen.getByLabelText('Department'), { target: { value: '3' } })
+    fireEvent.click(screen.getByLabelText('This is a development credential'))
+    submit()
+
+    await waitFor(() => expect(stabilityCaller).toHaveBeenCalledTimes(1))
+    expect(stabilityCaller.mock.calls[0][1]).toMatchObject({
+      platform_id: 10,
+      platform_other: '',
+      department_id: 3,
+      is_dev: true,
+    })
+  })
+
+  it('sends platform_other with a null platform_id when "Other" is chosen', async () => {
+    metadata.current = {
+      roles: [],
+      departments: [],
+      platforms: [{ id: 10, key: 'aws', name: 'AWS' }],
+    }
+    renderModal()
+    fillValidForm()
+
+    // The free-text box only exists after choosing "Other".
+    expect(screen.queryByLabelText(/other platform name/i)).toBeNull()
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'other' } })
+    type(/other platform name/i, 'Internal DevOps Platform')
+    submit()
+
+    await waitFor(() => expect(stabilityCaller).toHaveBeenCalledTimes(1))
+    expect(stabilityCaller.mock.calls[0][1]).toMatchObject({
+      platform_id: null,
+      platform_other: 'Internal DevOps Platform',
+    })
+  })
+
+  it('leaves platform, department and dev flag empty when untouched', async () => {
+    renderModal()
+    fillValidForm()
+    submit()
+
+    await waitFor(() => expect(stabilityCaller).toHaveBeenCalledTimes(1))
+    expect(stabilityCaller.mock.calls[0][1]).toMatchObject({
+      platform_id: null,
+      platform_other: '',
+      department_id: null,
+      is_dev: false,
+    })
   })
 
   it('keeps validation quiet until the first submit, then blocks the call', () => {

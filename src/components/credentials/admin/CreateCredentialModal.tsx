@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Field, controlClass } from '@/components/ui/Field'
 import { cn } from '@/lib/utils'
 import { useCreateCredential } from '@/hooks/useCreateCredential'
+import { useUserMetadata } from '@/hooks/useUserManagement'
 import { isEncryptionConfigured } from '@/lib/crypto/keys'
 import {
   credentialLimits,
@@ -21,6 +22,9 @@ import type {
 } from '@/lib/api/credentials'
 import { SecretInput } from './SecretInput'
 
+/** Sentinel `<option>` value ("Other") that switches the platform control to free text. */
+const OTHER_PLATFORM = 'other'
+
 interface CreateCredentialModalProps {
   open: boolean
   onClose: () => void
@@ -35,6 +39,11 @@ interface CreateCredentialModalProps {
  * `lib/crypto/secret-crypto.ts`. Nothing here ever holds the plaintext beyond the
  * component's own state, which is dropped every time the dialog opens or closes.
  *
+ * Platform and department are populated from the same get-metadata catalog the
+ * User Management form uses; platform additionally allows a value not yet in the
+ * catalog. Both, plus the dev-credential flag, are optional — leaving them alone
+ * reproduces the original create exactly.
+ *
  * The payload also carries tags, an elevation window and an auto-grant flag; they
  * have no control here and go out at their defaults (see `CredentialDraft`).
  */
@@ -43,6 +52,16 @@ export function CreateCredentialModal({ open, onClose, onCreated }: CreateCreden
   // Errors stay hidden until the first submit, so the form does not scold anyone
   // for fields they have not reached yet.
   const [submitted, setSubmitted] = useState(false)
+  // Whether the platform control is in free-text ("add new") mode rather than
+  // picking from the catalog. Reset with the draft on every open/close.
+  const [platformCustom, setPlatformCustom] = useState(false)
+
+  // Catalog for the platform/department dropdowns. Fetched only while the dialog
+  // is open, and allowed to fail quietly: platform still takes a typed value and
+  // department simply has no options, so a metadata 403 never blocks a create.
+  const metadata = useUserMetadata(open)
+  const platforms = metadata.data?.platforms ?? []
+  const departments = metadata.data?.departments ?? []
 
   const mutation = useCreateCredential({
     onSuccess: (result, submittedDraft) => {
@@ -58,6 +77,7 @@ export function CreateCredentialModal({ open, onClose, onCreated }: CreateCreden
   useEffect(() => {
     setDraft(emptyCredentialDraft())
     setSubmitted(false)
+    setPlatformCustom(false)
     resetMutation()
   }, [open, resetMutation])
 
@@ -74,6 +94,23 @@ export function CreateCredentialModal({ open, onClose, onCreated }: CreateCreden
 
   const set = <K extends keyof CredentialDraft>(key: K, value: CredentialDraft[K]) =>
     setDraft((d) => ({ ...d, [key]: value }))
+
+  // "Other" flips the control to a free-text input and clears any catalog id;
+  // picking a catalog platform flips it back and drops any typed name. Exactly
+  // one of platformId / platformOther is ever populated.
+  const onPlatformSelect = (value: string) => {
+    if (value === OTHER_PLATFORM) {
+      setPlatformCustom(true)
+      setDraft((d) => ({ ...d, platformId: null }))
+    } else {
+      setPlatformCustom(false)
+      setDraft((d) => ({
+        ...d,
+        platformId: value ? Number(value) : null,
+        platformOther: '',
+      }))
+    }
+  }
 
   const submit = () => {
     setSubmitted(true)
@@ -163,6 +200,80 @@ export function CreateCredentialModal({ open, onClose, onCreated }: CreateCreden
           />
           <FieldError message={shown.url} />
         </Field>
+
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <Field label="Platform" htmlFor="cred-platform">
+            <SelectControl
+              id="cred-platform"
+              value={
+                platformCustom
+                  ? OTHER_PLATFORM
+                  : draft.platformId != null
+                    ? String(draft.platformId)
+                    : ''
+              }
+              onChange={onPlatformSelect}
+              disabled={busy}
+            >
+              <option value="">
+                {metadata.isLoading ? 'Loading platforms…' : 'Select platform…'}
+              </option>
+              {platforms.map((p) => (
+                <option key={p.id} value={String(p.id)}>
+                  {p.name}
+                </option>
+              ))}
+              <option value={OTHER_PLATFORM}>Other</option>
+            </SelectControl>
+            {platformCustom && (
+              <input
+                value={draft.platformOther}
+                onChange={(e) => set('platformOther', e.target.value)}
+                placeholder="Platform name"
+                aria-label="Other platform name"
+                maxLength={credentialLimits.nameMaxLength}
+                disabled={busy}
+                autoFocus
+                className={cn(controlClass, 'mt-2 h-11')}
+              />
+            )}
+          </Field>
+          <Field label="Department" htmlFor="cred-department">
+            <SelectControl
+              id="cred-department"
+              value={draft.departmentId != null ? String(draft.departmentId) : ''}
+              onChange={(v) => set('departmentId', v ? Number(v) : null)}
+              disabled={busy}
+            >
+              <option value="">
+                {metadata.isLoading ? 'Loading departments…' : 'No department'}
+              </option>
+              {departments.map((d) => (
+                <option key={d.id} value={String(d.id)}>
+                  {d.name}
+                </option>
+              ))}
+            </SelectControl>
+          </Field>
+        </div>
+
+        <label
+          htmlFor="cred-is-dev"
+          className={cn(
+            'flex w-fit items-center gap-2.5 text-sm',
+            busy ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+          )}
+        >
+          <input
+            id="cred-is-dev"
+            type="checkbox"
+            checked={draft.isDev}
+            onChange={(e) => set('isDev', e.target.checked)}
+            disabled={busy}
+            className="accent-primary-bright size-4"
+          />
+          <span className="text-fg">This is a development credential</span>
+        </label>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <Field label="2FA Type" htmlFor="cred-2fa">
