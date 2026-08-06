@@ -14,12 +14,13 @@ import logoUrl from '@/assets/Logo.svg'
 function Brand({ collapsed }: { collapsed: boolean }) {
   return (
     <div className={cn('flex h-16 items-center gap-3 px-4', collapsed && 'justify-center px-0')}>
-      <img src={logoUrl} alt="Our World Energy" className="size-10 shrink-0" />
+      <img src={logoUrl} alt="Backplate by Our World Energy" className="size-10 shrink-0" />
       {!collapsed && (
         <div className="overflow-hidden">
-          <p className="text-fg truncate text-sm leading-tight font-bold">OWE</p>
+          {/* Product name on top, the company that makes it underneath. */}
+          <p className="text-fg truncate text-sm leading-tight font-bold">BACKPLATE</p>
           <p className="text-fg-muted truncate font-mono text-[10px] tracking-[0.12em] uppercase">
-            Our World Energy
+            By - Our World Energy
           </p>
         </div>
       )}
