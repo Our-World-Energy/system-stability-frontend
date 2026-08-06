@@ -11,7 +11,7 @@ interface AuthShellProps {
 }
 
 /**
- * Full-page frame shared by every auth screen: ambient backdrop, the OWE mark
+ * Full-page frame shared by every auth screen: ambient backdrop, the Backplate mark
  * pinned top-left, and a centred card with the emerald hairline along its top edge.
  */
 export function AuthShell({ title, subtitle, children }: AuthShellProps) {
@@ -20,7 +20,7 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
       <AuthBackdrop />
 
       <div className="absolute top-5 left-5 z-10 grid size-12 place-items-center rounded-xl border border-white/5 bg-white/[0.04] backdrop-blur-sm sm:top-6 sm:left-6">
-        <img src={logoUrl} alt="Our World Energy" className="size-8" />
+        <img src={logoUrl} alt="Backplate by Our World Energy" className="size-8" />
       </div>
 
       <div className="relative flex flex-1 items-center justify-center px-4 py-24 sm:px-6">
