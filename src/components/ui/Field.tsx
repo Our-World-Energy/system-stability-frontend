@@ -14,10 +14,24 @@ interface FieldProps {
   /** Appends the emerald asterisk the designs use to mark mandatory fields. */
   required?: boolean
   className?: string
+  /**
+   * Validation message shown under the control. Rendered with the id
+   * `${htmlFor}-error`, so the control itself can point at it with
+   * `aria-describedby` and pair that with `aria-invalid`.
+   */
+  error?: string | null
 }
 
 /** Labeled form-field wrapper with the mono uppercase caption used across modals. */
-export function Field({ label, children, accent, htmlFor, required, className }: FieldProps) {
+export function Field({
+  label,
+  children,
+  accent,
+  htmlFor,
+  required,
+  className,
+  error,
+}: FieldProps) {
   return (
     <div className={className}>
       <label
@@ -37,6 +51,11 @@ export function Field({ label, children, accent, htmlFor, required, className }:
         )}
       </label>
       {children}
+      {error && (
+        <p id={htmlFor ? `${htmlFor}-error` : undefined} role="alert" className="text-critical-bright mt-2 text-xs">
+          {error}
+        </p>
+      )}
     </div>
   )
 }

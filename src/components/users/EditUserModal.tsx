@@ -63,9 +63,8 @@ export function EditUserModal({
         </Button>
       }
     >
+      {/* The form renders its own validation messages; `gap` only gates Save. */}
       <UserFormFields form={form} onChange={patch} metadata={metadata} variant="edit" />
-
-      {gap && <p className="text-fg-subtle mt-4 text-[13px]">{gap}</p>}
     </Modal>
   )
 }
