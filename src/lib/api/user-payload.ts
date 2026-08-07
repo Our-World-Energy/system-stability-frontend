@@ -168,22 +168,112 @@ function unique(values: string[] | undefined): string[] {
   return out
 }
 
+/* ── field-level validation ───────────────────────────────────────────────── */
+
 /**
- * Why the form cannot be submitted yet, or null when it can.
+ * A person's name: letters, plus the two joiners real names actually contain —
+ * the hyphen in "Doe-Reid" and the apostrophe in "O'Brien". Everything else,
+ * including every digit, is rejected.
  *
- * Mirrors the backend's required-field rules so the dialog can disable its submit
- * button instead of relying on a round trip. The backend stays the authority — this
- * only catches what it would certainly reject.
+ * `\p{L}` rather than `A-Za-z` so accented and non-Latin names (José, Müller,
+ * Ahmed's Arabic spelling) are not treated as special characters. Tighten to
+ * `/^[\p{L}][\p{L} ]*$/u` if hyphens and apostrophes should be refused too.
  */
-export function describeUserFormGap(form: UserFormValues): string | null {
-  if (!form.fullName.trim()) return 'Enter the user’s full name.'
-  if (!form.email.trim()) return 'Enter an email address.'
-  if (!form.role) return 'Select a role.'
+const NAME_PATTERN = /^[\p{L}][\p{L} '-]*$/u
+
+/** Digits only — no spaces, no punctuation, no leading `+`. */
+const PHONE_PATTERN = /^\d+$/
+
+/** Something before the @, something after it, and a dotted domain. */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/** Which control an error belongs under. */
+export type UserFormField = 'fullName' | 'email' | 'phoneNumber' | 'role' | 'department' | 'platforms'
+
+export type UserFormErrors = Partial<Record<UserFormField, string>>
+
+/** The name rule, or null when it passes. Checked in the order a user hits them. */
+export function validateFullName(value: string): string | null {
+  if (/^\s/.test(value)) return 'Name cannot start with a space.'
+  const name = value.trim()
+  if (!name) return 'Enter the user’s full name.'
+  if (/\d/.test(name)) return 'Name cannot contain numbers.'
+  if (!NAME_PATTERN.test(name)) return 'Name cannot contain special characters.'
+  return null
+}
+
+/** Phone is optional, so an empty value passes; anything present must be digits. */
+export function validatePhoneNumber(value: string | undefined): string | null {
+  if (value === undefined) return null
+  if (/^\s/.test(value)) return 'Phone number cannot start with a space.'
+  const phone = value.trim()
+  if (!phone) return null
+  if (!PHONE_PATTERN.test(phone)) return 'Phone number must be digits only.'
+  return null
+}
+
+export function validateEmail(value: string): string | null {
+  if (/^\s/.test(value)) return 'Email cannot start with a space.'
+  const email = value.trim()
+  if (!email) return 'Enter an email address.'
+  if (!email.includes('@')) return 'Email must contain an @.'
+  if (!EMAIL_PATTERN.test(email)) return 'Enter a valid email address.'
+  return null
+}
+
+/**
+ * Every field error at once, keyed by control, so the dialog can show each message
+ * under the input it belongs to rather than one message for the whole form.
+ *
+ * These mirror what the backend would reject plus the house rules on name and phone
+ * shape. The backend remains the authority; this only catches what is certainly bad
+ * before spending a round trip on it.
+ */
+export function validateUserForm(form: UserFormValues): UserFormErrors {
+  const errors: UserFormErrors = {}
+
+  const name = validateFullName(form.fullName)
+  if (name) errors.fullName = name
+
+  const email = validateEmail(form.email)
+  if (email) errors.email = email
+
+  const phone = validatePhoneNumber(form.phoneNumber)
+  if (phone) errors.phoneNumber = phone
+
+  if (!form.role) {
+    errors.role = 'Select a role.'
+    return errors // The scope rules below depend on which role was chosen.
+  }
   if (needsDepartment(form.role) && !form.department?.trim()) {
-    return 'This role is scoped to a department — select one.'
+    errors.department = 'This role is scoped to a department — select one.'
   }
   if (needsPlatforms(form.role) && !unique(form.platforms).length) {
-    return 'A Platform Admin needs at least one platform.'
+    errors.platforms = 'A Platform Admin needs at least one platform.'
+  }
+
+  return errors
+}
+
+/** The order errors are surfaced in when only one can be shown. */
+const FIELD_ORDER: UserFormField[] = [
+  'fullName',
+  'email',
+  'phoneNumber',
+  'role',
+  'department',
+  'platforms',
+]
+
+/**
+ * Why the form cannot be submitted yet, or null when it can — the first field error
+ * in form order. Backs the summary line under the dialog's submit button, while
+ * `validateUserForm` backs the per-field messages.
+ */
+export function describeUserFormGap(form: UserFormValues): string | null {
+  const errors = validateUserForm(form)
+  for (const field of FIELD_ORDER) {
+    if (errors[field]) return errors[field]!
   }
   return null
 }

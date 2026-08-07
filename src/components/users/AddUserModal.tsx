@@ -62,10 +62,10 @@ export function AddUserModal({
         </Button>
       }
     >
+      {/* The form owns its own validation messages — per field, plus one summary
+          line for whatever has no inline message yet. `gap` here only gates the
+          submit button. */}
       <UserFormFields form={form} onChange={patch} metadata={metadata} variant="create" />
-
-      {/* Says what is still missing instead of leaving a disabled button unexplained. */}
-      {gap && <p className="text-fg-subtle mt-4 text-[13px]">{gap}</p>}
 
       {/* `mt-5` and an even `p-3` keep the note on the form's own spacing scale —
           20px between blocks, 12px inside a box — instead of 24px / 14px-by-12px. */}

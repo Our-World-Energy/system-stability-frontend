@@ -454,6 +454,136 @@ describe('User Management — create', () => {
   })
 })
 
+describe('User Management — add-user field validation', () => {
+  /** Type into a field and leave it, which is when its message appears. */
+  function fill(labelPattern: RegExp, value: string) {
+    const input = screen.getByLabelText(labelPattern)
+    fireEvent.change(input, { target: { value } })
+    fireEvent.blur(input)
+    return input
+  }
+
+  it('hints while typing, and only flags the field once it is left', async () => {
+    renderPage()
+    await waitForRegistry()
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+
+    const name = screen.getByLabelText(/full_name/i)
+    // Blank form: the summary explains why Create is disabled.
+    expect(screen.getByText(/enter the user’s full name/i)).toBeTruthy()
+
+    fireEvent.change(name, { target: { value: 'Elias 2' } })
+    // Mid-typing the problem is named in the muted summary, but the control is not
+    // yet marked invalid — no red message under a field someone is still filling in.
+    expect(screen.getByText(/cannot contain numbers/i)).toBeTruthy()
+    expect(name.getAttribute('aria-invalid')).toBeNull()
+    expect(document.getElementById('user-name-error')).toBeNull()
+
+    fireEvent.blur(name)
+    // Now it is flagged inline, and the summary drops it rather than repeating it.
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(document.getElementById('user-name-error')!.textContent).toMatch(
+      /cannot contain numbers/i,
+    )
+    expect(screen.getAllByText(/cannot contain numbers/i)).toHaveLength(1)
+  })
+
+  it('rejects a name that starts with a space, has a digit, or has a symbol', async () => {
+    renderPage()
+    await waitForRegistry()
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+
+    fill(/full_name/i, ' Elias')
+    expect(screen.getByText(/name cannot start with a space/i)).toBeTruthy()
+
+    fill(/full_name/i, 'Elias2')
+    expect(screen.getByText(/name cannot contain numbers/i)).toBeTruthy()
+
+    fill(/full_name/i, 'Elias@Thorne')
+    expect(screen.getByText(/name cannot contain special characters/i)).toBeTruthy()
+
+    // A legitimate hyphenated name is accepted, and the message clears.
+    fill(/full_name/i, 'Jonathan Doe-Reid')
+    expect(screen.queryByText(/name cannot/i)).toBeNull()
+  })
+
+  it('rejects a phone number that is not digits only', async () => {
+    renderPage()
+    await waitForRegistry()
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+
+    fill(/phone_number/i, ' 555')
+    expect(screen.getByText(/phone number cannot start with a space/i)).toBeTruthy()
+
+    fill(/phone_number/i, '+1 (555) 000-0000')
+    expect(screen.getByText(/digits only/i)).toBeTruthy()
+
+    fill(/phone_number/i, 'call me')
+    expect(screen.getByText(/digits only/i)).toBeTruthy()
+
+    fill(/phone_number/i, '5550000000')
+    expect(screen.queryByText(/digits only/i)).toBeNull()
+
+    // The field is optional, so clearing it is not an error.
+    fill(/phone_number/i, '')
+    expect(screen.queryByText(/digits only/i)).toBeNull()
+    expect(screen.queryByText(/phone number cannot/i)).toBeNull()
+  })
+
+  it('requires an @ in the email and refuses a leading space', async () => {
+    renderPage()
+    await waitForRegistry()
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+
+    fill(/email_address/i, ' a@ourworldenergy.com')
+    expect(screen.getByText(/email cannot start with a space/i)).toBeTruthy()
+
+    fill(/email_address/i, 'ourworldenergy.com')
+    expect(screen.getByText(/must contain an @/i)).toBeTruthy()
+
+    fill(/email_address/i, 'elias@')
+    expect(screen.getByText(/valid email address/i)).toBeTruthy()
+
+    fill(/email_address/i, 'elias.thorne@ourworldenergy.com')
+    expect(screen.queryByText(/email cannot|must contain an @|valid email/i)).toBeNull()
+  })
+
+  it('keeps Create disabled until every field is valid, then sends trimmed values', async () => {
+    renderPage()
+    await waitForRegistry()
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+
+    fill(/full_name/i, 'Elias 2')
+    fill(/email_address/i, 'elias.thorne@ourworldenergy.com')
+    chooseRole('org_admin')
+    // Name is still invalid, so the action stays blocked.
+    expect(createButton().disabled).toBe(true)
+
+    fill(/full_name/i, 'Elias Thorne')
+    fill(/phone_number/i, '55500')
+    expect(createButton().disabled).toBe(false)
+
+    fireEvent.click(createButton())
+    await waitFor(() => expect(mockCreateUser).toHaveBeenCalledTimes(1))
+    expect(mockCreateUser.mock.calls[0][0]).toEqual({
+      email: 'elias.thorne@ourworldenergy.com',
+      full_name: 'Elias Thorne',
+      phone_number: '55500',
+      role: 'org_admin',
+    })
+  })
+
+  it('marks an invalid control for assistive tech', async () => {
+    renderPage()
+    await waitForRegistry()
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+
+    const email = fill(/email_address/i, 'nope')
+    expect(email.getAttribute('aria-invalid')).toBe('true')
+    expect(email.getAttribute('aria-describedby')).toBe('user-email-error')
+  })
+})
+
 describe('User Management — update and delete', () => {
   it('rebuilds scope when an edit changes the role', async () => {
     renderPage()

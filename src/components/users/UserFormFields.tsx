@@ -3,13 +3,28 @@ import { ChevronDown } from 'lucide-react'
 import { Field, controlClass } from '@/components/ui/Field'
 import { cn } from '@/lib/utils'
 import { byRankDescending } from '@/lib/role-display'
-import { isGlobalRole, needsDepartment, needsPlatforms } from '@/lib/api/user-payload'
-import type { UserFormValues } from '@/lib/api/user-payload'
+import {
+  isGlobalRole,
+  needsDepartment,
+  needsPlatforms,
+  validateUserForm,
+} from '@/lib/api/user-payload'
+import type { UserFormField, UserFormValues } from '@/lib/api/user-payload'
 import type { MetadataData, RoleKey } from '@/lib/api/user-management.types'
 
 /** Caption styling shared with `Field`, for the controls it can't label directly. */
 const captionClass =
   'mb-2 block font-mono text-[11px] font-semibold tracking-[0.08em] uppercase text-fg-muted'
+
+/** Order the summary line picks a problem to name, matching the field order. */
+const SUMMARY_ORDER = [
+  'fullName',
+  'email',
+  'phoneNumber',
+  'role',
+  'department',
+  'platforms',
+] as const satisfies readonly UserFormField[]
 
 interface Option {
   /** What goes on the wire — a role/platform key, or an exact department name. */
@@ -56,6 +71,33 @@ export function UserFormFields({ form, onChange, metadata, variant }: UserFormFi
 
   const showDepartment = needsDepartment(form.role)
   const showPlatforms = needsPlatforms(form.role)
+
+  /*
+    Validation messages appear once a control has been left, not on the first
+    keystroke — "Email must contain an @" while someone is still typing the local
+    part is noise. The submit button is disabled throughout either way, and the
+    dialog shows the first outstanding problem underneath it, so nothing is hidden.
+  */
+  const [touched, setTouched] = useState<Partial<Record<UserFormField, boolean>>>({})
+  const errors = validateUserForm(form)
+  const errorFor = (field: UserFormField) => (touched[field] ? errors[field] : undefined)
+  const markTouched = (field: UserFormField) => setTouched((t) => ({ ...t, [field]: true }))
+
+  /*
+    One line under the form for the first problem that has NO inline message yet —
+    an untouched text field, or one of the dropdowns, which have nowhere of their
+    own to put a message. Skipping fields that already show their error inline
+    keeps the same sentence from appearing twice on screen.
+  */
+  const summary = SUMMARY_ORDER.map((field) =>
+    touched[field] ? undefined : errors[field],
+  ).find(Boolean)
+
+  /** `aria-invalid` plus a pointer at the message `Field` renders. */
+  const errorProps = (id: string, field: UserFormField) =>
+    errorFor(field)
+      ? ({ 'aria-invalid': true, 'aria-describedby': `${id}-error` } as const)
+      : {}
 
   const roleOptions = useMemo<Option[]>(
     () => byRankDescending(metadata.roles).map((r) => ({ value: r.key, label: r.name })),
@@ -104,23 +146,40 @@ export function UserFormFields({ form, onChange, metadata, variant }: UserFormFi
   return (
     <div className="space-y-5">
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label={label('full_name', 'full name')} htmlFor="user-name" required={creating}>
+        <Field
+          label={label('full_name', 'full name')}
+          htmlFor="user-name"
+          required={creating}
+          error={errorFor('fullName')}
+        >
           <input
             id="user-name"
             value={form.fullName}
             onChange={(e) => onChange({ fullName: e.target.value })}
+            onBlur={() => markTouched('fullName')}
             placeholder="e.g. Elias Thorne"
             className={cn(controlClass, 'h-11')}
+            {...errorProps('user-name', 'fullName')}
           />
         </Field>
 
-        <Field label={label('phone_number', 'phone number')} htmlFor="user-phone">
+        <Field
+          label={label('phone_number', 'phone number')}
+          htmlFor="user-phone"
+          error={errorFor('phoneNumber')}
+        >
           <input
             id="user-phone"
+            // Digits only, so the numeric keypad is the right one on mobile.
+            // `inputMode` rather than type="number", which would add spinners and
+            // let "1e5" through.
+            inputMode="numeric"
             value={form.phoneNumber ?? ''}
             onChange={(e) => onChange({ phoneNumber: e.target.value })}
-            placeholder="+1 (555) 000-0000"
+            onBlur={() => markTouched('phoneNumber')}
+            placeholder="5550000000"
             className={cn(controlClass, 'h-11 font-mono')}
+            {...errorProps('user-phone', 'phoneNumber')}
           />
         </Field>
       </div>
@@ -129,14 +188,19 @@ export function UserFormFields({ form, onChange, metadata, variant }: UserFormFi
         label={label('email_address', 'email address')}
         htmlFor="user-email"
         required={creating}
+        error={errorFor('email')}
       >
         <input
           id="user-email"
-          type="email"
+          // Deliberately not type="email": the browser's own bubble would compete
+          // with the message below, and its rules differ from the backend's.
+          type="text"
           value={form.email}
           onChange={(e) => onChange({ email: e.target.value })}
+          onBlur={() => markTouched('email')}
           placeholder="user.identity@ourworldenergy.com"
           className={cn(controlClass, 'h-11 font-mono')}
+          {...errorProps('user-email', 'email')}
         />
       </Field>
 
@@ -229,6 +293,10 @@ export function UserFormFields({ form, onChange, metadata, variant }: UserFormFi
           className={cn(controlClass, 'resize-none py-2.5')}
         />
       </Field>
+
+      {/* Says what is still outstanding, so the disabled submit button is never
+          unexplained. Fields already showing their own message are skipped. */}
+      {summary && <p className="text-fg-subtle text-[13px]">{summary}</p>}
     </div>
   )
 }

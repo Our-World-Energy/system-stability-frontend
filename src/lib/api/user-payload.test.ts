@@ -4,6 +4,10 @@ import {
   buildUpdateUserPayload,
   describeUserFormGap,
   formValuesFromUser,
+  validateEmail,
+  validateFullName,
+  validatePhoneNumber,
+  validateUserForm,
   type UserFormValues,
 } from './user-payload'
 import type { Role, UserRecord } from './user-management.types'
@@ -17,7 +21,9 @@ function dirtyForm(overrides: Partial<UserFormValues> = {}): UserFormValues {
   return {
     email: 'new.user@ourworldenergy.com',
     fullName: 'New User',
-    phoneNumber: '+1 (555) 000-0000',
+    // Digits only — the form now refuses "+1 (555) 000-0000", even though that is
+    // the shape the handbook's own examples use. See validatePhoneNumber.
+    phoneNumber: '5550000000',
     description: 'reason for access',
     role: 'standard_user',
     department: 'Internal Operations',
@@ -38,7 +44,7 @@ describe('buildCreateUserPayload — global roles', () => {
       expect(payload).toEqual({
         email: 'new.user@ourworldenergy.com',
         full_name: 'New User',
-        phone_number: '+1 (555) 000-0000',
+        phone_number: '5550000000',
         description: 'reason for access',
         role,
       })
@@ -161,9 +167,11 @@ describe('describeUserFormGap', () => {
   })
 
   it('requires name, email and role', () => {
-    expect(describeUserFormGap(dirtyForm({ fullName: ' ' }))).toMatch(/full name/i)
+    expect(describeUserFormGap(dirtyForm({ fullName: '' }))).toMatch(/full name/i)
     expect(describeUserFormGap(dirtyForm({ email: '' }))).toMatch(/email/i)
     expect(describeUserFormGap(dirtyForm({ role: '' }))).toMatch(/role/i)
+    // A space-only name trips the leading-space rule before the empty-name one.
+    expect(describeUserFormGap(dirtyForm({ fullName: ' ' }))).toMatch(/start with a space/i)
   })
 
   it('requires a department only for the department roles', () => {
@@ -178,6 +186,113 @@ describe('describeUserFormGap', () => {
       /platform/i,
     )
     expect(describeUserFormGap(dirtyForm({ role: 'standard_user', platforms: [] }))).toBeNull()
+  })
+})
+
+describe('validateFullName', () => {
+  it('rejects a leading space', () => {
+    expect(validateFullName(' Elias Thorne')).toMatch(/cannot start with a space/i)
+  })
+
+  it('rejects digits anywhere in the name', () => {
+    expect(validateFullName('Elias2')).toMatch(/cannot contain numbers/i)
+    expect(validateFullName('3lias Thorne')).toMatch(/cannot contain numbers/i)
+  })
+
+  it('rejects special characters', () => {
+    expect(validateFullName('Elias@Thorne')).toMatch(/special characters/i)
+    expect(validateFullName('Elias_Thorne')).toMatch(/special characters/i)
+    expect(validateFullName('<script>')).toMatch(/special characters/i)
+  })
+
+  it('requires something other than whitespace', () => {
+    expect(validateFullName('')).toMatch(/full name/i)
+  })
+
+  it('accepts ordinary names, including the two real ones use', () => {
+    // Hyphen and apostrophe are deliberately allowed — rejecting them would refuse
+    // legitimate names, and the registry already contains a "Doe-Reid".
+    expect(validateFullName('Elias Thorne')).toBeNull()
+    expect(validateFullName('Jonathan Doe-Reid')).toBeNull()
+    expect(validateFullName("Siobhan O'Brien")).toBeNull()
+    // Non-Latin letters are letters, not special characters.
+    expect(validateFullName('José Müller')).toBeNull()
+    // A trailing space is fine; it gets trimmed before it is sent.
+    expect(validateFullName('Elias Thorne ')).toBeNull()
+  })
+})
+
+describe('validatePhoneNumber', () => {
+  it('rejects a leading space', () => {
+    expect(validatePhoneNumber(' 5550000000')).toMatch(/cannot start with a space/i)
+  })
+
+  it('rejects letters and punctuation', () => {
+    expect(validatePhoneNumber('555-000-0000')).toMatch(/digits only/i)
+    expect(validatePhoneNumber('+1 (555) 000-0000')).toMatch(/digits only/i)
+    expect(validatePhoneNumber('call me')).toMatch(/digits only/i)
+    expect(validatePhoneNumber('555 000')).toMatch(/digits only/i)
+  })
+
+  it('accepts digits, and treats absent as fine because the field is optional', () => {
+    expect(validatePhoneNumber('5550000000')).toBeNull()
+    expect(validatePhoneNumber('')).toBeNull()
+    expect(validatePhoneNumber(undefined)).toBeNull()
+  })
+})
+
+describe('validateEmail', () => {
+  it('rejects a leading space', () => {
+    expect(validateEmail(' a@ourworldenergy.com')).toMatch(/cannot start with a space/i)
+  })
+
+  it('requires an @', () => {
+    expect(validateEmail('ourworldenergy.com')).toMatch(/must contain an @/i)
+  })
+
+  it('rejects an @ with nothing usable around it', () => {
+    expect(validateEmail('@ourworldenergy.com')).toMatch(/valid email/i)
+    expect(validateEmail('elias@')).toMatch(/valid email/i)
+    expect(validateEmail('elias@ourworldenergy')).toMatch(/valid email/i)
+    expect(validateEmail('elias thorne@owe.com')).toMatch(/valid email/i)
+  })
+
+  it('requires something', () => {
+    expect(validateEmail('')).toMatch(/email address/i)
+  })
+
+  it('accepts an ordinary address', () => {
+    expect(validateEmail('elias.thorne@ourworldenergy.com')).toBeNull()
+    expect(validateEmail('elias.thorne@ourworldenergy.com ')).toBeNull()
+  })
+})
+
+describe('validateUserForm', () => {
+  it('reports every bad field at once, keyed by control', () => {
+    const errors = validateUserForm(
+      dirtyForm({ fullName: 'Elias 2', email: 'nope', phoneNumber: '+1 555' }),
+    )
+
+    expect(errors.fullName).toMatch(/numbers/i)
+    expect(errors.email).toMatch(/@/)
+    expect(errors.phoneNumber).toMatch(/digits only/i)
+  })
+
+  it('stops at the role, since the scope rules depend on it', () => {
+    const errors = validateUserForm(dirtyForm({ role: '' }))
+    expect(errors.role).toMatch(/role/i)
+    expect(errors.department).toBeUndefined()
+    expect(errors.platforms).toBeUndefined()
+  })
+
+  it('is empty for a valid form', () => {
+    expect(validateUserForm(dirtyForm({ phoneNumber: '5550000000' }))).toEqual({})
+  })
+
+  it('blocks submission through describeUserFormGap on a format error alone', () => {
+    // Every required field is filled — only the shape is wrong.
+    const form = dirtyForm({ fullName: 'Elias 2', phoneNumber: '5550000000' })
+    expect(describeUserFormGap(form)).toMatch(/numbers/i)
   })
 })
 
