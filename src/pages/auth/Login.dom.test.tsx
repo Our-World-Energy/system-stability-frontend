@@ -126,6 +126,29 @@ describe('Login page', () => {
     expect(useAuthStore.getState().token).toBeNull()
   })
 
+  it('clears the rejected password and refocuses it, keeping the email', async () => {
+    mockLogin.mockRejectedValue(new ApiError('http', 'invalid email or password', 401))
+    renderLogin()
+
+    fillAndSubmit('ops@ourworldenergy.com', 'wrong-password')
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy())
+
+    const emailField = screen.getByLabelText(/Email Address/i) as HTMLInputElement
+    const passwordField = screen.getByLabelText(/Secure Password/i) as HTMLInputElement
+
+    // The password that was refused does not stay in the box…
+    expect(passwordField.value).toBe('')
+    // …and the cursor is already there, so the retry is a straight retype.
+    expect(document.activeElement).toBe(passwordField)
+    // The address is almost never the thing that was wrong, so it survives.
+    expect(emailField.value).toBe('ops@ourworldenergy.com')
+
+    // The form is usable again rather than stuck in its pending state.
+    expect(submit().disabled).toBe(true) // password is empty
+    fireEvent.change(passwordField, { target: { value: 'right-password' } })
+    expect(submit().disabled).toBe(false)
+  })
+
   it('surfaces a disabled account as the backend phrases it', async () => {
     mockLogin.mockRejectedValue(new ApiError('http', 'account is disabled', 403))
     renderLogin()
@@ -136,15 +159,66 @@ describe('Login page', () => {
     expect(screen.getByRole('alert').textContent).toMatch(/account is disabled/i)
   })
 
-  it('reveals and re-hides the password', () => {
+  it('reveals the password only while the eye is held down', () => {
     renderLogin()
     const field = screen.getByLabelText(/Secure Password/i) as HTMLInputElement
+    const eye = () => screen.getByRole('button', { name: /password$/i })
     expect(field.type).toBe('password')
 
-    fireEvent.click(screen.getByRole('button', { name: /Show password/i }))
+    // A click on its own is press *and* release, so it must leave nothing exposed.
+    fireEvent.click(eye())
+    expect(field.type).toBe('password')
+
+    fireEvent.pointerDown(eye())
     expect(field.type).toBe('text')
 
-    fireEvent.click(screen.getByRole('button', { name: /Hide password/i }))
+    fireEvent.pointerUp(eye())
+    expect(field.type).toBe('password')
+  })
+
+  it('re-hides the password when the pointer slides off the eye', () => {
+    renderLogin()
+    const field = screen.getByLabelText(/Secure Password/i) as HTMLInputElement
+    const eye = () => screen.getByRole('button', { name: /password$/i })
+
+    fireEvent.pointerDown(eye())
+    expect(field.type).toBe('text')
+
+    // Released somewhere else, so the button never sees its own pointerup.
+    fireEvent.pointerLeave(eye())
+    expect(field.type).toBe('password')
+  })
+
+  it('reveals on Enter or Space held, for keyboard users', () => {
+    renderLogin()
+    const field = screen.getByLabelText(/Secure Password/i) as HTMLInputElement
+    const eye = () => screen.getByRole('button', { name: /password$/i })
+
+    fireEvent.keyDown(eye(), { key: 'Enter' })
+    expect(field.type).toBe('text')
+    fireEvent.keyUp(eye(), { key: 'Enter' })
+    expect(field.type).toBe('password')
+
+    fireEvent.keyDown(eye(), { key: ' ' })
+    expect(field.type).toBe('text')
+    fireEvent.keyUp(eye(), { key: ' ' })
+    expect(field.type).toBe('password')
+
+    // An unrelated key must not expose anything.
+    fireEvent.keyDown(eye(), { key: 'a' })
+    expect(field.type).toBe('password')
+  })
+
+  it('re-hides the password if focus leaves mid-hold', () => {
+    renderLogin()
+    const field = screen.getByLabelText(/Secure Password/i) as HTMLInputElement
+    const eye = () => screen.getByRole('button', { name: /password$/i })
+
+    fireEvent.keyDown(eye(), { key: 'Enter' })
+    expect(field.type).toBe('text')
+
+    // Switching windows can swallow the key-up, so blur is the backstop.
+    fireEvent.blur(eye())
     expect(field.type).toBe('password')
   })
 })

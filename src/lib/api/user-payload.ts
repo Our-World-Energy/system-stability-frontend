@@ -181,8 +181,25 @@ function unique(values: string[] | undefined): string[] {
  */
 const NAME_PATTERN = /^[\p{L}][\p{L} '-]*$/u
 
-/** Digits only — no spaces, no punctuation, no leading `+`. */
-const PHONE_PATTERN = /^\d+$/
+/**
+ * Digits, plus the punctuation real phone numbers are written with — so
+ * "+1 (555) 000-0000" (the shape the API's own examples use) is accepted alongside
+ * "5550000000". Letters and every other symbol are still refused.
+ */
+const PHONE_ALLOWED = /^[\d+()\-\s]+$/
+
+/** A leading `+` is the country-code marker; one in the middle is a typo. */
+const PHONE_MISPLACED_PLUS = /(?!^)\+/
+
+/**
+ * Length bounds for a phone number, counted in DIGITS — punctuation does not
+ * count, so the same number passes whether or not it is formatted.
+ *
+ * 10 is a full national number (area code included); 15 is the most digits E.164
+ * allows for any international number, so nothing valid is excluded at the top end.
+ */
+export const PHONE_MIN_DIGITS = 10
+export const PHONE_MAX_DIGITS = 15
 
 /** Something before the @, something after it, and a dotted domain. */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -202,13 +219,30 @@ export function validateFullName(value: string): string | null {
   return null
 }
 
-/** Phone is optional, so an empty value passes; anything present must be digits. */
+/**
+ * Phone is optional, so an empty value passes.
+ *
+ * A present value may be written plainly or with the usual formatting; only the
+ * digits it contains are counted, so "+1 (555) 000-0000" and "15550000000" are the
+ * same eleven-digit number as far as this is concerned. The value is sent to the
+ * API exactly as typed — the handbook's own example carries the punctuation.
+ */
 export function validatePhoneNumber(value: string | undefined): string | null {
   if (value === undefined) return null
   if (/^\s/.test(value)) return 'Phone number cannot start with a space.'
   const phone = value.trim()
   if (!phone) return null
-  if (!PHONE_PATTERN.test(phone)) return 'Phone number must be digits only.'
+  if (!PHONE_ALLOWED.test(phone)) {
+    return 'Phone number can only contain digits and + ( ) - or spaces.'
+  }
+  if (PHONE_MISPLACED_PLUS.test(phone)) return 'A + can only appear at the start.'
+
+  // Counted last, so a value whose real problem is a stray letter is never told it
+  // is the wrong length.
+  const digits = phone.replace(/\D/g, '')
+  if (digits.length < PHONE_MIN_DIGITS || digits.length > PHONE_MAX_DIGITS) {
+    return `Phone number must be ${PHONE_MIN_DIGITS}–${PHONE_MAX_DIGITS} digits.`
+  }
   return null
 }
 
@@ -229,13 +263,32 @@ export function validateEmail(value: string): string | null {
  * shape. The backend remains the authority; this only catches what is certainly bad
  * before spending a round trip on it.
  */
-export function validateUserForm(form: UserFormValues): UserFormErrors {
+export interface UserFormValidationOptions {
+  /**
+   * True when the email control is locked (the Edit dialog), so nothing the admin
+   * can do would fix a complaint about it.
+   *
+   * Only the "is it there at all" check runs in that case. Format is left to the
+   * backend: an address it already stores but this regex happens to dislike would
+   * otherwise disable Save permanently, with no field to correct it in.
+   */
+  emailLocked?: boolean
+}
+
+export function validateUserForm(
+  form: UserFormValues,
+  options: UserFormValidationOptions = {},
+): UserFormErrors {
   const errors: UserFormErrors = {}
 
   const name = validateFullName(form.fullName)
   if (name) errors.fullName = name
 
-  const email = validateEmail(form.email)
+  const email = options.emailLocked
+    ? form.email.trim()
+      ? null
+      : 'Enter an email address.'
+    : validateEmail(form.email)
   if (email) errors.email = email
 
   const phone = validatePhoneNumber(form.phoneNumber)
@@ -270,8 +323,11 @@ const FIELD_ORDER: UserFormField[] = [
  * in form order. Backs the summary line under the dialog's submit button, while
  * `validateUserForm` backs the per-field messages.
  */
-export function describeUserFormGap(form: UserFormValues): string | null {
-  const errors = validateUserForm(form)
+export function describeUserFormGap(
+  form: UserFormValues,
+  options: UserFormValidationOptions = {},
+): string | null {
+  const errors = validateUserForm(form, options)
   for (const field of FIELD_ORDER) {
     if (errors[field]) return errors[field]!
   }

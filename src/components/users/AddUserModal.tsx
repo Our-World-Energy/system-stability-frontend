@@ -12,7 +12,6 @@ import type { CreateUserRequest, MetadataData } from '@/lib/api/user-management.
 import { UserFormFields } from './UserFormFields'
 
 interface AddUserModalProps {
-  open: boolean
   onClose: () => void
   onCreate: (payload: CreateUserRequest) => void
   metadata: MetadataData
@@ -28,24 +27,22 @@ interface AddUserModalProps {
  * password field: the backend generates the initial one and the account comes back
  * with `must_change_password: true`.
  */
-export function AddUserModal({
-  open,
-  onClose,
-  onCreate,
-  metadata,
-  pending = false,
-}: AddUserModalProps) {
+export function AddUserModal({ onClose, onCreate, metadata, pending = false }: AddUserModalProps) {
   const [form, setForm] = useState<UserFormValues>(emptyUserForm)
-
-  if (!open) return null
 
   const patch = (next: Partial<UserFormValues>) => setForm((f) => ({ ...f, ...next }))
   const gap = describeUserFormGap(form)
 
   const submit = () => {
+    // Nothing leaves this dialog while a field is invalid. The button is disabled
+    // too; this is the guard for every other way a click could arrive.
     if (gap || pending) return
     onCreate(buildCreateUserPayload(form))
-    setForm(emptyUserForm) // Reset, so reopening starts blank.
+    // Deliberately NOT cleared here. The request is still in flight, and clearing
+    // now would both blank the fields under the admin's cursor (showing "enter a
+    // name" against a user who is being created) and destroy everything they typed
+    // if the create comes back 409 or 400. The parent unmounts this dialog on
+    // success, which is what resets it.
   }
 
   return (

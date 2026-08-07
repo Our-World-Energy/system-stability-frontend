@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { KeyRound, Mail } from 'lucide-react'
 import { AuthShell } from '@/components/auth/AuthShell'
@@ -24,6 +24,7 @@ export function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const passwordRef = useRef<HTMLInputElement>(null)
 
   const state = location.state as LoginRouteState | null
   const canSubmit = email.trim().length > 0 && password.length > 0
@@ -50,7 +51,13 @@ export function Login() {
       // The backend's own wording — "invalid email or password", "account is
       // disabled" — is written to be shown as-is, so it goes straight in.
       setError(toApiError(err).message)
+      // Clear the rejected password and put the cursor back in the box, so the
+      // next attempt is a straight retype rather than select-all-then-type. The
+      // email is left alone deliberately: it is rarely the thing that was wrong,
+      // and re-entering a long address on every mistyped password is punishing.
+      setPassword('')
       setPending(false)
+      passwordRef.current?.focus()
     }
   }
 
@@ -81,6 +88,7 @@ export function Login() {
           <Field label="Secure Password" htmlFor="password">
             <PasswordInput
               id="password"
+              ref={passwordRef}
               autoComplete="current-password"
               placeholder="••••••••••••"
               value={password}

@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { UserManagement } from './UserManagement'
 import {
   createUser,
@@ -16,6 +17,8 @@ import type {
   Role,
   UserRecord,
 } from '@/lib/api/user-management.types'
+import { ApiError } from '@/lib/api/caller'
+import { notify } from '@/lib/notify'
 import { activeUsersSeries } from '@/lib/active-users-data'
 import { useAuthStore } from '@/store/auth'
 
@@ -31,6 +34,7 @@ vi.mock('@/lib/notify', () => ({
   notify: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }))
 
+const mockNotify = vi.mocked(notify)
 const mockGetMetadata = vi.mocked(getMetadata)
 const mockGetUsers = vi.mocked(getUsers)
 const mockCreateUser = vi.mocked(createUser)
@@ -166,7 +170,12 @@ function renderPage() {
   })
   return render(
     <QueryClientProvider client={queryClient}>
-      <UserManagement />
+      <MemoryRouter initialEntries={['/users']}>
+        <Routes>
+          <Route path="/users" element={<UserManagement />} />
+          <Route path="/login" element={<p>Sign in</p>} />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -324,6 +333,78 @@ describe('User Management — registry', () => {
     // Department role: department, with its sub-departments beneath.
     const deptRow = screen.getByText('Priya Raman').closest('tr')!
     expect(within(deptRow).getAllByText('Technology').length).toBeGreaterThan(0)
+  })
+})
+
+describe('User Management — empty states', () => {
+  /** get-users answering with nothing, whatever was asked for. */
+  function noResults() {
+    mockGetUsers.mockImplementation(async (params = {}) => ({
+      total: 0,
+      page: params.page ?? 1,
+      page_size: params.page_size ?? PAGE_SIZE,
+      users: [],
+    }))
+  }
+
+  it('offers a way out when filters match nothing', async () => {
+    renderPage()
+    await waitForRegistry()
+
+    noResults()
+    fireEvent.change(screen.getByRole('searchbox', { name: /Search registry/i }), {
+      target: { value: 'zzz-no-such-user' },
+    })
+
+    await waitFor(() =>
+      expect(screen.getByText(/No users match this search or filter/i)).toBeTruthy(),
+    )
+    // The recovery action is in the empty state itself, not buried at the bottom of
+    // the filter dropdown where a short table used to clip it off.
+    expect(screen.getByRole('button', { name: /Clear filters/i })).toBeTruthy()
+  })
+
+  it('clearing from the empty state drops the search and the role filter together', async () => {
+    renderPage()
+    await waitForRegistry()
+
+    fireEvent.click(screen.getByRole('button', { name: /Filter registry by role/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Standard User' }))
+    fireEvent.click(screen.getByRole('button', { name: /Filter registry by role/i })) // close
+
+    noResults()
+    fireEvent.change(screen.getByRole('searchbox', { name: /Search registry/i }), {
+      target: { value: 'zzz' },
+    })
+    await waitFor(() => expect(screen.getByRole('button', { name: /Clear filters/i })).toBeTruthy())
+
+    mockGetUsers.mockImplementation(async (params = {}) => page(params))
+    fireEvent.click(screen.getByRole('button', { name: /Clear filters/i }))
+
+    // Back to an unfiltered request — both the search box and the role filter reset.
+    await waitFor(() =>
+      expect(mockGetUsers).toHaveBeenLastCalledWith({ page: 1, page_size: PAGE_SIZE }),
+    )
+    expect((screen.getByRole('searchbox', { name: /Search registry/i }) as HTMLInputElement).value)
+      .toBe('')
+    await waitFor(() => expect(registryRows().length).toBe(PAGE_SIZE))
+  })
+
+  it('invites the first user when the registry is genuinely empty', async () => {
+    noResults()
+    renderPage()
+
+    await waitFor(() =>
+      expect(screen.getByText(/No users have been provisioned yet/i)).toBeTruthy(),
+    )
+    // Nothing is filtered, so clearing filters would be meaningless — it offers the
+    // only action that helps instead.
+    expect(screen.queryByRole('button', { name: /Clear filters/i })).toBeNull()
+
+    // And it opens the same dialog as the header button.
+    const addButtons = screen.getAllByRole('button', { name: /Add User/i })
+    fireEvent.click(addButtons[addButtons.length - 1])
+    expect(screen.getByLabelText(/full_name/i)).toBeTruthy()
   })
 })
 
@@ -507,7 +588,7 @@ describe('User Management — add-user field validation', () => {
     expect(screen.queryByText(/name cannot/i)).toBeNull()
   })
 
-  it('rejects a phone number that is not digits only', async () => {
+  it('rejects a phone number containing anything but digits and phone punctuation', async () => {
     renderPage()
     await waitForRegistry()
     fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
@@ -515,18 +596,23 @@ describe('User Management — add-user field validation', () => {
     fill(/phone_number/i, ' 555')
     expect(screen.getByText(/phone number cannot start with a space/i)).toBeTruthy()
 
-    fill(/phone_number/i, '+1 (555) 000-0000')
-    expect(screen.getByText(/digits only/i)).toBeTruthy()
-
     fill(/phone_number/i, 'call me')
-    expect(screen.getByText(/digits only/i)).toBeTruthy()
+    expect(screen.getByText(/can only contain digits/i)).toBeTruthy()
+
+    fill(/phone_number/i, '555.000.0000')
+    expect(screen.getByText(/can only contain digits/i)).toBeTruthy()
+
+    // Formatted numbers are fine — punctuation does not count toward the length.
+    fill(/phone_number/i, '+1 (555) 000-0000')
+    expect(screen.queryByText(/can only contain digits/i)).toBeNull()
+    expect(screen.queryByText(/10–15 digits/)).toBeNull()
 
     fill(/phone_number/i, '5550000000')
-    expect(screen.queryByText(/digits only/i)).toBeNull()
+    expect(screen.queryByText(/can only contain digits/i)).toBeNull()
 
     // The field is optional, so clearing it is not an error.
     fill(/phone_number/i, '')
-    expect(screen.queryByText(/digits only/i)).toBeNull()
+    expect(screen.queryByText(/can only contain digits/i)).toBeNull()
     expect(screen.queryByText(/phone number cannot/i)).toBeNull()
   })
 
@@ -560,7 +646,12 @@ describe('User Management — add-user field validation', () => {
     expect(createButton().disabled).toBe(true)
 
     fill(/full_name/i, 'Elias Thorne')
+    // Too short to be a real number — still blocked.
     fill(/phone_number/i, '55500')
+    expect(screen.getByText(/10–15 digits/)).toBeTruthy()
+    expect(createButton().disabled).toBe(true)
+
+    fill(/phone_number/i, '5550000000')
     expect(createButton().disabled).toBe(false)
 
     fireEvent.click(createButton())
@@ -568,9 +659,206 @@ describe('User Management — add-user field validation', () => {
     expect(mockCreateUser.mock.calls[0][0]).toEqual({
       email: 'elias.thorne@ourworldenergy.com',
       full_name: 'Elias Thorne',
-      phone_number: '55500',
+      phone_number: '5550000000',
       role: 'org_admin',
     })
+  })
+
+  it('bounds the phone number to 10–15 digits', async () => {
+    renderPage()
+    await waitForRegistry()
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+
+    fill(/phone_number/i, '555000000') // 9
+    expect(screen.getByText(/10–15 digits/)).toBeTruthy()
+
+    fill(/phone_number/i, '1234567890123456') // 16
+    expect(screen.getByText(/10–15 digits/)).toBeTruthy()
+
+    // Counted in digits, so formatting neither helps nor hurts.
+    fill(/phone_number/i, '(555) 000-000') // 9 digits, 13 characters
+    expect(screen.getByText(/10–15 digits/)).toBeTruthy()
+
+    fill(/phone_number/i, '123456789012345') // 15, the upper bound
+    expect(screen.queryByText(/10–15 digits/)).toBeNull()
+
+    fill(/phone_number/i, '5550000000') // 10, the lower bound
+    expect(screen.queryByText(/10–15 digits/)).toBeNull()
+  })
+
+  it('does not flag the fields it just submitted while the create is in flight', async () => {
+    // Regression: the dialog used to blank itself the moment Create was clicked,
+    // so the (still open) form showed "Enter the user's full name." against a user
+    // that was being created perfectly well.
+    let settle: (value: never) => void = () => {}
+    mockCreateUser.mockReturnValue(new Promise((resolve) => (settle = resolve as never)))
+
+    renderPage()
+    await waitForRegistry()
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+    fill(/full_name/i, 'Elias Thorne')
+    fill(/email_address/i, 'elias.thorne@ourworldenergy.com')
+    chooseRole('org_admin')
+    fireEvent.click(createButton())
+
+    await waitFor(() => expect(mockCreateUser).toHaveBeenCalledTimes(1))
+    // Still open, still filled in, and nothing is complaining.
+    expect((screen.getByLabelText(/full_name/i) as HTMLInputElement).value).toBe('Elias Thorne')
+    expect(screen.queryByText(/enter the user’s full name/i)).toBeNull()
+    expect(screen.queryByText(/enter an email address/i)).toBeNull()
+    settle(undefined as never)
+  })
+
+  it('keeps what was typed when the create is rejected', async () => {
+    // A duplicate email is a 409, and the admin needs their input back to fix it.
+    mockCreateUser.mockRejectedValue(new Error('a user with this email already exists'))
+
+    renderPage()
+    await waitForRegistry()
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+    fill(/full_name/i, 'Elias Thorne')
+    fill(/email_address/i, 'taken@ourworldenergy.com')
+    chooseRole('org_admin')
+    fireEvent.click(createButton())
+
+    await waitFor(() => expect(mockCreateUser).toHaveBeenCalledTimes(1))
+    await waitFor(() =>
+      expect((screen.getByLabelText(/full_name/i) as HTMLInputElement).value).toBe('Elias Thorne'),
+    )
+    expect((screen.getByLabelText(/email_address/i) as HTMLInputElement).value).toBe(
+      'taken@ourworldenergy.com',
+    )
+    // Still submittable, so the email can be corrected and retried.
+    expect(createButton().disabled).toBe(false)
+  })
+
+  it('starts blank again the next time it is opened', async () => {
+    mockCreateUser.mockResolvedValue({
+      user: user({ id: 99, full_name: 'Elias Thorne' }),
+      email_sent: false,
+      message: 'user created',
+      reactivated: false,
+    })
+    renderPage()
+    await waitForRegistry()
+
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+    fill(/full_name/i, 'Elias Thorne')
+    fill(/email_address/i, 'elias.thorne@ourworldenergy.com')
+    chooseRole('org_admin')
+    fireEvent.click(createButton())
+
+    // The dialog closes on success…
+    await waitFor(() => expect(screen.queryByLabelText(/full_name/i)).toBeNull())
+
+    // …and reopening gives a clean form with no leftover errors from last time.
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+    expect((screen.getByLabelText(/full_name/i) as HTMLInputElement).value).toBe('')
+    expect(document.getElementById('user-name-error')).toBeNull()
+    expect(document.getElementById('user-email-error')).toBeNull()
+    expect(createButton().disabled).toBe(true)
+  })
+
+  /** Fill every control the form offers, including the role-scoped ones. */
+  function fillEverything() {
+    fill(/full_name/i, 'Elias Thorne')
+    fill(/email_address/i, 'elias.thorne@ourworldenergy.com')
+    fill(/phone_number/i, '5550000000')
+    chooseRole('standard_user')
+    fireEvent.change(screen.getByRole('combobox', { name: /^department$/i }), {
+      target: { value: 'Sales' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /sub_departments/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Partner Success' }))
+    fireEvent.change(screen.getByLabelText(/description_justification/i), {
+      target: { value: 'needs access' },
+    })
+  }
+
+  /** Every control is back to its blank state. */
+  function expectBlankForm() {
+    expect((screen.getByLabelText(/full_name/i) as HTMLInputElement).value).toBe('')
+    expect((screen.getByLabelText(/email_address/i) as HTMLInputElement).value).toBe('')
+    expect((screen.getByLabelText(/phone_number/i) as HTMLInputElement).value).toBe('')
+    expect((screen.getByLabelText(/description_justification/i) as HTMLTextAreaElement).value).toBe(
+      '',
+    )
+    expect((screen.getByRole('combobox', { name: /^role$/i }) as HTMLSelectElement).value).toBe('')
+    // A blank role hides the scope controls entirely.
+    expect(screen.queryByRole('combobox', { name: /^department$/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /sub_departments/i })).toBeNull()
+    // And no leftover validation from the previous visit.
+    expect(document.getElementById('user-name-error')).toBeNull()
+    expect(document.getElementById('user-email-error')).toBeNull()
+    expect(createButton().disabled).toBe(true)
+  }
+
+  it('starts blank after being dismissed with Escape', async () => {
+    renderPage()
+    await waitForRegistry()
+
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+    fillEverything()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByLabelText(/full_name/i)).toBeNull())
+
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+    expectBlankForm()
+  })
+
+  it('starts blank after being closed with the X', async () => {
+    renderPage()
+    await waitForRegistry()
+
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+    fillEverything()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(screen.queryByLabelText(/full_name/i)).toBeNull())
+
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+    expectBlankForm()
+  })
+
+  it('starts blank after a rejected create is dismissed', async () => {
+    mockCreateUser.mockRejectedValue(new Error('a user with this email already exists'))
+    renderPage()
+    await waitForRegistry()
+
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+    fillEverything()
+    fireEvent.click(createButton())
+    await waitFor(() => expect(mockCreateUser).toHaveBeenCalledTimes(1))
+
+    // Kept while the dialog is open, so the email can be corrected…
+    expect((screen.getByLabelText(/full_name/i) as HTMLInputElement).value).toBe('Elias Thorne')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(screen.queryByLabelText(/full_name/i)).toBeNull())
+
+    // …but abandoned once it is dismissed.
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+    expectBlankForm()
+  })
+
+  it('starts blank after a successful create, scope controls included', async () => {
+    mockCreateUser.mockResolvedValue({
+      user: user({ id: 99, full_name: 'Elias Thorne' }),
+      email_sent: false,
+      message: 'user created',
+      reactivated: false,
+    })
+    renderPage()
+    await waitForRegistry()
+
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+    fillEverything()
+    fireEvent.click(createButton())
+
+    await waitFor(() => expect(screen.queryByLabelText(/full_name/i)).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+    expectBlankForm()
   })
 
   it('marks an invalid control for assistive tech', async () => {
@@ -581,6 +869,118 @@ describe('User Management — add-user field validation', () => {
     const email = fill(/email_address/i, 'nope')
     expect(email.getAttribute('aria-invalid')).toBe('true')
     expect(email.getAttribute('aria-describedby')).toBe('user-email-error')
+  })
+})
+
+describe('User Management — edit-user field validation', () => {
+  /** Open the edit dialog on a row and return a setter for its phone field. */
+  async function openEdit(name: string) {
+    renderPage()
+    await waitForRegistry()
+    fireEvent.click(screen.getByRole('button', { name: `Edit ${name}` }))
+    return (value: string) => {
+      const input = screen.getByLabelText(/phone number/i)
+      fireEvent.change(input, { target: { value } })
+      fireEvent.blur(input)
+      return input
+    }
+  }
+
+  const saveButton = () => screen.getByRole('button', { name: /Save Changes/i }) as HTMLButtonElement
+
+  it('applies the same phone rules as the add dialog', async () => {
+    const setPhone = await openEdit('Priya Raman')
+
+    setPhone('555000000') // 9
+    expect(screen.getByText(/10–15 digits/)).toBeTruthy()
+    expect(saveButton().disabled).toBe(true)
+
+    setPhone('call me')
+    expect(screen.getByText(/can only contain digits/i)).toBeTruthy()
+    expect(saveButton().disabled).toBe(true)
+
+    // A stored number in the API's own documented format is accepted as-is, so
+    // editing an existing user does not force their phone to be retyped.
+    setPhone('+1 (555) 000-0000')
+    expect(document.getElementById('user-phone-error')).toBeNull()
+    expect(saveButton().disabled).toBe(false)
+
+    setPhone('919876543210') // 12
+    expect(screen.queryByText(/10–15 digits/)).toBeNull()
+    expect(saveButton().disabled).toBe(false)
+  })
+
+  it('applies the name rules on edit too', async () => {
+    await openEdit('Priya Raman')
+
+    const name = screen.getByLabelText(/full name/i)
+    fireEvent.change(name, { target: { value: 'Priya 2' } })
+    fireEvent.blur(name)
+    expect(screen.getByText(/cannot contain numbers/i)).toBeTruthy()
+    expect(saveButton().disabled).toBe(true)
+
+    fireEvent.change(name, { target: { value: 'Priya Raman' } })
+    expect(saveButton().disabled).toBe(false)
+  })
+
+  it('locks the email, because changing it would strand the password mail', async () => {
+    // create-user is what issues the initial password and mails it; update-user
+    // sends nothing. A changed address therefore never receives credentials.
+    await openEdit('Priya Raman')
+
+    const email = screen.getByLabelText(/email address/i) as HTMLInputElement
+    expect(email.readOnly).toBe(true)
+    expect(email.value).toBe('priya.raman@ourworldenergy.com')
+    expect(screen.getByText(/fixed after the account is created/i)).toBeTruthy()
+
+    // Still submitted, since update-user is a full replace and requires it.
+    fireEvent.click(saveButton())
+    await waitFor(() => expect(mockUpdateUser).toHaveBeenCalledTimes(1))
+    expect(mockUpdateUser.mock.calls[0][0].email).toBe('priya.raman@ourworldenergy.com')
+  })
+
+  it('never lets a stored address it cannot parse block Save', async () => {
+    // The address comes from the server and there is no field to correct it in, so
+    // a format complaint here would be a dead end rather than a prompt.
+    mockGetUsers.mockImplementation(async () => ({
+      total: 1,
+      page: 1,
+      page_size: PAGE_SIZE,
+      // org_admin, so no scope requirement can be what blocks Save — the odd
+      // address is the only thing under test here.
+      users: [
+        user({
+          id: 77,
+          full_name: 'Legacy Account',
+          email: 'legacy@localhost',
+          role: METADATA.roles[0],
+        }),
+      ],
+    }))
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Legacy Account')).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Legacy Account' }))
+    expect(document.getElementById('user-email-error')).toBeNull()
+    expect(saveButton().disabled).toBe(false)
+  })
+
+  it('leaves the email editable when adding a user', async () => {
+    renderPage()
+    await waitForRegistry()
+    fireEvent.click(screen.getByRole('button', { name: /Add User/i }))
+
+    const email = screen.getByLabelText(/email_address/i) as HTMLInputElement
+    expect(email.readOnly).toBe(false)
+    expect(screen.queryByText(/fixed after the account is created/i)).toBeNull()
+  })
+
+  it('does not flag a stored phone number that already passes', async () => {
+    // Priya's record carries no phone at all, and the field is optional — opening
+    // the dialog must not greet the admin with an error they did not cause.
+    await openEdit('Priya Raman')
+    expect(document.getElementById('user-phone-error')).toBeNull()
+    expect(saveButton().disabled).toBe(false)
   })
 })
 
@@ -612,6 +1012,67 @@ describe('User Management — update and delete', () => {
     })
   })
 
+  it('warns that a re-roled user keeps the old role until they sign in again', async () => {
+    // The role lives in the JWT, which is only reissued at login — so their open
+    // session is unaffected by this change, and the admin should know that.
+    mockUpdateUser.mockResolvedValue(
+      user({
+        id: 2,
+        full_name: 'Alice Schmidt',
+        email: 'alice.schmidt@ourworldenergy.com',
+        role: METADATA.roles[0], // promoted platform_admin → org_admin
+      }),
+    )
+    renderPage()
+    await waitForRegistry()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Alice Schmidt' }))
+    chooseRole('org_admin')
+    fireEvent.click(screen.getByRole('button', { name: /Save Changes/i }))
+
+    await waitFor(() => expect(mockUpdateUser).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(mockNotify.info).toHaveBeenCalledTimes(1))
+    expect(mockNotify.info.mock.calls[0][0]).toMatch(/sign out and back in/i)
+  })
+
+  it('says nothing about sessions when the role did not change', async () => {
+    mockUpdateUser.mockResolvedValue(
+      user({ id: 2, full_name: 'Alice Renamed', role: METADATA.roles[1] }),
+    )
+    renderPage()
+    await waitForRegistry()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Alice Schmidt' }))
+    fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: 'Alice Renamed' } })
+    fireEvent.click(screen.getByRole('button', { name: /Save Changes/i }))
+
+    await waitFor(() => expect(mockUpdateUser).toHaveBeenCalledTimes(1))
+    expect(mockNotify.info).not.toHaveBeenCalled()
+  })
+
+  it('signs the admin out when they change their own role', async () => {
+    // Their own token now misdescribes their access, so every later call would be
+    // judged against a role the UI no longer agrees with. Start a fresh session.
+    mockUpdateUser.mockResolvedValue(
+      user({
+        id: 1,
+        full_name: 'Bootstrap Admin',
+        email: ADMIN_EMAIL,
+        role: METADATA.roles[3], // demoted to executive_user
+      }),
+    )
+    renderPage()
+    await waitForRegistry()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Bootstrap Admin' }))
+    chooseRole('executive_user')
+    fireEvent.click(screen.getByRole('button', { name: /Save Changes/i }))
+
+    await waitFor(() => expect(screen.getByText('Sign in')).toBeTruthy())
+    expect(useAuthStore.getState().token).toBeNull()
+    expect(localStorage.getItem('token')).toBeNull()
+  })
+
   it('requires typing DELETE, then soft-deletes by user_id', async () => {
     renderPage()
     await waitForRegistry()
@@ -635,6 +1096,39 @@ describe('User Management — update and delete', () => {
     await waitFor(() => expect(mockDeleteUser).toHaveBeenCalledTimes(1))
     // Soft delete takes the numeric user_id straight from the row.
     expect(mockDeleteUser.mock.calls[0][0]).toBe(2)
+  })
+
+  it('confirms on Enter once DELETE has been typed', async () => {
+    renderPage()
+    await waitForRegistry()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Alice Schmidt' }))
+    const field = screen.getByLabelText(/confirm de-provisioning/i)
+    // The caret is already in the box, so it is type-then-return.
+    expect(document.activeElement).toBe(field)
+
+    // Enter before the word is complete must not delete anything.
+    fireEvent.change(field, { target: { value: 'DELET' } })
+    fireEvent.keyDown(field, { key: 'Enter' })
+    expect(mockDeleteUser).not.toHaveBeenCalled()
+
+    fireEvent.change(field, { target: { value: 'DELETE' } })
+    fireEvent.keyDown(field, { key: 'Enter' })
+    await waitFor(() => expect(mockDeleteUser).toHaveBeenCalledTimes(1))
+    expect(mockDeleteUser.mock.calls[0][0]).toBe(2)
+  })
+
+  it('ignores other keys in the confirmation box', async () => {
+    renderPage()
+    await waitForRegistry()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Alice Schmidt' }))
+    const field = screen.getByLabelText(/confirm de-provisioning/i)
+    fireEvent.change(field, { target: { value: 'DELETE' } })
+
+    fireEvent.keyDown(field, { key: 'a' })
+    fireEvent.keyDown(field, { key: ' ' })
+    expect(mockDeleteUser).not.toHaveBeenCalled()
   })
 
   it('offers no delete control on the signed-in admin’s own row', async () => {
@@ -673,24 +1167,48 @@ describe('User Management — update and delete', () => {
 })
 
 describe('User Management — access and metadata', () => {
-  it('shows a gate and calls nothing when the user is not an org admin', async () => {
+  it('gates on the backend’s answer, not on the token’s role claim', async () => {
+    // The token still says org_admin — this is exactly the state a demoted admin's
+    // open session is in, because the role claim is fixed for the token's 8 hours.
+    mockGetMetadata.mockRejectedValue(new ApiError('http', 'forbidden', 403))
+    renderPage()
+
+    await waitFor(() =>
+      expect(screen.getByText(/Organizational Admin access required/i)).toBeTruthy(),
+    )
+    // And it says what actually fixes it, since a reload cannot.
+    expect(screen.getByText(/sign out and back in/i)).toBeTruthy()
+    // The registry itself is never requested once access is refused.
+    expect(mockGetUsers).not.toHaveBeenCalled()
+  })
+
+  it('shows the registry when the backend allows it, whatever the claim says', async () => {
+    // The mirror case: a promoted user whose token still says platform_admin. If the
+    // backend authorises from the database, the page must not hide behind the claim.
     useAuthStore.setState({
       token: 'token',
       user: {
-        email: 'priya.raman@ourworldenergy.com',
-        role: 'management_user',
-        roleLabel: 'Management User',
+        email: 'alice.schmidt@ourworldenergy.com',
+        role: 'platform_admin',
+        roleLabel: 'Platform Admin',
       },
       expiresAt: null,
       mustChangePassword: false,
     })
     renderPage()
 
-    expect(screen.getByText(/Organizational Admin access required/i)).toBeTruthy()
-    expect(screen.getByText(/signed in as Management User/i)).toBeTruthy()
-    // Both registry routes are org_admin only; calling them would only earn a 403.
-    expect(mockGetUsers).not.toHaveBeenCalled()
-    expect(mockGetMetadata).not.toHaveBeenCalled()
+    await waitForRegistry()
+    expect(screen.queryByText(/Organizational Admin access required/i)).toBeNull()
+  })
+
+  it('does not mistake a server error for a refusal', async () => {
+    // A 500 is transient; hiding the whole page behind it would be wrong.
+    mockGetMetadata.mockRejectedValue(new ApiError('http', 'failed to fetch metadata', 500))
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('User Registry')).toBeTruthy())
+    expect(screen.queryByText(/Organizational Admin access required/i)).toBeNull()
+    expect(mockGetUsers).toHaveBeenCalled()
   })
 
   it('surfaces a metadata failure instead of showing empty dropdowns', async () => {

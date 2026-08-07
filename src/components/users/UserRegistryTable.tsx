@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { Pencil, Search, SlidersHorizontal, Trash2, UserPlus, X } from 'lucide-react'
+import {
+  LoaderCircle,
+  Pencil,
+  Search,
+  SearchX,
+  SlidersHorizontal,
+  Trash2,
+  UserPlus,
+  UsersRound,
+  X,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { byRankDescending } from '@/lib/role-display'
@@ -64,8 +74,14 @@ export function UserRegistryTable({
   const pageCount = Math.max(Math.ceil(total / pageSize), 1)
   const filtering = Boolean(query.trim()) || roleFilter.length > 0
 
+  // No `overflow-hidden` on the section below, deliberately. It used to be there
+  // for rounded corners, but it also clipped the role filter's dropdown: with a
+  // full page of rows the section was tall enough to contain the panel, and with
+  // the empty state it was not — so "Clear filter", the last item in it, was cut
+  // off exactly when it was needed most. Nothing actually needs clipping, because
+  // the table sits between the header and the footer and never reaches the corners.
   return (
-    <section className="border-line bg-surface overflow-hidden rounded-lg border">
+    <section className="border-line bg-surface rounded-lg border">
       <header className="border-line flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
         <h2 className="text-fg text-sm font-semibold">User Registry</h2>
         <div className="flex items-center gap-2">
@@ -105,14 +121,16 @@ export function UserRegistryTable({
           <tbody>
             {users.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-5 py-16 text-center">
-                  <p className="text-fg-muted font-mono text-sm">
-                    {loading
-                      ? 'Loading users…'
-                      : filtering
-                        ? 'No users match this search or filter'
-                        : 'No users have been provisioned yet'}
-                  </p>
+                <td colSpan={columns.length} className="px-5 py-14">
+                  <EmptyState
+                    loading={loading}
+                    filtering={filtering}
+                    onClearFilters={() => {
+                      onQueryChange('')
+                      onClearRoleFilter()
+                    }}
+                    onAddUser={onAddUser}
+                  />
                 </td>
               </tr>
             ) : (
@@ -176,6 +194,79 @@ export function UserRegistryTable({
         <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} />
       </footer>
     </section>
+  )
+}
+
+/**
+ * What fills the table when it has no rows: still loading, filtered down to
+ * nothing, or a genuinely empty registry.
+ *
+ * The filtered case carries its own "Clear filters" button. That is the way back
+ * for someone who has searched themselves into a corner, and it used to live only
+ * at the bottom of the role-filter dropdown — the one place that is awkward to
+ * reach, and the place a short table used to clip off entirely.
+ */
+function EmptyState({
+  loading,
+  filtering,
+  onClearFilters,
+  onAddUser,
+}: {
+  loading: boolean
+  filtering: boolean
+  onClearFilters: () => void
+  onAddUser: () => void
+}) {
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center gap-3 text-center">
+        <LoaderCircle className="text-fg-subtle size-8 animate-spin" aria-hidden />
+        <p className="text-fg-muted font-mono text-sm">Loading users…</p>
+      </div>
+    )
+  }
+
+  const Icon = filtering ? SearchX : UsersRound
+
+  return (
+    <div className="animate-fade-in flex flex-col items-center gap-3 text-center">
+      {/* A tinted disc behind the glyph, so the state reads as a deliberate piece
+          of the design rather than a stray icon in an empty box. Animation is CSS
+          on an inline SVG — no image to download, and it honours the reduced-motion
+          rule the other animations in index.css already respect. */}
+      <span
+        aria-hidden
+        className={cn(
+          'grid size-14 place-items-center rounded-full',
+          filtering ? 'bg-degraded/10 text-degraded' : 'bg-primary/10 text-primary-bright',
+        )}
+      >
+        <Icon className="size-7" />
+      </span>
+
+      <div>
+        <p className="text-fg text-sm font-semibold">
+          {filtering ? 'No users match this search or filter' : 'No users have been provisioned yet'}
+        </p>
+        <p className="text-fg-muted mx-auto mt-1 max-w-[46ch] text-[13px] leading-relaxed">
+          {filtering
+            ? 'Nothing in the registry matches every active filter. Clear them to see everyone again.'
+            : 'Add the first account and it will appear here, newest first.'}
+        </p>
+      </div>
+
+      {filtering ? (
+        <Button variant="ghost" onClick={onClearFilters} className="mt-1">
+          <X className="size-4" />
+          Clear filters
+        </Button>
+      ) : (
+        <Button variant="cta" onClick={onAddUser} className="mt-1 font-medium">
+          <UserPlus className="size-4" />
+          Add User
+        </Button>
+      )}
+    </div>
   )
 }
 

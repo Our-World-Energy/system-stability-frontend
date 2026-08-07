@@ -79,7 +79,8 @@ export function UserFormFields({ form, onChange, metadata, variant }: UserFormFi
     dialog shows the first outstanding problem underneath it, so nothing is hidden.
   */
   const [touched, setTouched] = useState<Partial<Record<UserFormField, boolean>>>({})
-  const errors = validateUserForm(form)
+  // The edit dialog locks the email, so it must not be able to block Save either.
+  const errors = validateUserForm(form, { emailLocked: !creating })
   const errorFor = (field: UserFormField) => (touched[field] ? errors[field] : undefined)
   const markTouched = (field: UserFormField) => setTouched((t) => ({ ...t, [field]: true }))
 
@@ -170,14 +171,14 @@ export function UserFormFields({ form, onChange, metadata, variant }: UserFormFi
         >
           <input
             id="user-phone"
-            // Digits only, so the numeric keypad is the right one on mobile.
-            // `inputMode` rather than type="number", which would add spinners and
-            // let "1e5" through.
-            inputMode="numeric"
+            // `tel` rather than `numeric`: the phone keypad includes + ( ) and -,
+            // which are all accepted. Not type="tel", which adds no validation but
+            // does invite browser autofill into an admin form about someone else.
+            inputMode="tel"
             value={form.phoneNumber ?? ''}
             onChange={(e) => onChange({ phoneNumber: e.target.value })}
             onBlur={() => markTouched('phoneNumber')}
-            placeholder="5550000000"
+            placeholder="+1 (555) 000-0000"
             className={cn(controlClass, 'h-11 font-mono')}
             {...errorProps('user-phone', 'phoneNumber')}
           />
@@ -190,18 +191,41 @@ export function UserFormFields({ form, onChange, metadata, variant }: UserFormFi
         required={creating}
         error={errorFor('email')}
       >
+        {/*
+          Fixed once the account exists. The initial password is issued by
+          create-user and mailed to whatever address it was given; update-user
+          never touches the password and sends nothing. So changing the address
+          afterwards produces a user who cannot receive their own credentials —
+          it looks like it worked and silently does not.
+
+          readOnly rather than disabled: the admin can still select and copy the
+          address, and a disabled control would drop out of the tab order.
+        */}
         <input
           id="user-email"
           // Deliberately not type="email": the browser's own bubble would compete
           // with the message below, and its rules differ from the backend's.
           type="text"
+          readOnly={!creating}
+          aria-readonly={creating ? undefined : true}
           value={form.email}
           onChange={(e) => onChange({ email: e.target.value })}
           onBlur={() => markTouched('email')}
           placeholder="user.identity@ourworldenergy.com"
-          className={cn(controlClass, 'h-11 font-mono')}
+          className={cn(
+            controlClass,
+            'h-11 font-mono',
+            !creating &&
+              'text-fg-muted cursor-not-allowed focus:border-line focus:ring-0',
+          )}
           {...errorProps('user-email', 'email')}
         />
+        {!creating && (
+          <p className="text-fg-subtle mt-2 text-xs">
+            Fixed after the account is created — the password email only ever goes to the
+            original address.
+          </p>
+        )}
       </Field>
 
       <Field label="role" htmlFor="user-role" required={creating}>

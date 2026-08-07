@@ -42,7 +42,8 @@ export function EditUserModal({
   const [form, setForm] = useState<UserFormValues>(() => formValuesFromUser(user))
 
   const patch = (next: Partial<UserFormValues>) => setForm((f) => ({ ...f, ...next }))
-  const gap = describeUserFormGap(form)
+  // Matches the locked email control in the form — see UserFormFields.
+  const gap = describeUserFormGap(form, { emailLocked: true })
 
   const submit = () => {
     if (gap || pending) return
