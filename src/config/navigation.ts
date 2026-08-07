@@ -62,24 +62,45 @@ export const pageNavigation = [
     sidebar: { label: 'Users', icon: Users },
   },
   // The two credential entries occupy the same sidebar slot: everyone works out of
-  // the requester-facing Credential Manager, and the Organizational Admin gets the
-  // admin console in its place rather than both. The admin console is guarded as
-  // well, so a non-admin who types the URL lands on the requester page instead.
+  // the requester-facing Credential Manager, while the Organizational Admin and the
+  // Executive User get the admin console in its place rather than both. The admin
+  // console is guarded as well, so anyone else who types the URL lands on the
+  // requester page instead. (The Exec's console is view + request-rotation only;
+  // the direct rotate/create/purge controls are gated to the org admin in-page.)
   {
     path: '/credentials',
     navbarTitle: 'Credential Manager',
-    sidebar: { label: 'Credentials', icon: KeyRound, rolesAllowed: rolesExcept('org_admin') },
+    sidebar: {
+      label: 'Credentials',
+      icon: KeyRound,
+      rolesAllowed: rolesExcept('org_admin', 'executive_user'),
+    },
   },
   { path: '/credentials/logs', navbarTitle: 'Credential Manager' },
   {
     path: '/credentials/admin',
     navbarTitle: 'Credential Manager',
-    sidebar: { label: 'Credential Admin', icon: ShieldCheck, rolesAllowed: ['org_admin'] },
-    // Covers /credentials/admin/logs and /credentials/admin/pending by inheritance.
+    sidebar: {
+      label: 'Credential Admin',
+      icon: ShieldCheck,
+      rolesAllowed: ['org_admin', 'executive_user'],
+    },
+    // The console itself is org_admin + executive. The two nested routes below
+    // declare their own guards (most-specific wins), because their audiences
+    // differ: the ledger is the org admin's, and the approval queue is worked by
+    // the org admin and the platform admin (who reach it from the requester view).
+    guard: { rolesAllowed: ['org_admin', 'executive_user'], fallbackPath: '/credentials' },
+  },
+  {
+    path: '/credentials/admin/logs',
+    navbarTitle: 'Credential Manager',
     guard: { rolesAllowed: ['org_admin'], fallbackPath: '/credentials' },
   },
-  { path: '/credentials/admin/logs', navbarTitle: 'Credential Manager' },
-  { path: '/credentials/admin/pending', navbarTitle: 'Credential Manager' },
+  {
+    path: '/credentials/admin/pending',
+    navbarTitle: 'Credential Manager',
+    guard: { rolesAllowed: ['org_admin', 'platform_admin'], fallbackPath: '/credentials' },
+  },
   { path: '/alerts', navbarTitle: 'Incidents' },
   { path: '/reviewer-inbox', navbarTitle: 'Reviewer Inbox' },
   { path: '/slos', navbarTitle: 'Stability & SLOs' },

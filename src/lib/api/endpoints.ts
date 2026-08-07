@@ -19,6 +19,17 @@ export const endpoints = {
     search: 'credential-manager/search-credentials',
     /** Replace the encrypted secret, and optionally amend metadata. */
     rotate: 'credential-manager/rotate-credential',
+    /**
+     * Executive / Management ask that a credential be rotated to a new secret they
+     * supply — they cannot rotate directly. The new value is encrypted client-side,
+     * exactly like create/rotate; an admin then applies it.
+     *
+     * NOT BUILT YET on the backend — this is the shape the frontend sends, for the
+     * backend to implement against:
+     *   POST { credential_id, encrypted_secret, justification } → { status, message, data }
+     * Correcting this string is the only change needed here once the route lands.
+     */
+    requestRotation: 'credential-manager/request-rotation',
     /** Hard delete — not recoverable. */
     delete: 'credential-manager/delete-credential',
     /**

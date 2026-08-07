@@ -12,12 +12,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   credentialErrorMessage,
   deleteCredential,
+  requestCredentialRotation,
   revealCredentialDetails,
   revealCredentialSecret,
   rotateCredential,
   searchCredentials,
 } from '@/lib/api/credentials'
-import type { RevealedCredential, RotateCredentialDraft } from '@/lib/api/credentials'
+import type {
+  RevealedCredential,
+  RotateCredentialDraft,
+  RotationRequestDraft,
+} from '@/lib/api/credentials'
 import { credentialKeys } from '@/lib/api/query-keys'
 import { notify } from '@/lib/notify'
 import type { Credential } from '@/lib/api/types'
@@ -59,6 +64,28 @@ export function useRotateCredential({ onSuccess }: RotateOptions = {}) {
       onSuccess?.(result.data)
     },
     onError: (err) => notify.error(credentialErrorMessage(err, 'The credential was not rotated.')),
+  })
+}
+
+interface RequestRotationOptions {
+  onSuccess?: () => void
+}
+
+/**
+ * Submit a rotation request for roles that may ask but not rotate (Executive,
+ * Management). The new secret is encrypted in `requestCredentialRotation` before
+ * it leaves the browser; here we only own the pending state and the toast.
+ */
+export function useRequestRotation({ onSuccess }: RequestRotationOptions = {}) {
+  return useMutation({
+    mutationFn: (draft: RotationRequestDraft) => requestCredentialRotation(draft),
+    retry: false,
+    onSuccess: (result) => {
+      notify.success(result.message?.trim() || 'Rotation request submitted for approval.')
+      onSuccess?.()
+    },
+    onError: (err) =>
+      notify.error(credentialErrorMessage(err, 'The rotation request was not submitted.')),
   })
 }
 

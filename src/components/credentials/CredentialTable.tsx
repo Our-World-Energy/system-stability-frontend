@@ -1,4 +1,4 @@
-import { Clock, KeyRound } from 'lucide-react'
+import { Clock, KeyRound, RotateCw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import { formatCountdown, formatDuration } from '@/lib/format'
@@ -10,6 +10,16 @@ interface CredentialTableProps {
   onRequest: (credential: Credential) => void
   /** Reveal the secret for a credential the requester may access. */
   onReveal: (credential: Credential) => void
+  /**
+   * Rotate a credential's secret directly (Platform / Dev admins). Shown only on
+   * rows with automatic access; omitted for roles that cannot rotate.
+   */
+  onRotate?: (credential: Credential) => void
+  /**
+   * Propose a new secret for a credential (Management users). Shown only on rows
+   * with automatic access; omitted for roles that cannot request a rotation.
+   */
+  onRequestRotation?: (credential: Credential) => void
   /**
    * Grants opened in this session: credential id → epoch ms the window closes.
    * A fallback for a just-submitted auto-grant the search has not refetched yet;
@@ -34,6 +44,8 @@ export function CredentialTable({
   credentials,
   onRequest,
   onReveal,
+  onRotate,
+  onRequestRotation,
   grants,
   now,
   loading,
@@ -102,32 +114,56 @@ export function CredentialTable({
                   {formatDuration(cred.elevation_duration_seconds)}
                 </td>
                 <td className="px-4 py-3.5">
-                  {revealable ? (
-                    // Access the requester already has (auto-access or a granted
-                    // request): reveal the secret, and count down the window when
-                    // the grant carries one.
-                    <div className="flex items-center justify-end gap-2">
-                      {timerActive && (
-                        <span className="border-primary/25 bg-primary/10 text-primary-bright inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[11px] font-semibold">
-                          <Clock className="size-3" />
-                          {formatCountdown(remaining)}
-                        </span>
-                      )}
-                      <Button onClick={() => onReveal(cred)} className="py-1.5 text-xs">
-                        <KeyRound className="size-3.5" />
-                        View Password
-                      </Button>
-                    </div>
-                  ) : isPending ? (
-                    // A request is already in the queue — nothing to do but wait.
-                    <div className="flex justify-end">
+                  <div className="flex items-center justify-end gap-2">
+                    {/* Platform / Dev admins rotate directly; Management requests a
+                        rotation. Both apply only to credentials with automatic
+                        access, and are hidden on every other row. */}
+                    {onRotate && cred.has_auto_access === true && (
+                      <button
+                        type="button"
+                        onClick={() => onRotate(cred)}
+                        aria-label={`Rotate ${cred.name}`}
+                        title="Rotate credential"
+                        className="text-fg-muted hover:bg-surface-3 hover:text-fg grid size-8 shrink-0 place-items-center rounded-lg transition-colors"
+                      >
+                        <RotateCw className="size-4" />
+                      </button>
+                    )}
+                    {onRequestRotation && cred.has_auto_access === true && (
+                      <button
+                        type="button"
+                        onClick={() => onRequestRotation(cred)}
+                        aria-label={`Request rotation for ${cred.name}`}
+                        title="Request rotation"
+                        className="text-fg-muted hover:bg-surface-3 hover:text-fg grid size-8 shrink-0 place-items-center rounded-lg transition-colors"
+                      >
+                        <RotateCw className="size-4" />
+                      </button>
+                    )}
+
+                    {revealable ? (
+                      // Access the requester already has (auto-access or a granted
+                      // request): reveal the secret, and count down the window when
+                      // the grant carries one.
+                      <>
+                        {timerActive && (
+                          <span className="border-primary/25 bg-primary/10 text-primary-bright inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[11px] font-semibold">
+                            <Clock className="size-3" />
+                            {formatCountdown(remaining)}
+                          </span>
+                        )}
+                        <Button onClick={() => onReveal(cred)} className="py-1.5 text-xs">
+                          <KeyRound className="size-3.5" />
+                          View Password
+                        </Button>
+                      </>
+                    ) : isPending ? (
+                      // A request is already in the queue — nothing to do but wait.
                       <span className="border-degraded/30 bg-degraded/10 text-degraded inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[11px] font-semibold">
                         <Clock className="size-3" />
                         Pending Approval
                       </span>
-                    </div>
-                  ) : (
-                    <div className="text-right">
+                    ) : (
                       <Button
                         variant="outline"
                         onClick={() => onRequest(cred)}
@@ -135,8 +171,8 @@ export function CredentialTable({
                       >
                         Request Access
                       </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </td>
               </tr>
             )
