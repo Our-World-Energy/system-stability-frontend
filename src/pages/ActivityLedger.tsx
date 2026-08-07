@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronDown, ChevronLeft } from 'lucide-react'
+import { ChevronDown, ChevronLeft, History, ScrollText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Pagination } from '@/components/ui/Pagination'
 import { RequestStatusPill } from '@/components/credentials/RequestStatusPill'
 import { RequestDetailsModal } from '@/components/credentials/RequestDetailsModal'
+import { CredentialAuditLog } from '@/components/credentials/admin/CredentialAuditLog'
 import { useRequestLogs } from '@/hooks/useRequests'
 import { useActivityStats } from '@/hooks/useStats'
 import { DEFAULT_PAGE_SIZE, requestErrorMessage } from '@/lib/api/requests'
@@ -38,7 +39,11 @@ const statusColor: Record<RequestStatus, string> = {
   expired: 'bg-fg-subtle',
 }
 
+/** Which ledger the org admin is looking at. */
+type LedgerView = 'access' | 'audit'
+
 export function ActivityLedger() {
+  const [view, setView] = useState<LedgerView>('access')
   const [selected, setSelected] = useState<RequestLogItem | null>(null)
   const [status, setStatus] = useState<RequestStatus | 'all'>('all')
   const [page, setPage] = useState(1)
@@ -65,13 +70,100 @@ export function ActivityLedger() {
             <ChevronLeft className="size-4" />
             Credential Management
           </Link>
-          <h1 className="text-fg text-2xl font-semibold tracking-tight">Activity Ledger</h1>
+          <h1 className="text-fg text-2xl font-semibold tracking-tight">
+            {view === 'audit' ? 'Credential Audit Log' : 'Activity Ledger'}
+          </h1>
           <p className="text-fg-muted mt-1 text-sm">
-            Organisation-wide elevation audit trail across every requester.
+            {view === 'audit'
+              ? 'Every action on the credential manager — created, viewed, copied, rotated or removed.'
+              : 'Organisation-wide elevation audit trail across every requester.'}
           </p>
         </div>
+        <ViewToggle view={view} onChange={setView} />
       </header>
 
+      {view === 'audit' ? (
+        <CredentialAuditLog />
+      ) : (
+        <AccessActivity
+          stats={stats}
+          logs={logs}
+          items={items}
+          total={total}
+          page={page}
+          pageCount={pageCount}
+          onPageChange={setPage}
+          status={status}
+          onStatusChange={(v) => {
+            setStatus(v)
+            setPage(1)
+          }}
+          onSelect={setSelected}
+        />
+      )}
+
+      <RequestDetailsModal
+        detail={selected ? requestLogToDetail(selected) : null}
+        onClose={() => setSelected(null)}
+      />
+    </div>
+  )
+}
+
+/** Toggle between the elevation ledger and the full credential audit log. */
+function ViewToggle({ view, onChange }: { view: LedgerView; onChange: (v: LedgerView) => void }) {
+  const tabs: { id: LedgerView; label: string; icon: typeof History }[] = [
+    { id: 'access', label: 'Access Activity', icon: History },
+    { id: 'audit', label: 'Audit Log', icon: ScrollText },
+  ]
+  return (
+    <div className="border-line bg-surface inline-flex shrink-0 rounded-lg border p-1">
+      {tabs.map(({ id, label, icon: Icon }) => (
+        <button
+          key={id}
+          onClick={() => onChange(id)}
+          aria-pressed={view === id}
+          className={cn(
+            'inline-flex items-center gap-2 rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors',
+            view === id
+              ? 'bg-primary text-canvas'
+              : 'text-fg-muted hover:text-fg',
+          )}
+        >
+          <Icon className="size-3.5" />
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** The original elevation ledger: stat cards, status filter, table and side panels. */
+function AccessActivity({
+  stats,
+  logs,
+  items,
+  total,
+  page,
+  pageCount,
+  onPageChange,
+  status,
+  onStatusChange,
+  onSelect,
+}: {
+  stats: ReturnType<typeof useActivityStats>
+  logs: ReturnType<typeof useRequestLogs>
+  items: RequestLogItem[]
+  total: number
+  page: number
+  pageCount: number
+  onPageChange: (page: number) => void
+  status: RequestStatus | 'all'
+  onStatusChange: (value: RequestStatus | 'all') => void
+  onSelect: (entry: RequestLogItem) => void
+}) {
+  return (
+    <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Total Requests (24h)"
@@ -103,14 +195,7 @@ export function ActivityLedger() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <FilterSelect
-          label="Status"
-          value={status}
-          onChange={(v) => {
-            setStatus(v)
-            setPage(1)
-          }}
-        />
+        <FilterSelect label="Status" value={status} onChange={onStatusChange} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px]">
@@ -141,7 +226,7 @@ export function ActivityLedger() {
               </thead>
               <tbody>
                 {items.map((entry) => (
-                  <LedgerRow key={entry.id} entry={entry} onView={() => setSelected(entry)} />
+                  <LedgerRow key={entry.id} entry={entry} onView={() => onSelect(entry)} />
                 ))}
                 {items.length === 0 && (
                   <tr>
@@ -173,7 +258,7 @@ export function ActivityLedger() {
               page={page}
               pageSize={logs.data?.page_size ?? DEFAULT_PAGE_SIZE}
               total={total}
-              onPageChange={setPage}
+              onPageChange={onPageChange}
             />
           </div>
         </section>
@@ -186,12 +271,7 @@ export function ActivityLedger() {
           <StatusDistributionPanel slices={stats.data?.status_distribution ?? []} />
         </aside>
       </div>
-
-      <RequestDetailsModal
-        detail={selected ? requestLogToDetail(selected) : null}
-        onClose={() => setSelected(null)}
-      />
-    </div>
+    </>
   )
 }
 
