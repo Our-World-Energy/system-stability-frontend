@@ -45,6 +45,8 @@ export function useUserMetadata(enabled = true) {
     queryFn: getMetadata,
     enabled,
     staleTime: 5 * 60_000,
+    // A 403 is an answer, not a failure to retry — see the access probe in
+    // UserManagement, which reads exactly that to decide what to render.
     retry: false,
   })
 }
@@ -109,8 +111,13 @@ export function useCreateUser({ onSuccess }: MutationOptions = {}) {
   })
 }
 
+interface UpdateOptions {
+  /** Receives the saved record, so the caller can react to what actually changed. */
+  onSuccess?: (user: UserRecord) => void
+}
+
 /** Full replace of a user's profile, role and scope. */
-export function useUpdateUser({ onSuccess }: MutationOptions = {}) {
+export function useUpdateUser({ onSuccess }: UpdateOptions = {}) {
   const refresh = useRefreshRegistry()
 
   return useMutation({
@@ -119,7 +126,7 @@ export function useUpdateUser({ onSuccess }: MutationOptions = {}) {
     onSuccess: (user: UserRecord) => {
       notify.success(`${user.full_name || user.email} was updated.`)
       refresh()
-      onSuccess?.()
+      onSuccess?.(user)
     },
     onError: (err) => notify.error(toApiError(err).message),
   })

@@ -3,7 +3,10 @@ import { Eye, EyeOff, Lock } from 'lucide-react'
 import { controlClass } from '@/components/ui/Field'
 import { cn } from '@/lib/utils'
 
-interface AuthInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+// ComponentPropsWithRef rather than InputHTMLAttributes so a caller can hold a ref
+// to the underlying input — the login form needs one to put focus back on the
+// password box after a rejected attempt.
+interface AuthInputProps extends React.ComponentPropsWithRef<'input'> {
   /** Leading glyph, e.g. `Mail` or `Lock`. */
   icon: React.ComponentType<{ className?: string }>
   /** Slot pinned to the right edge — the password reveal toggle. */
@@ -26,9 +29,27 @@ export function AuthInput({ icon: Icon, trailing, className, ...props }: AuthInp
 
 type PasswordInputProps = Omit<AuthInputProps, 'icon' | 'trailing' | 'type'>
 
-/** Password field with the lock glyph and a show/hide eye toggle. */
+/**
+ * Password field with the lock glyph and a hold-to-reveal eye.
+ *
+ * The eye is a momentary control, not a toggle: the password is legible only while
+ * the button is actually held down, and re-hides the instant the pointer is
+ * released, moves off the button, or focus goes elsewhere. A toggle can be left
+ * switched on and forgotten, which is how a password ends up sitting in clear text
+ * on a screen someone walks away from — or on a shared one.
+ *
+ * Pointer events rather than mouse events, so press-and-hold works the same with a
+ * finger or a stylus. Keyboard users get the same behaviour from Enter/Space, which
+ * reveal on key-down and hide on key-up.
+ */
 export function PasswordInput(props: PasswordInputProps) {
   const [revealed, setRevealed] = useState(false)
+  const show = () => setRevealed(true)
+  const hide = () => setRevealed(false)
+
+  /** Enter and Space are what activates a button; other keys must not reveal. */
+  const isActivationKey = (key: string) => key === 'Enter' || key === ' ' || key === 'Spacebar'
+
   return (
     <AuthInput
       icon={Lock}
@@ -36,9 +57,29 @@ export function PasswordInput(props: PasswordInputProps) {
       trailing={
         <button
           type="button"
-          onClick={() => setRevealed((r) => !r)}
+          // Holding the eye should not pull the caret out of the field being typed
+          // into, so the press is prevented from moving focus. Tab still reaches
+          // the button, which is what the key handlers below are for.
+          onPointerDown={(e) => {
+            e.preventDefault()
+            show()
+          }}
+          onPointerUp={hide}
+          onPointerLeave={hide}
+          onPointerCancel={hide}
+          // Backstop: a window switch mid-hold can swallow the release.
+          onBlur={hide}
+          onKeyDown={(e) => {
+            if (!isActivationKey(e.key)) return
+            e.preventDefault() // Space would otherwise scroll the page.
+            show()
+          }}
+          onKeyUp={(e) => {
+            if (isActivationKey(e.key)) hide()
+          }}
           aria-label={revealed ? 'Hide password' : 'Show password'}
           aria-pressed={revealed}
+          title="Hold to show password"
           className="text-fg-muted hover:text-fg focus-visible:ring-primary/30 grid size-8 place-items-center rounded-md transition-colors outline-none focus-visible:ring-2"
         >
           {revealed ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}

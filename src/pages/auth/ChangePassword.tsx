@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AuthShell } from '@/components/auth/AuthShell'
 import { PasswordInput } from '@/components/auth/AuthInput'
@@ -41,6 +41,7 @@ export function ChangePassword() {
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const currentRef = useRef<HTMLInputElement>(null)
 
   const state = location.state as ChangePasswordRouteState | null
 
@@ -72,7 +73,16 @@ export function ChangePassword() {
       // "current password is incorrect", "new_password must be different from
       // current_password" — all already phrased for a user.
       setError(toApiError(err).message)
+      // Clear the credential that was checked and put the cursor back in it, the
+      // same as a rejected sign-in. The new password and its confirmation are
+      // left alone: they are the user's own choice, still valid, and making them
+      // type it twice again to fix a mistyped current password is punishing.
+      //
+      // Deliberately not keyed off the message text — which field to clear should
+      // not depend on backend wording this code also renders verbatim.
+      setCurrent('')
       setPending(false)
+      currentRef.current?.focus()
     }
   }
 
@@ -100,6 +110,7 @@ export function ChangePassword() {
           <Field label="Current Password" htmlFor="current-password">
             <PasswordInput
               id="current-password"
+              ref={currentRef}
               autoComplete="current-password"
               autoFocus
               placeholder="••••••••••••"

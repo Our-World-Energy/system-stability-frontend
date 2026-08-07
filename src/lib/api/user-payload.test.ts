@@ -21,8 +21,6 @@ function dirtyForm(overrides: Partial<UserFormValues> = {}): UserFormValues {
   return {
     email: 'new.user@ourworldenergy.com',
     fullName: 'New User',
-    // Digits only — the form now refuses "+1 (555) 000-0000", even though that is
-    // the shape the handbook's own examples use. See validatePhoneNumber.
     phoneNumber: '5550000000',
     description: 'reason for access',
     role: 'standard_user',
@@ -227,15 +225,44 @@ describe('validatePhoneNumber', () => {
     expect(validatePhoneNumber(' 5550000000')).toMatch(/cannot start with a space/i)
   })
 
-  it('rejects letters and punctuation', () => {
-    expect(validatePhoneNumber('555-000-0000')).toMatch(/digits only/i)
-    expect(validatePhoneNumber('+1 (555) 000-0000')).toMatch(/digits only/i)
-    expect(validatePhoneNumber('call me')).toMatch(/digits only/i)
-    expect(validatePhoneNumber('555 000')).toMatch(/digits only/i)
+  it('rejects letters and symbols that are not phone punctuation', () => {
+    expect(validatePhoneNumber('call me now')).toMatch(/can only contain digits/i)
+    expect(validatePhoneNumber('555000000x12')).toMatch(/can only contain digits/i)
+    expect(validatePhoneNumber('555.000.0000')).toMatch(/can only contain digits/i)
+    expect(validatePhoneNumber('555#000#0000')).toMatch(/can only contain digits/i)
   })
 
-  it('accepts digits, and treats absent as fine because the field is optional', () => {
-    expect(validatePhoneNumber('5550000000')).toBeNull()
+  it('allows a + only at the start', () => {
+    expect(validatePhoneNumber('555+000+0000')).toMatch(/\+ can only appear at the start/i)
+    expect(validatePhoneNumber('+15550000000')).toBeNull()
+  })
+
+  it('counts digits only, ignoring the punctuation, against the 10–15 bound', () => {
+    // 17 characters, 11 digits — the formatting must not push it over the limit.
+    expect(validatePhoneNumber('+1 (555) 000-0000')).toBeNull()
+    expect(validatePhoneNumber('555-000-0000')).toBeNull()
+    expect(validatePhoneNumber('(555) 000-0000')).toBeNull()
+    expect(validatePhoneNumber('+91 98765 43210')).toBeNull()
+  })
+
+  it('rejects fewer than 10 digits or more than 15, however it is written', () => {
+    expect(validatePhoneNumber('555000000')).toMatch(/10–15 digits/) // 9
+    expect(validatePhoneNumber('(555) 000')).toMatch(/10–15 digits/) // 8 digits
+    expect(validatePhoneNumber('555 000')).toMatch(/10–15 digits/) // 6 digits
+    expect(validatePhoneNumber('1234567890123456')).toMatch(/10–15 digits/) // 16
+    expect(validatePhoneNumber('+1 (234) 567-890123456')).toMatch(/10–15 digits/) // 16 digits
+  })
+
+  it('reports a bad character before the length', () => {
+    // Told it is the wrong length, someone would go counting instead of deleting
+    // the letter that is actually the problem.
+    expect(validatePhoneNumber('call')).toMatch(/can only contain digits/i)
+  })
+
+  it('accepts a plain number, and treats absent as fine since the field is optional', () => {
+    expect(validatePhoneNumber('5550000000')).toBeNull() // 10, the lower bound
+    expect(validatePhoneNumber('123456789012345')).toBeNull() // 15, the upper bound
+    expect(validatePhoneNumber('919876543210')).toBeNull() // 12, an ordinary one
     expect(validatePhoneNumber('')).toBeNull()
     expect(validatePhoneNumber(undefined)).toBeNull()
   })
@@ -275,7 +302,7 @@ describe('validateUserForm', () => {
 
     expect(errors.fullName).toMatch(/numbers/i)
     expect(errors.email).toMatch(/@/)
-    expect(errors.phoneNumber).toMatch(/digits only/i)
+    expect(errors.phoneNumber).toMatch(/10–15 digits/)
   })
 
   it('stops at the role, since the scope rules depend on it', () => {
@@ -287,6 +314,22 @@ describe('validateUserForm', () => {
 
   it('is empty for a valid form', () => {
     expect(validateUserForm(dirtyForm({ phoneNumber: '5550000000' }))).toEqual({})
+  })
+
+  it('skips the email format check when the field is locked', () => {
+    // The Edit dialog fixes the address, so a complaint about its shape would be a
+    // dead end — there is no control to fix it in.
+    const odd = dirtyForm({ email: 'legacy@localhost' })
+    expect(validateUserForm(odd).email).toMatch(/valid email/i)
+    expect(validateUserForm(odd, { emailLocked: true }).email).toBeUndefined()
+    expect(describeUserFormGap(odd, { emailLocked: true })).toBeNull()
+  })
+
+  it('still objects to a missing email even when locked', () => {
+    // An absent address is a real problem: update-user requires one.
+    expect(validateUserForm(dirtyForm({ email: '  ' }), { emailLocked: true }).email).toMatch(
+      /email address/i,
+    )
   })
 
   it('blocks submission through describeUserFormGap on a format error alone', () => {

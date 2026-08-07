@@ -101,6 +101,19 @@ export function DeleteUserModal({ user, onClose, onConfirm, pending = false }: D
         id="delete-confirm"
         value={confirmation}
         onChange={(e) => setConfirmation(e.target.value)}
+        // Enter confirms, so the whole thing is type-then-return without reaching
+        // for the mouse. It can only fire once DELETE has been typed in full —
+        // `armed` also covers the in-flight case, so a second Enter cannot send a
+        // second request. The dialog body is not a <form> (the footer lives outside
+        // it in Modal), so there is no implicit submission to rely on.
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return
+          e.preventDefault()
+          if (armed) onConfirm()
+        }}
+        // The caret starts here: typing the confirmation is the only thing to do in
+        // this dialog, and it saves a click before the keyboard path above works.
+        autoFocus
         autoComplete="off"
         placeholder="ENTER CONFIRMATION STRING"
         className="border-line-bright bg-input text-fg placeholder:text-fg-subtle focus:border-critical focus:ring-critical/20 mt-2 h-11 w-full rounded-lg border px-3 font-mono text-sm tracking-[0.08em] uppercase transition-colors outline-none focus:ring-2"
