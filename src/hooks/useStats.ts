@@ -1,12 +1,12 @@
 /*
   The dashboard-metric queries.
 
-  Activity and request stats poll on the same interval as the queues they sit
-  above, so a header card and the table beneath it never disagree about how many
-  requests are pending. Pending-approval stats are different: the backend pushes
-  them over SSE (see `pending-stats-stream`), so those cards update the instant a
-  request is submitted, approved or denied — no polling, and every open tab moves
-  together.
+  Activity and request stats sit on the logs pages, which are reviewed rather than
+  watched live, so they refresh on a gentle 3-minute cadence — enough to keep the
+  cards and the table beneath them in step without hammering the service.
+  Pending-approval stats are different: the backend pushes them over SSE (see
+  `pending-stats-stream`), so those cards update the instant a request is
+  submitted, approved or denied — no polling, and every open tab moves together.
 */
 
 import { useEffect, useState } from 'react'
@@ -16,7 +16,8 @@ import { subscribePendingStats } from '@/lib/api/pending-stats-stream'
 import { statsKeys } from '@/lib/api/query-keys'
 import type { PendingStats } from '@/lib/api/types'
 
-const STATS_POLL_MS = 30_000
+/** Logs-page stats refresh every 3 minutes, matching the request-logs list. */
+const STATS_POLL_MS = 180_000
 
 /**
  * Header cards on the admin Pending Approvals page, fed by the live SSE stream.

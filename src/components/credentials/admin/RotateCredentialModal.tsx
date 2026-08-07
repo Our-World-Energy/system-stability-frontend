@@ -3,6 +3,7 @@ import { ChevronDown, Loader2, RotateCw } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Field, controlClass } from '@/components/ui/Field'
+import { Select } from '@/components/ui/Select'
 import { cn } from '@/lib/utils'
 import { formatTimestamp } from '@/lib/format'
 import { useRotateCredential } from '@/hooks/useCredentials'
@@ -158,23 +159,19 @@ export function RotateCredentialModal({ record, onClose, onRotated }: RotateCred
 
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <Field label="2FA Type" htmlFor="rotate-2fa">
-                  <div className="relative">
-                    <select
-                      id="rotate-2fa"
-                      value={draft.twoFactorType}
-                      onChange={(e) => set('twoFactorType', e.target.value as TwoFactorType)}
-                      disabled={busy}
-                      className={cn(controlClass, 'h-11 appearance-none pr-10')}
-                    >
-                      <option value="unchanged">Leave unchanged</option>
-                      {twoFactorOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="text-fg-subtle pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2" />
-                  </div>
+                  <Select
+                    id="rotate-2fa"
+                    value={draft.twoFactorType}
+                    onChange={(value) => set('twoFactorType', value as TwoFactorType)}
+                    disabled={busy}
+                  >
+                    <option value="unchanged">Leave unchanged</option>
+                    {twoFactorOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
                 </Field>
                 <Field label="2FA Approver" htmlFor="rotate-approver">
                   <input

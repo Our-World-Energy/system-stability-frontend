@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { ChevronDown, KeyRound, Loader2, Mail } from 'lucide-react'
+import { KeyRound, Loader2, Mail } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { Select } from '@/components/ui/Select'
 import { cn } from '@/lib/utils'
 import { formatDuration } from '@/lib/format'
 import { useSubmitRequest } from '@/hooks/useRequests'
@@ -99,24 +100,20 @@ export function RequestAccessModal({ credential, onClose, onSubmitted }: Request
         </Field>
 
         <Field label="Reason Category" htmlFor="request-reason">
-          <div className="relative">
-            <select
-              id="request-reason"
-              value={draft.reasonCategory}
-              onChange={(e) =>
-                setDraft((d) => ({ ...d, reasonCategory: e.target.value as ReasonCategory }))
-              }
-              disabled={busy}
-              className="border-line bg-input text-fg focus:border-primary focus:ring-primary/20 h-11 w-full appearance-none rounded-lg border px-3 pr-10 text-sm transition-colors outline-none focus:ring-2"
-            >
-              {reasonCategoryOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="text-fg-subtle pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2" />
-          </div>
+          <Select
+            id="request-reason"
+            value={draft.reasonCategory}
+            onChange={(value) =>
+              setDraft((d) => ({ ...d, reasonCategory: value as ReasonCategory }))
+            }
+            disabled={busy}
+          >
+            {reasonCategoryOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
         </Field>
 
         {/*

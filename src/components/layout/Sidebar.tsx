@@ -1,15 +1,17 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, LogOut, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { navItems, activeNavItem } from '@/lib/navigation'
+import { activeNavItem } from '@/lib/navigation'
+import { useNavItems } from '@/hooks/useNavItems'
 import { useSidebarStore } from '@/store/sidebar'
 import { useAuthStore } from '@/store/auth'
 import logoUrl from '@/assets/Logo.svg'
 
-// Which routes appear here — and their labels, icons and order — comes from
-// `src/config/navigation.ts`. Active highlighting is resolved by activeNavItem,
-// which picks the most specific match, so overlapping paths like /credentials
-// and /credentials/admin light the right entry without per-item predicates.
+// Which routes appear here — and their labels, icons, order and which roles see
+// them — comes from `src/config/navigation.ts`; useNavItems narrows that list to
+// the signed-in role. Active highlighting is resolved by activeNavItem, which
+// picks the most specific match, so overlapping paths like /credentials and
+// /credentials/admin light the right entry without per-item predicates.
 
 function Brand({ collapsed }: { collapsed: boolean }) {
   return (
@@ -30,12 +32,13 @@ function Brand({ collapsed }: { collapsed: boolean }) {
 
 function NavList({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
   const { pathname } = useLocation()
-  const active = activeNavItem(pathname)
+  const items = useNavItems()
+  const active = activeNavItem(pathname, items)
 
   return (
     <nav className="flex-1 overflow-x-hidden overflow-y-auto py-3">
       <ul className="space-y-0.5 px-2">
-        {navItems.map(({ to, label, icon: Icon }) => {
+        {items.map(({ to, label, icon: Icon }) => {
           const isActive = active?.to === to
           return (
             <li key={to}>

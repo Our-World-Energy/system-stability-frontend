@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronDown, KeyRound, Loader2, TriangleAlert } from 'lucide-react'
+import { KeyRound, Loader2, TriangleAlert } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Field, controlClass } from '@/components/ui/Field'
+import { Select } from '@/components/ui/Select'
 import { cn } from '@/lib/utils'
 import { useCreateCredential } from '@/hooks/useCreateCredential'
 import { useUserMetadata } from '@/hooks/useUserManagement'
@@ -203,7 +204,7 @@ export function CreateCredentialModal({ open, onClose, onCreated }: CreateCreden
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <Field label="Platform" htmlFor="cred-platform">
-            <SelectControl
+            <Select
               id="cred-platform"
               value={
                 platformCustom
@@ -224,7 +225,7 @@ export function CreateCredentialModal({ open, onClose, onCreated }: CreateCreden
                 </option>
               ))}
               <option value={OTHER_PLATFORM}>Other</option>
-            </SelectControl>
+            </Select>
             {platformCustom && (
               <input
                 value={draft.platformOther}
@@ -239,7 +240,7 @@ export function CreateCredentialModal({ open, onClose, onCreated }: CreateCreden
             )}
           </Field>
           <Field label="Department" htmlFor="cred-department">
-            <SelectControl
+            <Select
               id="cred-department"
               value={draft.departmentId != null ? String(draft.departmentId) : ''}
               onChange={(v) => set('departmentId', v ? Number(v) : null)}
@@ -253,7 +254,7 @@ export function CreateCredentialModal({ open, onClose, onCreated }: CreateCreden
                   {d.name}
                 </option>
               ))}
-            </SelectControl>
+            </Select>
           </Field>
         </div>
 
@@ -277,7 +278,7 @@ export function CreateCredentialModal({ open, onClose, onCreated }: CreateCreden
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <Field label="2FA Type" htmlFor="cred-2fa">
-            <SelectControl
+            <Select
               id="cred-2fa"
               value={draft.twoFactorType}
               onChange={(v) => set('twoFactorType', v as TwoFactorType)}
@@ -288,7 +289,7 @@ export function CreateCredentialModal({ open, onClose, onCreated }: CreateCreden
                   {option.label}
                 </option>
               ))}
-            </SelectControl>
+            </Select>
           </Field>
           <Field label="2FA Approver" htmlFor="cred-approver">
             <input
@@ -340,36 +341,6 @@ function Banner({ children }: { children: React.ReactNode }) {
     >
       <TriangleAlert className="mt-0.5 size-4 shrink-0" />
       <p className="min-w-0">{children}</p>
-    </div>
-  )
-}
-
-/** Native select styled to match the dark form controls, with a chevron affordance. */
-function SelectControl({
-  id,
-  value,
-  onChange,
-  disabled,
-  children,
-}: {
-  id?: string
-  value: string
-  onChange: (value: string) => void
-  disabled?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <div className="relative">
-      <select
-        id={id}
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-        className={cn(controlClass, 'h-11 appearance-none pr-10 disabled:cursor-not-allowed')}
-      >
-        {children}
-      </select>
-      <ChevronDown className="text-fg-subtle pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2" />
     </div>
   )
 }
