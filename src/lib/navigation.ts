@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { pageNavigation } from '@/config/navigation'
+import { pageNavigation, type PageNavigationConfig } from '@/config/navigation'
 import type { RoleKey } from '@/lib/api/user-management.types'
 
 /*
@@ -74,7 +74,15 @@ export function activeNavItem(pathname: string, items: NavItem[] = navItems): Na
   a nested route resolves to the nearest guard above it: /credentials/admin/pending
   finds /credentials/admin's, while /credentials/logs finds none.
 */
-const guardedRoutes = pageNavigation
+/** A route that declares a guard, paired with its path. */
+type GuardedRoute = { path: string; guard: NonNullable<PageNavigationConfig['guard']> }
+
+// The explicit element type matters: `satisfies` in the config keeps each
+// `rolesAllowed` as a narrow literal tuple (e.g. `readonly ['org_admin']`), and
+// without this annotation `guard.rolesAllowed.includes(role)` below would reject
+// any RoleKey other than that one literal. Typing it as `readonly RoleKey[]`
+// widens it back.
+const guardedRoutes: GuardedRoute[] = pageNavigation
   .flatMap((page) => (page.guard ? [{ path: page.path, guard: page.guard }] : []))
   .sort((a, b) => b.path.length - a.path.length)
 
