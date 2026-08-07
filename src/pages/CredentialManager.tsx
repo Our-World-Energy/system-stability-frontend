@@ -1,22 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ScrollText } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Link, useNavigate } from 'react-router-dom'
+import { Clock, ScrollText } from 'lucide-react'
+import { Button } from '@/components/ui/Button'
 import { CredentialTable } from '@/components/credentials/CredentialTable'
 import { CredentialSearchScreen } from '@/components/credentials/CredentialSearchScreen'
 import { RequestAccessModal } from '@/components/credentials/RequestAccessModal'
 import { RequestApprovedModal } from '@/components/credentials/RequestApprovedModal'
 import { CredentialSecretModal } from '@/components/credentials/CredentialSecretModal'
+import { RequestRotationModal } from '@/components/credentials/RequestRotationModal'
+import { RotateCredentialModal } from '@/components/credentials/admin/RotateCredentialModal'
 import { useCredentialSearch, useRevealCredentialDetails } from '@/hooks/useCredentials'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { usePendingStats } from '@/hooks/useStats'
+import { useAuthStore } from '@/store/auth'
+import { canRequestRotation, canRotateCredentials } from '@/lib/credential-permissions'
 import { credentialErrorMessage } from '@/lib/api/credentials'
 import type { RevealedCredential } from '@/lib/api/credentials'
 import type { Credential, Grant } from '@/lib/api/types'
-
-/** A requester has automatic access when the search row says so (falls back to the record flag). */
-function hasAutoAccess(cred: Credential): boolean {
-  return cred.has_auto_access ?? cred.auto_grant ?? false
-}
 
 /**
  * Epoch ms this credential's access window closes, or null when it has no limit
@@ -31,21 +31,11 @@ function accessExpiry(cred: Credential, session: Record<string, ActiveGrant>): n
   return entry ? new Date(entry.grant.expires_at).getTime() : null
 }
 
-/** Catalog filter presets shown as chips above the table. */
-type CatalogFilter = 'all' | 'auto_grants' | 'requires_approval'
-
-const filters: { id: CatalogFilter; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'auto_grants', label: 'Auto-grants to me' },
-  { id: 'requires_approval', label: 'Requires approval' },
-]
-
 /** A live elevation window, kept alongside the credential it belongs to. */
 type ActiveGrant = { credential: Credential; grant: Grant }
 
 export function CredentialManager() {
   const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<CatalogFilter>('all')
 
   const [requestFor, setRequestFor] = useState<Credential | null>(null)
   const [viewing, setViewing] = useState<ActiveGrant | null>(null)
@@ -56,6 +46,22 @@ export function CredentialManager() {
   const [revealFor, setRevealFor] = useState<Credential | null>(null)
   const [revealed, setRevealed] = useState<RevealedCredential | null>(null)
   const revealSecret = useRevealCredentialDetails({ onSuccess: setRevealed })
+
+  // Role shapes the per-row rotation controls on this requester view:
+  //   Platform / Dev admins rotate directly; Management proposes a rotation.
+  // Both are hidden for everyone else, and the API enforces the real rule anyway.
+  const navigate = useNavigate()
+  const role = useAuthStore((s) => s.user?.role ?? null)
+  const canRotate = canRotateCredentials(role)
+  const canRequestRot = canRequestRotation(role)
+  // Only the Platform admin works the approval queue from here, so only they get
+  // the Pending Actions button — and therefore the pending-stats subscription.
+  const isPlatformAdmin = role === 'platform_admin'
+  const pendingStats = usePendingStats(isPlatformAdmin)
+  const totalPending = pendingStats.data?.total_pending ?? 0
+
+  const [rotateFor, setRotateFor] = useState<Credential | null>(null)
+  const [rotationFor, setRotationFor] = useState<Credential | null>(null)
 
   // Grants issued during this session, credential id → window. The service has no
   // "my active grants" route, so this cannot survive a reload — a window opened
@@ -71,12 +77,6 @@ export function CredentialManager() {
     const id = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(id)
   }, [])
-
-  const visible = useMemo(() => {
-    const rows = search.data ?? []
-    if (filter === 'all') return rows
-    return rows.filter((c) => (filter === 'auto_grants' ? hasAutoAccess(c) : !hasAutoAccess(c)))
-  }, [search.data, filter])
 
   const openReveal = (credential: Credential) => {
     setRevealed(null)
@@ -113,6 +113,21 @@ export function CredentialManager() {
             <span className="border-line bg-surface text-fg-muted rounded-lg border px-3 py-1.5 font-mono text-xs">
               Your access: <span className="text-primary-bright">Requester</span>
             </span>
+            {isPlatformAdmin && (
+              <Button
+                variant="outline"
+                onClick={() => navigate('/credentials/admin/pending')}
+                className="relative"
+              >
+                <Clock className="size-4" />
+                Pending Actions
+                {totalPending > 0 && (
+                  <span className="bg-critical ring-canvas absolute -top-2 -right-2 grid h-5 min-w-5 place-items-center rounded-full px-1 font-mono text-[10px] font-bold text-white ring-2">
+                    {totalPending > 99 ? '99+' : totalPending}
+                  </span>
+                )}
+              </Button>
+            )}
             <Link
               to="/credentials/logs"
               className="bg-primary text-canvas hover:bg-primary-bright inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
@@ -123,31 +138,16 @@ export function CredentialManager() {
           </>
         }
       >
-        <div className="flex flex-wrap gap-2">
-          {filters.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setFilter(f.id)}
-              className={cn(
-                'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                filter === f.id
-                  ? 'border-primary/40 bg-primary/10 text-primary-bright'
-                  : 'border-line text-fg-muted hover:border-line-bright hover:text-fg',
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
         <CredentialTable
-          credentials={visible}
+          credentials={search.data ?? []}
           grants={expiryMap}
           now={now}
           loading={search.isFetching}
           error={search.isError ? credentialErrorMessage(search.error, 'Search failed.') : null}
           onRequest={setRequestFor}
           onReveal={openReveal}
+          onRotate={canRotate ? setRotateFor : undefined}
+          onRequestRotation={canRequestRot ? setRotationFor : undefined}
         />
       </CredentialSearchScreen>
 
@@ -180,6 +180,13 @@ export function CredentialManager() {
         expiresAt={revealFor ? accessExpiry(revealFor, grants) : null}
         onClose={closeReveal}
       />
+
+      {rotateFor && (
+        <RotateCredentialModal record={rotateFor} onClose={() => setRotateFor(null)} />
+      )}
+      {rotationFor && (
+        <RequestRotationModal record={rotationFor} onClose={() => setRotationFor(null)} />
+      )}
     </>
   )
 }

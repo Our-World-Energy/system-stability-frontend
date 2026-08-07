@@ -9,6 +9,7 @@ import {
 } from './navigation'
 import { resolvePageMeta } from './page-meta'
 import { ROLE_KEYS, rolesExcept } from './roles'
+import type { RoleKey } from '@/lib/api/user-management.types'
 
 describe('navigation configuration', () => {
   it('defines unique route paths', () => {
@@ -39,11 +40,13 @@ describe('sidebar role visibility', () => {
   const pathsFor = (role: Parameters<typeof navItemsForRole>[0]) =>
     navItemsForRole(role).map((item) => item.to)
 
-  it('swaps the credential entry for the admin console on org_admin only', () => {
-    expect(pathsFor('org_admin')).toContain('/credentials/admin')
-    expect(pathsFor('org_admin')).not.toContain('/credentials')
+  it('swaps the credential entry for the admin console on org_admin and executive_user', () => {
+    for (const role of ['org_admin', 'executive_user'] as const) {
+      expect(pathsFor(role)).toContain('/credentials/admin')
+      expect(pathsFor(role)).not.toContain('/credentials')
+    }
 
-    for (const role of rolesExcept('org_admin')) {
+    for (const role of rolesExcept('org_admin', 'executive_user')) {
       expect(pathsFor(role)).toContain('/credentials')
       expect(pathsFor(role)).not.toContain('/credentials/admin')
     }
@@ -84,15 +87,25 @@ describe('route guards', () => {
     '/credentials/admin/pending',
   ]
 
-  it('opens the admin console to org_admin alone, nested routes included', () => {
-    for (const path of adminRoutes) {
-      expect(canRoleOpen(path, 'org_admin')).toBe(true)
-      expect(routeRedirectFor(path, 'org_admin')).toBeNull()
+  it('opens each guarded admin route to exactly its own roles, redirecting the rest', () => {
+    // The console, the ledger and the approval queue have different audiences —
+    // the nested routes declare their own guards (most-specific wins).
+    const access: { path: string; allowed: RoleKey[] }[] = [
+      { path: '/credentials/admin', allowed: ['org_admin', 'executive_user'] },
+      { path: '/credentials/admin/logs', allowed: ['org_admin'] },
+      { path: '/credentials/admin/pending', allowed: ['org_admin', 'platform_admin'] },
+    ]
 
-      for (const role of rolesExcept('org_admin')) {
-        expect(canRoleOpen(path, role)).toBe(false)
-        // Sent to the requester page they do work in, not to a dead end.
-        expect(routeRedirectFor(path, role)).toBe('/credentials')
+    for (const { path, allowed } of access) {
+      for (const role of ROLE_KEYS) {
+        if (allowed.includes(role)) {
+          expect(canRoleOpen(path, role)).toBe(true)
+          expect(routeRedirectFor(path, role)).toBeNull()
+        } else {
+          expect(canRoleOpen(path, role)).toBe(false)
+          // Sent to the requester page they do work in, not to a dead end.
+          expect(routeRedirectFor(path, role)).toBe('/credentials')
+        }
       }
     }
   })

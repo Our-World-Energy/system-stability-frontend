@@ -405,6 +405,92 @@ export async function rotateCredential(
   )
 }
 
+/* ── Request rotation ───────────────────────────────────────────────────────── */
+
+/**
+ * What the "Request Rotation" form holds. Used by roles that may ask for a
+ * rotation but not perform one (Executive, Management): they supply the new secret
+ * — typed twice, since it is irreversible once applied — and a justification, and
+ * an admin/approver applies it.
+ */
+export interface RotationRequestDraft {
+  id: string
+  secret: string
+  confirmSecret: string
+  justification: string
+}
+
+/** Exactly what goes over the wire to `credential-manager/request-rotation`. */
+export interface RequestRotationPayload {
+  credential_id: string
+  /** Encrypted client-side — a plaintext value must never appear here. */
+  encrypted_secret: string
+  justification: string
+}
+
+export type RotationRequestField = keyof RotationRequestDraft
+export type RotationRequestErrors = Partial<Record<RotationRequestField, string>>
+
+/** Minimum justification length, matching the access-request form. */
+export const ROTATION_JUSTIFICATION_MIN = 10
+
+export function emptyRotationRequestDraft(id: string): RotationRequestDraft {
+  return { id, secret: '', confirmSecret: '', justification: '' }
+}
+
+export function validateRotationRequest(draft: RotationRequestDraft): RotationRequestErrors {
+  const errors: RotationRequestErrors = {}
+
+  if (!draft.id) errors.id = 'No credential selected.'
+
+  if (!draft.secret) errors.secret = 'Enter the new secret value.'
+  else if (draft.secret !== draft.confirmSecret) {
+    errors.confirmSecret = 'The two secret values do not match.'
+  }
+
+  const justification = draft.justification.trim()
+  if (!justification) errors.justification = 'A justification is required.'
+  else if (justification.length < ROTATION_JUSTIFICATION_MIN) {
+    errors.justification = 'Say a little more about why this rotation is needed.'
+  }
+
+  return errors
+}
+
+export function hasRotationRequestErrors(errors: RotationRequestErrors): boolean {
+  return Object.keys(errors).length > 0
+}
+
+export function buildRequestRotationPayload(
+  draft: RotationRequestDraft,
+  encryptedSecret: string,
+): RequestRotationPayload {
+  return {
+    credential_id: draft.id,
+    encrypted_secret: encryptedSecret,
+    justification: draft.justification.trim(),
+  }
+}
+
+/**
+ * Encrypt the proposed new secret and submit a rotation request. Same plaintext
+ * guarantee as `createCredential` / `rotateCredential`: the value is an argument
+ * and nothing more — it is encrypted before the request leaves the browser.
+ */
+export async function requestCredentialRotation(
+  draft: RotationRequestDraft,
+): Promise<ApiEnvelope<unknown>> {
+  const errors = validateRotationRequest(draft)
+  if (hasRotationRequestErrors(errors)) {
+    throw new Error(Object.values(errors)[0] ?? 'The rotation request is incomplete.')
+  }
+  const encryptedSecret = await encryptSecret(draft.secret)
+  return stabilityCaller<unknown>(
+    endpoints.credentialManager.requestRotation,
+    buildRequestRotationPayload(draft, encryptedSecret),
+  )
+}
+
 /* ── Reveal ───────────────────────────────────────────────────────────────── */
 
 /**

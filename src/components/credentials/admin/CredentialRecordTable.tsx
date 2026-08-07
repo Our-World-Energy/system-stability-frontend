@@ -6,11 +6,13 @@ import { useRevealCredentialDetails } from '@/hooks/useCredentials'
 import type { RevealedCredential } from '@/lib/api/credentials'
 import type { Credential } from '@/lib/api/types'
 import { CredentialSecretModal } from '@/components/credentials/CredentialSecretModal'
-import { RowActions, type RecordAction } from './RowActions'
+import { RowActions, type RecordAction, type RecordPermissions } from './RowActions'
 
 interface CredentialRecordTableProps {
   records: Credential[]
   onAction: (action: RecordAction, record: Credential) => void
+  /** Which per-row actions the signed-in role may take. */
+  permissions: RecordPermissions
   /** True while a search is in flight, so the empty state does not flash. */
   loading?: boolean
   /** Set when the search itself failed. */
@@ -23,6 +25,7 @@ const columns = ['Name & Tags', 'Status', 'Owner', 'Elevation', 'Last Rotated', 
 export function CredentialRecordTable({
   records,
   onAction,
+  permissions,
   loading,
   error,
 }: CredentialRecordTableProps) {
@@ -95,7 +98,7 @@ export function CredentialRecordTable({
                   <SecretCell record={record} />
                 </td>
                 <td className="px-4 py-3.5">
-                  <RowActions record={record} onAction={onAction} />
+                  <RowActions record={record} permissions={permissions} onAction={onAction} />
                 </td>
               </tr>
             )

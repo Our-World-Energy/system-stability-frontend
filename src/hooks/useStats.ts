@@ -20,15 +20,23 @@ import type { PendingStats } from '@/lib/api/types'
 const STATS_POLL_MS = 180_000
 
 /**
- * Header cards on the admin Pending Approvals page, fed by the live SSE stream.
- * Returns the same `{ data, isLoading }` surface the query version did, so the
- * cards read `data?.total_pending` and `isLoading` unchanged — `isLoading` stays
- * true only until the first frame lands.
+ * Live pending-approval stats over the SSE stream, returning the same
+ * `{ data, isLoading }` surface the query version did.
+ *
+ * `enabled` gates the subscription: only roles that actually show a pending
+ * count (the org admin's console, the platform admin's requester view) should
+ * open the stream — the endpoint is admin-only, so a role without access would
+ * otherwise hit a failing/401 stream. Disabled callers report `isLoading: false`.
  */
-export function usePendingStats(): { data: PendingStats | undefined; isLoading: boolean } {
+export function usePendingStats(
+  enabled = true,
+): { data: PendingStats | undefined; isLoading: boolean } {
   const [data, setData] = useState<PendingStats>()
-  useEffect(() => subscribePendingStats(setData), [])
-  return { data, isLoading: data === undefined }
+  useEffect(() => {
+    if (!enabled) return
+    return subscribePendingStats(setData)
+  }, [enabled])
+  return { data, isLoading: enabled && data === undefined }
 }
 
 /** Org-wide last-24h metrics for the admin Activity Ledger. */
