@@ -8,6 +8,7 @@ import { useStatusPoller } from '@/hooks/useStatusPoller'
 import { resolveSseUrl } from '@/lib/ws-status'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { RequireAuth, RequireSession } from '@/components/auth/RequireAuth'
+import { RequireRole } from '@/components/auth/RequireRole'
 import { Login } from '@/pages/auth/Login'
 import { ChangePassword } from '@/pages/auth/ChangePassword'
 import { ForgotPassword } from '@/pages/auth/ForgotPassword'
@@ -75,20 +76,24 @@ export default function App() {
 
           <Route element={REQUIRE_AUTH ? <RequireAuth /> : <Outlet />}>
             <Route element={<AppLayout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="alerts" element={<Incidents />} />
-              <Route path="reviewer-inbox" element={<Monitoring />} />
-              <Route path="slos" element={<Stability />} />
-              <Route path="audit-log" element={<Analytics />} />
-              <Route path="baselines" element={<Performance />} />
-              <Route path="users" element={<UserManagement />} />
-              <Route path="credentials" element={<CredentialManager />} />
-              <Route path="credentials/logs" element={<RequestLogs />} />
-              <Route path="credentials/admin" element={<CredentialManagement />} />
-              <Route path="credentials/admin/logs" element={<ActivityLedger />} />
-              <Route path="credentials/admin/pending" element={<PendingApprovals />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="*" element={<NotFound />} />
+              {/* Role-restricted routes are declared in src/config/navigation.ts;
+                  RequireRole applies them to every child at once. */}
+              <Route element={<RequireRole />}>
+                <Route index element={<Dashboard />} />
+                <Route path="alerts" element={<Incidents />} />
+                <Route path="reviewer-inbox" element={<Monitoring />} />
+                <Route path="slos" element={<Stability />} />
+                <Route path="audit-log" element={<Analytics />} />
+                <Route path="baselines" element={<Performance />} />
+                <Route path="users" element={<UserManagement />} />
+                <Route path="credentials" element={<CredentialManager />} />
+                <Route path="credentials/logs" element={<RequestLogs />} />
+                <Route path="credentials/admin" element={<CredentialManagement />} />
+                <Route path="credentials/admin/logs" element={<ActivityLedger />} />
+                <Route path="credentials/admin/pending" element={<PendingApprovals />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="*" element={<NotFound />} />
+              </Route>
             </Route>
           </Route>
         </Routes>

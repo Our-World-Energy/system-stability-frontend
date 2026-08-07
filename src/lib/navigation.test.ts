@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { pageNavigation } from '@/config/navigation'
-import { activeNavItem, navItems } from './navigation'
+import {
+  activeNavItem,
+  canRoleOpen,
+  navItems,
+  navItemsForRole,
+  routeRedirectFor,
+} from './navigation'
 import { resolvePageMeta } from './page-meta'
+import { ROLE_KEYS, rolesExcept } from './roles'
 
 describe('navigation configuration', () => {
   it('defines unique route paths', () => {
@@ -25,5 +32,95 @@ describe('navigation configuration', () => {
 
     expect(activeNavItem('/credentials/logs')?.to).toBe('/credentials')
     expect(activeNavItem('/credentials/admin/logs')?.to).toBe('/credentials/admin')
+  })
+})
+
+describe('sidebar role visibility', () => {
+  const pathsFor = (role: Parameters<typeof navItemsForRole>[0]) =>
+    navItemsForRole(role).map((item) => item.to)
+
+  it('swaps the credential entry for the admin console on org_admin only', () => {
+    expect(pathsFor('org_admin')).toContain('/credentials/admin')
+    expect(pathsFor('org_admin')).not.toContain('/credentials')
+
+    for (const role of rolesExcept('org_admin')) {
+      expect(pathsFor(role)).toContain('/credentials')
+      expect(pathsFor(role)).not.toContain('/credentials/admin')
+    }
+  })
+
+  it('shows unrestricted items to every role, and everything when no role is known', () => {
+    const unrestricted = navItems.filter((item) => !item.rolesAllowed).map((item) => item.to)
+    expect(unrestricted).toContain('/')
+
+    for (const role of ROLE_KEYS) {
+      expect(pathsFor(role)).toEqual(expect.arrayContaining(unrestricted))
+    }
+
+    expect(pathsFor(null)).toEqual(navItems.map((item) => item.to))
+  })
+
+  it('keeps each role in config order and highlights only its own items', () => {
+    for (const role of ROLE_KEYS) {
+      const items = navItemsForRole(role)
+      const order = navItems.filter((item) => items.includes(item)).map((item) => item.to)
+      expect(items.map((item) => item.to)).toEqual(order)
+    }
+
+    // An admin on a requester-side route lights nothing — /credentials is not in
+    // their list, and highlighting never falls back to an item they cannot see.
+    expect(activeNavItem('/credentials/logs', navItemsForRole('org_admin'))).toBeUndefined()
+    // Everyone else keeps the nested behaviour: /credentials owns its subtree.
+    expect(activeNavItem('/credentials/logs', navItemsForRole('standard_user'))?.to).toBe(
+      '/credentials',
+    )
+  })
+})
+
+describe('route guards', () => {
+  const adminRoutes = [
+    '/credentials/admin',
+    '/credentials/admin/logs',
+    '/credentials/admin/pending',
+  ]
+
+  it('opens the admin console to org_admin alone, nested routes included', () => {
+    for (const path of adminRoutes) {
+      expect(canRoleOpen(path, 'org_admin')).toBe(true)
+      expect(routeRedirectFor(path, 'org_admin')).toBeNull()
+
+      for (const role of rolesExcept('org_admin')) {
+        expect(canRoleOpen(path, role)).toBe(false)
+        // Sent to the requester page they do work in, not to a dead end.
+        expect(routeRedirectFor(path, role)).toBe('/credentials')
+      }
+    }
+  })
+
+  it('leaves every other route open, including the requester pages for org_admin', () => {
+    const unguarded = ['/', '/users', '/credentials', '/credentials/logs', '/settings', '/alerts']
+
+    for (const role of ROLE_KEYS) {
+      for (const path of unguarded) {
+        expect(canRoleOpen(path, role)).toBe(true)
+        expect(routeRedirectFor(path, role)).toBeNull()
+      }
+    }
+  })
+
+  it('opens everything when no role is known, so the no-auth dev shell still works', () => {
+    for (const path of adminRoutes) {
+      expect(canRoleOpen(path, null)).toBe(true)
+      expect(routeRedirectFor(path, undefined)).toBeNull()
+    }
+  })
+
+  it('never redirects to a page the role cannot open either', () => {
+    for (const role of ROLE_KEYS) {
+      for (const path of [...adminRoutes, '/', '/credentials', '/nope']) {
+        const target = routeRedirectFor(path, role)
+        if (target) expect(canRoleOpen(target, role)).toBe(true)
+      }
+    }
   })
 })
