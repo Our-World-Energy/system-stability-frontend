@@ -146,6 +146,17 @@
   input:where([type='checkbox'], [type='radio']):not(:disabled) {
     cursor: pointer;
   }
+
+  /*
+    Native <select> dropdown lists render with the OS light palette by default,
+    which clashes with the dark controls. Darkening the options keeps the open
+    list on-theme. Chromium 121+ and Firefox honour these; older engines ignore
+    them harmlessly.
+  */
+  select option {
+    background-color: var(--color-surface);
+    color: var(--color-fg);
+  }
 }
 
 /*

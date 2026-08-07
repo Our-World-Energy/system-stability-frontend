@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { Pagination } from '@/components/ui/Pagination'
 import { ReviewRequestDialog } from '@/components/credentials/admin/ReviewRequestDialog'
-import { usePendingRequests } from '@/hooks/useRequests'
+import { usePendingRequests, useRefreshPendingRequestsOnStats } from '@/hooks/useRequests'
 import { usePendingStats } from '@/hooks/useStats'
 import { DEFAULT_PAGE_SIZE, requestErrorMessage } from '@/lib/api/requests'
 import type { ReviewAction } from '@/lib/api/requests'
@@ -47,6 +47,9 @@ export function PendingApprovals() {
 
   const stats = usePendingStats()
   const queue = usePendingRequests(page, DEFAULT_PAGE_SIZE)
+  // A live pending-stats push means a request was just submitted/approved/denied,
+  // so pull the queue fresh rather than waiting for the next poll.
+  useRefreshPendingRequestsOnStats()
 
   const items = queue.data?.items ?? []
   const total = queue.data?.total ?? 0
