@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Field, controlClass } from '@/components/ui/Field'
+import { Select as UiSelect } from '@/components/ui/Select'
 import { cn } from '@/lib/utils'
 import { byRankDescending } from '@/lib/role-display'
 import {
@@ -430,30 +431,18 @@ function Select({
   accent?: boolean
   disabled?: boolean
 }) {
+  // Delegates to the shared control so every dropdown in the app looks identical;
+  // this wrapper only maps the options list onto <option> children.
   return (
-    <div className="relative">
-      <select
-        id={id}
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-        className={cn(
-          controlClass,
-          'h-11 appearance-none pr-10 disabled:cursor-not-allowed disabled:opacity-50',
-          !value && 'text-fg-subtle',
-          accent && value && 'text-primary-bright font-mono',
-        )}
-      >
-        <option value="" disabled>
-          {placeholder}
+    <UiSelect id={id} value={value} onChange={onChange} accent={accent} disabled={disabled}>
+      <option value="" disabled>
+        {placeholder}
+      </option>
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
         </option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="text-fg-subtle pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2" />
-    </div>
+      ))}
+    </UiSelect>
   )
 }

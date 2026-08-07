@@ -6,6 +6,7 @@
   the same request.
 */
 
+import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   DEFAULT_PAGE_SIZE,
@@ -16,12 +17,16 @@ import {
   submitAccessRequest,
 } from '@/lib/api/requests'
 import type { AccessRequestDraft, RequestLogFilters, ReviewAction } from '@/lib/api/requests'
+import { subscribePendingStats } from '@/lib/api/pending-stats-stream'
 import { requestKeys, statsKeys } from '@/lib/api/query-keys'
 import { notify } from '@/lib/notify'
 import type { RequestOutcome } from '@/lib/api/types'
 
-/** How often the live queues re-fetch while their page is open. */
+/** How often the live approval queue re-fetches while its page is open. */
 const QUEUE_POLL_MS = 30_000
+
+/** The audit logs move far more slowly, so they refresh on a gentler cadence. */
+const LOGS_POLL_MS = 180_000
 
 interface SubmitOptions {
   onSuccess?: (outcome: RequestOutcome) => void
@@ -91,12 +96,35 @@ export function usePendingRequests(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
   })
 }
 
+/**
+ * Refetch the approval queue whenever the pending-stats SSE pushes an update.
+ *
+ * The stream fires on every submit / approve / deny across the org, so a live
+ * push means the queue on screen may be stale — this pulls the fresh list at
+ * once, on top of the slower poll. Only active while the page that calls it (the
+ * admin Pending Approvals page) is mounted, so nothing runs off-screen.
+ */
+export function useRefreshPendingRequestsOnStats() {
+  const queryClient = useQueryClient()
+  useEffect(
+    () =>
+      // The `requests` prefix matches every pending page in the cache; only the
+      // one currently on screen is active and actually refetches.
+      subscribePendingStats(() => {
+        void queryClient.invalidateQueries({ queryKey: requestKeys.all })
+      }),
+    [queryClient],
+  )
+}
+
 /** Request history — everyone's for an admin, the caller's own otherwise. */
 export function useRequestLogs(filters: RequestLogFilters = {}) {
   return useQuery({
     queryKey: requestKeys.logs(filters),
     queryFn: () => getRequestLogs(filters),
-    refetchInterval: QUEUE_POLL_MS,
+    // Refreshed every 3 minutes so the page shows fresh data without hammering
+    // the service — the ledger is reviewed, not watched live like the queue.
+    refetchInterval: LOGS_POLL_MS,
     placeholderData: (previous) => previous,
   })
 }
