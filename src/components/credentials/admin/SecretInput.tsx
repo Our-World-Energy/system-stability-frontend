@@ -48,7 +48,7 @@ export function SecretInput({
         aria-label={visible ? 'Hide secret' : 'Show secret'}
         className="text-fg-subtle hover:text-fg absolute top-1/2 right-3 -translate-y-1/2 transition-colors disabled:cursor-not-allowed"
       >
-        {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+        {visible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
       </button>
     </div>
   )
