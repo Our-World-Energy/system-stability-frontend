@@ -74,10 +74,20 @@ export type StabilityEndpoint = Leaf<typeof endpoints>
   and separate unions make that a type error rather than a 404.
 */
 export const userManagementEndpoints = {
-  /** Exchange email/password for an 8-hour JWT. The only unprotected route. */
+  /** Exchange email/password for an 8-hour JWT. Unprotected. */
   login: 'login',
+  /** Mail a reset link. Unprotected — the caller has forgotten their password. */
+  forgotPassword: 'forgot-password',
+  /** Set a new password from the mailed link's token. Unprotected, single-use. */
+  resetPassword: 'reset-password',
   /** Live roles, departments (sub-departments nested) and platforms. org_admin. */
   getMetadata: 'get-metadata',
+  /**
+   * GA4-derived active-user counts for a date range, plus the period before it.
+   * org_admin. Fed by the backend's hourly sync of the System Stability GA4
+   * property — the browser never talks to GA for this.
+   */
+  activeUserStats: 'get-active-user-stats',
   /** The registry: search, role filter, pagination. org_admin. Send `{}` for defaults. */
   getUsers: 'get-users',
   /** Provision a user — or reactivate a soft-deleted one with the same email. 201. */

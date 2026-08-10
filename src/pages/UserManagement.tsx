@@ -181,7 +181,9 @@ export function UserManagement() {
       {/* No page heading here — the navbar already renders "User Management", and
           Add User lives in the registry table's own header. */}
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
-        <ActiveUsersChart />
+        {/* Same org_admin gate the registry uses: no point spending a request on
+            analytics the backend has already said this session cannot read. */}
+        <ActiveUsersChart enabled={!accessDenied && !checkingAccess} />
         <RoleAllocation roles={metadata.roles} />
       </div>
 

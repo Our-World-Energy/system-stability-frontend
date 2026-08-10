@@ -17,11 +17,13 @@ import { userKeys } from '@/lib/api/query-keys'
 import {
   createUser,
   deleteUser,
+  getActiveUserStats,
   getMetadata,
   getUsers,
   updateUser,
 } from '@/lib/api/user-management'
 import type {
+  ActiveUserStatsRequest,
   CreateUserRequest,
   GetUsersRequest,
   UpdateUserRequest,
@@ -63,6 +65,29 @@ export function useUsers(params: GetUsersRequest, enabled = true) {
     queryFn: () => getUsers(params),
     enabled,
     placeholderData: (previous) => previous,
+    retry: false,
+  })
+}
+
+/**
+ * GA4 active users for one inclusive date range.
+ *
+ * org_admin only, so it takes the same `enabled` gate the registry does — asking
+ * as anyone else buys a 403. React Query's `signal` is handed to axios, which is
+ * what makes a quick run through the range pills abort the requests it passed.
+ *
+ * `placeholderData` keeps the previous curve on screen while the next range
+ * loads, so switching pills fades between two charts rather than flashing empty.
+ */
+export function useActiveUserStats(range: ActiveUserStatsRequest | null, enabled = true) {
+  return useQuery({
+    queryKey: userKeys.activeStats(range?.start_date ?? '', range?.end_date ?? ''),
+    queryFn: ({ signal }) => getActiveUserStats(range!, signal),
+    enabled: enabled && range !== null,
+    placeholderData: (previous) => previous,
+    // Counts are synced hourly by the backend; re-asking on every remount would
+    // spend a request on data that cannot have moved.
+    staleTime: 5 * 60_000,
     retry: false,
   })
 }

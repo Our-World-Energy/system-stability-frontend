@@ -5,14 +5,15 @@ import 'react-toastify/dist/ReactToastify.css'
 import { useThemeStore } from '@/store/theme'
 import { useStatusStream } from '@/hooks/useStatusStream'
 import { useStatusPoller } from '@/hooks/useStatusPoller'
+import { useSessionWatch } from '@/hooks/useSessionWatch'
 import { resolveSseUrl } from '@/lib/ws-status'
+import { AnalyticsObserver } from '@/analytics/AnalyticsObserver'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { RequireAuth, RequireSession } from '@/components/auth/RequireAuth'
 import { RequireRole } from '@/components/auth/RequireRole'
 import { Login } from '@/pages/auth/Login'
 import { ChangePassword } from '@/pages/auth/ChangePassword'
 import { ForgotPassword } from '@/pages/auth/ForgotPassword'
-import { VerifyOtp } from '@/pages/auth/VerifyOtp'
 import { ResetPassword } from '@/pages/auth/ResetPassword'
 import { Dashboard } from '@/pages/Dashboard'
 import { Monitoring } from '@/pages/Monitoring'
@@ -49,6 +50,9 @@ const REQUIRE_AUTH = import.meta.env.VITE_REQUIRE_AUTH !== 'false'
 export default function App() {
   useStatusStream(SSE_URL, !REST_DEBUG)
   useStatusPoller(REST_DEBUG)
+  // Notices a session invalidated in another tab (role change, disable) instead of
+  // waiting for the user to happen to open a page that calls the API.
+  useSessionWatch()
   // Toasts follow the app theme rather than defaulting to toastify's own light
   // palette, which would flash white over the dark shell.
   const theme = useThemeStore((s) => s.theme)
@@ -62,10 +66,12 @@ export default function App() {
         style={{ zIndex: 9999 }}
       />
       <BrowserRouter>
+        {/* Inside the router because it tracks route changes; one mount only. */}
+        <AnalyticsObserver />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/verify-otp" element={<VerifyOtp />} />
+          {/* Reached from the emailed link, which carries ?token=… */}
           <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Signed in but still on the temporary password. Guarded by session

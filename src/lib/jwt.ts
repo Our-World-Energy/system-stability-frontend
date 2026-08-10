@@ -22,6 +22,12 @@ import type { RoleKey } from '@/lib/api/user-management.types'
 export interface JwtClaims {
   email?: string
   role?: RoleKey | string
+  /**
+   * Numeric `users.id`. The analytics integration needs it — see
+   * `analyticsUserId` — and everything else in the app works without it, so it is
+   * read defensively rather than assumed.
+   */
+  user_id?: number
   /** Seconds since the epoch, per the JWT spec. */
   exp?: number
   iat?: number
@@ -66,6 +72,20 @@ export function readJwtClaims(token: string | null | undefined): JwtClaims | nul
   } catch {
     return null
   }
+}
+
+/**
+ * The GA4 identity for this token: `String(users.id)`, or null when the token
+ * carries no numeric `user_id`.
+ *
+ * Null is a real outcome, not a bug to route around: analytics identity is sent
+ * only when the backend put an id in the token. There is deliberately no fallback
+ * to `email` — GA4 must never receive PII, and the backend's sync job matches on
+ * `user_code = users.id`, so an address would not match a row anyway.
+ */
+export function analyticsUserId(token: string | null | undefined): string | null {
+  const id = readJwtClaims(token)?.user_id
+  return Number.isInteger(id) ? String(id) : null
 }
 
 /**

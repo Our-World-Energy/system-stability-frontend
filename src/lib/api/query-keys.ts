@@ -31,6 +31,9 @@ export const userKeys = {
    * invalidate both the list and the role counts without refetching one twice.
    */
   metadata: () => [...userKeys.all, 'metadata'] as const,
+  /** GA4 active-user counts for one inclusive date range. */
+  activeStats: (start: string, end: string) =>
+    [...userKeys.all, 'active-stats', start, end] as const,
 }
 
 export const statsKeys = {

@@ -1,5 +1,5 @@
 /*
-  The seven user-management routes, one function each.
+  The ten user-management routes, one function each.
 
     const { users, total } = await getUsers({ page: 2, search: 'jane' })
 
@@ -11,14 +11,17 @@
   Success is decided by `postApi` from the HTTP status, never by inspecting `data`:
   every error path returns valid JSON in this same envelope with `data: null`.
 
-  Access, per the handbook: `login` is unprotected, `change-password` works for any
-  authenticated role, and the other five are org_admin only (403 otherwise).
+  Access, per the handbook: `login`, `forgot-password` and `reset-password` are
+  unprotected, `change-password` works for any authenticated role, and the other
+  six are org_admin only (403 otherwise).
 */
 
 import { ApiError, postApi } from './caller'
 import { userManagementApi } from './client'
 import { userManagementEndpoints as paths } from './endpoints'
 import type {
+  ActiveUserStatsData,
+  ActiveUserStatsRequest,
   ChangePasswordRequest,
   CreateUserData,
   CreateUserRequest,
@@ -157,7 +160,74 @@ export async function changePassword(body: ChangePasswordRequest): Promise<void>
   await postApi<null>(userManagementApi, paths.changePassword, body)
 }
 
-/* ── 7. delete-user ───────────────────────────────────────────────────────── */
+/* ── 7. get-active-user-stats ─────────────────────────────────────────────── */
+
+/**
+ * GA4-derived active users for an inclusive date range, plus the equally long
+ * period before it. org_admin only — a 403 for everyone else.
+ *
+ * The numbers come from the backend's periodic sync of the GA4 property that
+ * `src/analytics` feeds, so they lag live traffic by up to an hour. An all-zero
+ * series is a valid answer (no activity), not a failure.
+ *
+ * `signal` is passed through so a fast run of range changes leaves no stale
+ * request to land after the one the user is waiting for.
+ */
+export async function getActiveUserStats(
+  range: ActiveUserStatsRequest,
+  signal?: AbortSignal,
+): Promise<ActiveUserStatsData> {
+  const { data } = await postApi<ActiveUserStatsData | null>(
+    userManagementApi,
+    paths.activeUserStats,
+    range,
+    { signal },
+  )
+  return required(data, 'the active user stats')
+}
+
+/* ── 8. forgot-password ───────────────────────────────────────────────────── */
+
+/**
+ * Ask for a reset link to be mailed to `email`, and return the envelope message.
+ *
+ * The reply is deliberately identical whether the address belongs to an active
+ * account, a disabled one, or nobody at all — that is what stops the route being
+ * used to test which addresses are registered. So there is nothing here to branch
+ * on: show the returned message and stop.
+ *
+ * The mailed link points at `<origin>/reset-password?token=…`, is good for an hour,
+ * and requesting another one invalidates the previous unused link.
+ */
+export async function forgotPassword(email: string): Promise<string> {
+  const { message } = await postApi<null>(userManagementApi, paths.forgotPassword, {
+    email: email.trim(),
+  })
+  return message
+}
+
+/* ── 9. reset-password ────────────────────────────────────────────────────── */
+
+/**
+ * Set a new password using the token from the mailed link. No JWT — the token is
+ * the identity.
+ *
+ * `token` is single-use: a second call with the same one fails as "invalid or
+ * expired" even though the first succeeded, so callers must not fire this twice
+ * (double-click, a re-run effect). Unknown, expired and already-used tokens all
+ * come back with that same message, so they cannot be told apart in the UI.
+ *
+ * On success the old password stops working immediately and there is no session —
+ * the user signs in again.
+ */
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  await postApi<null>(userManagementApi, paths.resetPassword, {
+    token,
+    new_password: newPassword,
+  })
+}
+
+/* ── 10. delete-user ───────────────────────────────────────────────────────── */
 
 /**
  * Soft-delete a user: the row stays in the database so past credential actions

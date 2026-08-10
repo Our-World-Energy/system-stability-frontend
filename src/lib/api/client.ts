@@ -1,6 +1,7 @@
 /*
-  Axios instances for the owe-stability-service backend. Separate from
-  `lib/axios.ts`, which points at the health/status service on a different origin.
+  Axios instances for the owe-stability-service backend. The health/status feed is
+  not here — it is public, and `useStatusStream`/`useStatusPoller` reach it with
+  EventSource and `fetch` directly.
 
   One origin serves both halves of the service, so both instances resolve from the
   same base:
@@ -20,12 +21,12 @@
   matters, because it does not.
 
   Both instances share the same request/response behaviour: attach the bearer token
-  when one is stored, and treat a 401 as an expired session.
+  when one is stored, and end the session on any 401.
 */
 
 import axios from 'axios'
 import type { AxiosInstance } from 'axios'
-import { TOKEN_KEY, clearStoredSession } from '@/lib/auth-storage'
+import { SESSION_ENDED_NOTICE, TOKEN_KEY, endSession } from '@/lib/auth-storage'
 
 /** Same-origin prefix the dev proxy and the Vercel rewrite both understand. */
 export const STABILITY_PROXY_PREFIX = '/stability'
@@ -64,16 +65,16 @@ function withSession(instance: AxiosInstance): AxiosInstance {
   instance.interceptors.response.use(
     (res) => res,
     (err) => {
-      // The JWT is valid 8 hours; after that every protected route 401s. Clearing
-      // here rather than in the store keeps this working for callers that never
-      // touch the store, and avoids importing it (which imports axios back).
+      // Every 401 on either instance ends the session — including the ones the
+      // service now raises mid-session, when an admin has changed this user's role
+      // or disabled the account and the still-unexpired JWT no longer matches the
+      // live row. `endSession` skips the bounce on /login, where a 401 is a rejected
+      // sign-in for the form to render rather than a session to end.
+      //
+      // Handled here rather than in the store so it also covers callers that never
+      // touch the store, and to avoid importing it (which imports axios back).
       if (err.response?.status === 401) {
-        clearStoredSession()
-        // Guard against redirect loops: /login itself 401s on bad credentials, and
-        // that is a form error to render, not an expired session to bounce on.
-        if (!window.location.pathname.startsWith('/login')) {
-          window.location.href = '/login'
-        }
+        endSession(SESSION_ENDED_NOTICE)
       }
       return Promise.reject(err)
     },

@@ -1,13 +1,21 @@
 /*
-  Mock data for the Active Users chart on User Management. There is no analytics
-  API yet, so the series is *generated* rather than listed: each bucket's value
-  is derived deterministically from its calendar key, so the same day always
-  yields the same numbers (stable renders, stable tests) while "today" and "this
-  month" still mean what they say. Swap `seriesFor` for a fetch later — the
-  returned `ActiveUsersSeries` is the shape the chart consumes.
+  The Active Users chart's two halves that are not rendering: turning a range pill
+  into the dates the API wants, and turning the API's reply into what the chart
+  draws.
+
+  Counts come from `get-active-user-stats`, which the backend fills from its
+  periodic sync of the GA4 property that `src/analytics` feeds. Buckets are whole
+  local days — GA4 daily rows are all the backend stores, so there is no hourly
+  view even for "Today", which is a single day's bucket.
+
+  Nothing here recomputes an average, a peak or a percentage: the backend sends
+  all three, and deriving them again in the browser would be a second source of
+  truth that drifts from the one on the wire.
 
   Every entry point takes `now` so callers (and tests) can pin the clock.
 */
+
+import type { ActiveUserPoint, ActiveUserStatsData } from '@/lib/api/user-management.types'
 
 /** Selectable windows behind the chart's range pills. */
 export type ActiveUsersRange = 'today' | 'last_7_days' | 'this_month' | 'custom'
@@ -20,7 +28,7 @@ export const activeUsersRanges: { id: ActiveUsersRange; label: string }[] = [
 ]
 
 export interface ActiveUsersPoint {
-  /** Axis caption for the bucket, e.g. "09:00" or "3 Aug". */
+  /** Axis caption for the bucket, e.g. "3 Aug". */
   label: string
   value: number
 }
@@ -31,11 +39,12 @@ export interface ActiveUsersSeries {
   previous: ActiveUsersPoint[]
   average: number
   peak: number
-  /** Change in average against `previous`; null when there is nothing to compare. */
-  changePercent: number | null
+  /** Change in average against `previous`, already formatted, e.g. "+2.1%". */
+  changeLabel: string | null
+  /** Sign of that change, for the colour. */
+  changeDirection: 'up' | 'down' | 'flat'
   /** Caption for the window, e.g. "28 Jul – 3 Aug 2026". */
   caption: string
-  granularity: 'hour' | 'day'
 }
 
 /** A custom window, as the two `<input type="date">` values backing it. */
@@ -61,7 +70,10 @@ export function parseIsoDay(value: string): Date | null {
   if (!match) return null
   const [, y, m, d] = match
   const date = new Date(Number(y), Number(m) - 1, Number(d))
-  return Number.isNaN(date.getTime()) ? null : date
+  // Rejects the impossible dates a regex still matches, e.g. 2026-02-31.
+  if (date.getFullYear() !== Number(y) || date.getMonth() !== Number(m) - 1) return null
+  if (date.getDate() !== Number(d)) return null
+  return date
 }
 
 function addDays(date: Date, days: number): Date {
@@ -72,61 +84,6 @@ function addDays(date: Date, days: number): Date {
 
 function dayLabel(date: Date): string {
   return `${date.getDate()} ${date.toLocaleDateString('en-US', { month: 'short' })}`
-}
-
-/* ── value generation ── */
-
-/** Deterministic 0..1 from a bucket key (FNV-1a), standing in for real counts. */
-function noise(key: string): number {
-  let h = 2166136261
-  for (let i = 0; i < key.length; i++) {
-    h ^= key.charCodeAt(i)
-    h = Math.imul(h, 16777619)
-  }
-  return ((h >>> 0) % 10_000) / 10_000
-}
-
-/** Daily active users: a weekday plateau with a pronounced weekend dip. */
-function dailyValue(date: Date): number {
-  const weekend = date.getDay() === 0 || date.getDay() === 6
-  const base = weekend ? 430 : 940
-  return Math.round(base + noise(isoDay(date)) * 260)
-}
-
-/** Hourly active users: a working-day bell centred on early afternoon. */
-function hourlyValue(day: string, hour: number): number {
-  const shape = Math.exp(-((hour - 14) ** 2) / 42)
-  return Math.round(45 + shape * 520 + noise(`${day}:${hour}`) * 70)
-}
-
-/* ── series assembly ── */
-
-function hourlyPoints(day: Date, throughHour: number): ActiveUsersPoint[] {
-  const key = isoDay(day)
-  return Array.from({ length: throughHour + 1 }, (_, hour) => ({
-    label: `${String(hour).padStart(2, '0')}:00`,
-    value: hourlyValue(key, hour),
-  }))
-}
-
-/** Daily buckets from `start` to `end` inclusive. */
-function dailyPoints(start: Date, end: Date): ActiveUsersPoint[] {
-  const points: ActiveUsersPoint[] = []
-  for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
-    points.push({ label: dayLabel(d), value: dailyValue(d) })
-  }
-  return points
-}
-
-function average(points: ActiveUsersPoint[]): number {
-  if (!points.length) return 0
-  return Math.round(points.reduce((sum, p) => sum + p.value, 0) / points.length)
-}
-
-function dayCaption(start: Date, end: Date): string {
-  const year = end.getFullYear()
-  if (isoDay(start) === isoDay(end)) return `${dayLabel(end)} ${year}`
-  return `${dayLabel(start)} – ${dayLabel(end)} ${year}`
 }
 
 /**
@@ -151,63 +108,90 @@ export function defaultCustomRange(now: Date): CustomRange {
   return { from: isoDay(addDays(now, -6)), to: isoDay(now) }
 }
 
+/* ── range pill → request ── */
+
 /**
- * The series for `range`. `custom` is only read for the custom range, and an
- * unparseable one yields an empty series so the chart can show its empty state
- * instead of inventing data.
+ * The inclusive `YYYY-MM-DD` bounds to ask for. Null when a custom range is
+ * unusable, which is the chart's cue to show its empty state rather than send a
+ * request the backend would reject.
+ *
+ * Local calendar days throughout, never `toISOString()`: near midnight the UTC
+ * conversion lands on the wrong day for anyone west of Greenwich, so "Today"
+ * would quietly ask for yesterday.
  */
-export function activeUsersSeries(
+export function activeUsersRequest(
   range: ActiveUsersRange,
   now: Date,
   custom?: CustomRange,
-): ActiveUsersSeries {
-  if (range === 'today') {
-    const hour = now.getHours()
-    return summarize(
-      hourlyPoints(now, hour),
-      hourlyPoints(addDays(now, -1), hour),
-      `${dayLabel(now)} ${now.getFullYear()} · hourly`,
-      'hour',
-    )
-  }
-
+): { start_date: string; end_date: string } | null {
   const today = parseIsoDay(isoDay(now))!
-  let start = today
-  let end = today
 
+  if (range === 'today') return { start_date: isoDay(today), end_date: isoDay(today) }
   if (range === 'last_7_days') {
-    start = addDays(today, -6)
-  } else if (range === 'this_month') {
-    start = new Date(today.getFullYear(), today.getMonth(), 1)
-  } else {
-    const clamped = custom && clampCustomRange(custom, now)
-    if (!clamped) return summarize([], [], 'Select a valid range', 'day')
-    start = clamped.start
-    end = clamped.end
+    // Inclusive: today plus the previous six days.
+    return { start_date: isoDay(addDays(today, -6)), end_date: isoDay(today) }
+  }
+  if (range === 'this_month') {
+    const first = new Date(today.getFullYear(), today.getMonth(), 1)
+    return { start_date: isoDay(first), end_date: isoDay(today) }
   }
 
-  const points = dailyPoints(start, end)
-  // The comparison window is the same number of days, ending the day before.
-  const previousEnd = addDays(start, -1)
-  const previous = dailyPoints(addDays(previousEnd, -(points.length - 1)), previousEnd)
-  return summarize(points, previous, dayCaption(start, end), 'day')
+  const clamped = custom && clampCustomRange(custom, now)
+  if (!clamped) return null
+  return { start_date: isoDay(clamped.start), end_date: isoDay(clamped.end) }
 }
 
-function summarize(
-  points: ActiveUsersPoint[],
-  previous: ActiveUsersPoint[],
-  caption: string,
-  granularity: 'hour' | 'day',
-): ActiveUsersSeries {
-  const now = average(points)
-  const before = average(previous)
+/* ── response → chart series ── */
+
+function toPoints(daily: ActiveUserPoint[]): ActiveUsersPoint[] {
+  return daily.map((point) => {
+    const date = parseIsoDay(point.date)
+    return {
+      // An unparseable date keeps its raw string rather than being dropped: the
+      // count is still real, and a gap in the line would misrepresent it.
+      label: date ? dayLabel(date) : point.date,
+      value: point.active_users,
+    }
+  })
+}
+
+function caption(start: string, end: string): string {
+  const from = parseIsoDay(start)
+  const to = parseIsoDay(end)
+  if (!from || !to) return `${start} – ${end}`
+  if (start === end) return `${dayLabel(to)} ${to.getFullYear()}`
+  return `${dayLabel(from)} – ${dayLabel(to)} ${to.getFullYear()}`
+}
+
+/**
+ * The chart's view of one API response.
+ *
+ * The two series are compared by index, which is what the backend guarantees:
+ * equal lengths, zero-filled, previous period immediately before this one. Each
+ * point keeps its own label so the tooltip can name both dates.
+ */
+export function activeUsersSeries(data: ActiveUserStatsData): ActiveUsersSeries {
+  const change = data.percent_change_vs_previous_period
   return {
-    points,
-    previous,
-    average: now,
-    peak: points.length ? Math.max(...points.map((p) => p.value)) : 0,
-    changePercent: before ? Math.round(((now - before) / before) * 100) : null,
-    caption,
-    granularity,
+    points: toPoints(data.daily ?? []),
+    previous: toPoints(data.previous_period_daily ?? []),
+    average: data.average_daily_active_users,
+    peak: data.peak_daily_active_users,
+    // A backend 0 means "nothing to compare against" as well as "no change", and
+    // it sends the same 0 for both — so both render as a flat 0.0%.
+    changeLabel: `${change > 0 ? '+' : ''}${change.toFixed(1)}%`,
+    changeDirection: change > 0 ? 'up' : change < 0 ? 'down' : 'flat',
+    caption: caption(data.start_date, data.end_date),
   }
+}
+
+/** What the chart shows before the first response, and when a range is unusable. */
+export const EMPTY_SERIES: ActiveUsersSeries = {
+  points: [],
+  previous: [],
+  average: 0,
+  peak: 0,
+  changeLabel: null,
+  changeDirection: 'flat',
+  caption: '',
 }
