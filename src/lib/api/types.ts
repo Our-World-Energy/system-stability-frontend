@@ -130,6 +130,21 @@ export interface PendingRequestItem {
   is_sla_breach: boolean
 }
 
+/** A row in the rotation approval queue (get-pending-rotation-requests). */
+export interface PendingRotationRequestItem {
+  id: string
+  credential_id: string
+  /** Always 'rotation' for this queue; carried through from the backend. */
+  request_type: string
+  credential_name: string
+  requested_by: number
+  reason_category: string
+  justification: string
+  requested_at: string
+  wait_minutes: number
+  is_sla_breach: boolean
+}
+
 /** A row in the request history (get-request-logs). */
 export interface RequestLogItem {
   id: string

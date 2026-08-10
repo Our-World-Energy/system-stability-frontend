@@ -19,6 +19,8 @@ export const requestKeys = {
   all: ['requests'] as const,
   pending: (page: number, pageSize: number) =>
     [...requestKeys.all, 'pending', page, pageSize] as const,
+  rotationPending: (page: number, pageSize: number) =>
+    [...requestKeys.all, 'rotation-pending', page, pageSize] as const,
   logs: (filters: RequestLogFilters) => [...requestKeys.all, 'logs', filters] as const,
 }
 

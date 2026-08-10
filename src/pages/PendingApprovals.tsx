@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { AlertTriangle, ChevronLeft, Clock } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, Clock, KeyRound, RotateCw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { Pagination } from '@/components/ui/Pagination'
 import { ReviewRequestDialog } from '@/components/credentials/admin/ReviewRequestDialog'
+import { RotationQueue } from '@/components/credentials/admin/RotationQueue'
 import { usePendingRequests, useRefreshPendingRequestsOnStats } from '@/hooks/useRequests'
 import { usePendingStats } from '@/hooks/useStats'
+import { useAuthStore } from '@/store/auth'
 import { DEFAULT_PAGE_SIZE, requestErrorMessage } from '@/lib/api/requests'
 import type { ReviewAction } from '@/lib/api/requests'
 import {
@@ -45,6 +47,12 @@ export function PendingApprovals() {
   const [page, setPage] = useState(1)
   const [decision, setDecision] = useState<PendingDecision | null>(null)
 
+  // Rotation-request review is org-admin only; the platform admin reaches this
+  // page for access approvals and never sees the rotation queue.
+  const role = useAuthStore((s) => s.user?.role ?? null)
+  const isOrgAdmin = role === 'org_admin'
+  const [view, setView] = useState<'access' | 'rotation'>('access')
+
   const stats = usePendingStats()
   const queue = usePendingRequests(page, DEFAULT_PAGE_SIZE)
   // A live pending-stats push means a request was just submitted/approved/denied,
@@ -58,20 +66,109 @@ export function PendingApprovals() {
 
   return (
     <div className="space-y-6 pb-4">
-      <header>
-        <Link
-          to="/credentials/admin"
-          className="text-fg-muted hover:text-fg mb-2 inline-flex items-center gap-1.5 font-mono text-xs transition-colors"
-        >
-          <ChevronLeft className="size-4" />
-          Credential Management
-        </Link>
-        <h1 className="text-fg text-2xl font-semibold tracking-tight">Pending Approvals</h1>
-        <p className="text-fg-muted mt-1 text-sm">
-          Review and action outstanding authorization requests.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <Link
+            to="/credentials/admin"
+            className="text-fg-muted hover:text-fg mb-2 inline-flex items-center gap-1.5 font-mono text-xs transition-colors"
+          >
+            <ChevronLeft className="size-4" />
+            Credential Management
+          </Link>
+          <h1 className="text-fg text-2xl font-semibold tracking-tight">Pending Approvals</h1>
+          <p className="text-fg-muted mt-1 text-sm">
+            {view === 'rotation'
+              ? 'Review and action credential rotation requests.'
+              : 'Review and action outstanding authorization requests.'}
+          </p>
+        </div>
+        {/* Only the org admin reviews rotations, so only they get the switch. */}
+        {isOrgAdmin && <ViewToggle view={view} onChange={setView} />}
       </header>
 
+      {view === 'rotation' ? (
+        <RotationQueue />
+      ) : (
+        <AccessApprovals
+          stats={stats}
+          queue={queue}
+          items={items}
+          total={total}
+          from={from}
+          to={to}
+          page={page}
+          onPageChange={setPage}
+          onDecide={(request, action) => setDecision({ request, action })}
+        />
+      )}
+
+      {decision && (
+        <ReviewRequestDialog
+          request={decision.request}
+          action={decision.action}
+          onClose={() => setDecision(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+/** Toggle between the access-request and rotation-request queues (org admin). */
+function ViewToggle({
+  view,
+  onChange,
+}: {
+  view: 'access' | 'rotation'
+  onChange: (v: 'access' | 'rotation') => void
+}) {
+  const tabs = [
+    { id: 'access' as const, label: 'Access Requests', icon: KeyRound },
+    { id: 'rotation' as const, label: 'Rotation Requests', icon: RotateCw },
+  ]
+  return (
+    <div className="border-line bg-surface inline-flex shrink-0 rounded-lg border p-1">
+      {tabs.map(({ id, label, icon: Icon }) => (
+        <button
+          key={id}
+          onClick={() => onChange(id)}
+          aria-pressed={view === id}
+          className={cn(
+            'inline-flex items-center gap-2 rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors',
+            view === id ? 'bg-primary text-canvas' : 'text-fg-muted hover:text-fg',
+          )}
+        >
+          <Icon className="size-3.5" />
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** The original access-request approval queue: stat cards + live queue table. */
+function AccessApprovals({
+  stats,
+  queue,
+  items,
+  total,
+  from,
+  to,
+  page,
+  onPageChange,
+  onDecide,
+}: {
+  stats: ReturnType<typeof usePendingStats>
+  queue: ReturnType<typeof usePendingRequests>
+  items: PendingRequestItem[]
+  total: number
+  from: number
+  to: number
+  page: number
+  onPageChange: (page: number) => void
+  onDecide: (request: PendingRequestItem, action: ReviewAction) => void
+}) {
+  return (
+    <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           label="Total Pending"
@@ -139,7 +236,7 @@ export function PendingApprovals() {
                 <QueueRow
                   key={req.id}
                   request={req}
-                  onDecide={(action) => setDecision({ request: req, action })}
+                  onDecide={(action) => onDecide(req, action)}
                 />
               ))}
               {items.length === 0 && (
@@ -173,20 +270,12 @@ export function PendingApprovals() {
             page={page}
             pageSize={queue.data?.page_size ?? DEFAULT_PAGE_SIZE}
             total={total}
-            onPageChange={setPage}
+            onPageChange={onPageChange}
             className="font-mono text-xs"
           />
         </div>
       </section>
-
-      {decision && (
-        <ReviewRequestDialog
-          request={decision.request}
-          action={decision.action}
-          onClose={() => setDecision(null)}
-        />
-      )}
-    </div>
+    </>
   )
 }
 
