@@ -61,7 +61,10 @@ const columns = ['Actor', 'Action', 'Credential', 'Detail', 'Timestamp']
 
 type ActionFilter = CredentialAuditAction | 'all'
 
-const actionFilters = Object.keys(actionMeta) as CredentialAuditAction[]
+// Viewed events remain visible under All Events, but are not offered as a filter.
+const actionFilters = (Object.keys(actionMeta) as CredentialAuditAction[]).filter(
+  (action) => action !== 'viewed',
+)
 
 /**
  * Org-admin audit trail for the credential manager: who created, viewed, copied,
