@@ -9,6 +9,7 @@ import { useSessionWatch } from '@/hooks/useSessionWatch'
 import { resolveSseUrl } from '@/lib/ws-status'
 import { AnalyticsObserver } from '@/analytics/AnalyticsObserver'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { GlobalApiLoader } from '@/components/ui/GlobalApiLoader'
 import { RequireAuth, RequireSession } from '@/components/auth/RequireAuth'
 import { RequireRole } from '@/components/auth/RequireRole'
 import { Login } from '@/pages/auth/Login'
@@ -58,6 +59,7 @@ export default function App() {
   const theme = useThemeStore((s) => s.theme)
   return (
     <QueryClientProvider client={queryClient}>
+      <GlobalApiLoader />
       <ToastContainer
         theme={theme}
         newestOnTop

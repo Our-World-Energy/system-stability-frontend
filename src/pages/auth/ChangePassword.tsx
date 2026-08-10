@@ -13,7 +13,7 @@ import { useAuthStore } from '@/store/auth'
 const MIN_LENGTH = 8
 
 interface ChangePasswordRouteState {
-  /** Where the user was originally headed, forwarded by Login. */
+  /** Return path for a voluntary change, such as one opened from Settings. */
   from?: string
 }
 

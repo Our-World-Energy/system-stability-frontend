@@ -20,9 +20,9 @@ import {
 } from '@/lib/api/requests'
 import type { AccessRequestDraft, RequestLogFilters, ReviewAction } from '@/lib/api/requests'
 import { subscribePendingStats } from '@/lib/api/pending-stats-stream'
-import { requestKeys, statsKeys } from '@/lib/api/query-keys'
+import { credentialKeys, requestKeys, statsKeys } from '@/lib/api/query-keys'
 import { notify } from '@/lib/notify'
-import type { RequestOutcome } from '@/lib/api/types'
+import type { Credential, RequestOutcome } from '@/lib/api/types'
 
 /** How often the live approval queue re-fetches while its page is open. */
 const QUEUE_POLL_MS = 30_000
@@ -46,13 +46,32 @@ export function useSubmitRequest({ onSuccess }: SubmitOptions = {}) {
   return useMutation({
     mutationFn: (draft: AccessRequestDraft) => submitAccessRequest(draft),
     retry: false,
-    onSuccess: (result) => {
+    onSuccess: (result, draft) => {
       const outcome = result.data
+
+      // The search response will not know about a newly queued request until its
+      // next fetch. Update every cached search containing this credential first,
+      // so the modal can close onto "Pending Approval" immediately.
+      if (!outcome.grant && outcome.request.status === 'pending') {
+        queryClient.setQueriesData<Credential[]>({ queryKey: credentialKeys.all }, (credentials) =>
+          credentials?.map((credential) =>
+            credential.id === draft.credentialId
+              ? {
+                  ...credential,
+                  request_status: 'pending',
+                  request_id: outcome.request.id,
+                  grant: null,
+                }
+              : credential,
+          ),
+        )
+      }
       notify.success(
         outcome?.grant
           ? 'Access granted — your window is open.'
           : 'Request submitted for approval.',
       )
+      void queryClient.invalidateQueries({ queryKey: credentialKeys.all })
       void queryClient.invalidateQueries({ queryKey: requestKeys.all })
       void queryClient.invalidateQueries({ queryKey: statsKeys.all })
       onSuccess?.(outcome)
@@ -99,10 +118,11 @@ export function usePendingRequests(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
 }
 
 /** The rotation-request approval queue (org admin only). */
-export function usePendingRotationRequests(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
+export function usePendingRotationRequests(page = 1, pageSize = DEFAULT_PAGE_SIZE, enabled = true) {
   return useQuery({
     queryKey: requestKeys.rotationPending(page, pageSize),
     queryFn: () => getPendingRotationRequests(page, pageSize),
+    enabled,
     refetchInterval: QUEUE_POLL_MS,
     placeholderData: (previous) => previous,
   })

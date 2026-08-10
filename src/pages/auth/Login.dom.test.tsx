@@ -35,12 +35,13 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-function renderLogin() {
+function renderLogin(from?: string) {
   return render(
-    <MemoryRouter initialEntries={['/login']}>
+    <MemoryRouter initialEntries={[from ? { pathname: '/login', state: { from } } : '/login']}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<p>Dashboard</p>} />
+        <Route path="/credentials" element={<p>Credentials</p>} />
         <Route path="/change-password" element={<p>Set a New Password</p>} />
       </Routes>
     </MemoryRouter>,
@@ -92,6 +93,20 @@ describe('Login page', () => {
       roleLabel: 'Organizational Admin',
     })
     expect(expiresAt).toBe('2026-08-06T01:35:22Z')
+  })
+
+  it('always lands on Overview instead of returning to a protected deep link', async () => {
+    mockLogin.mockResolvedValue({
+      token: TOKEN,
+      expires_at: '2026-08-06T01:35:22Z',
+      must_change_password: false,
+    })
+    renderLogin('/credentials')
+
+    fillAndSubmit()
+
+    await waitFor(() => expect(screen.getByText('Dashboard')).toBeTruthy())
+    expect(screen.queryByText('Credentials')).toBeNull()
   })
 
   it('routes to the forced screen when the password must change', async () => {

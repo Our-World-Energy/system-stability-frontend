@@ -10,9 +10,8 @@ import { toApiError } from '@/lib/api/caller'
 import { takeSessionNotice } from '@/lib/auth-storage'
 import { useAuthStore } from '@/store/auth'
 
-/** Location state set by RequireAuth (where to return to) and by ResetPassword. */
+/** Location state used by ResetPassword and session-expiry notices. */
 interface LoginRouteState {
-  from?: string
   notice?: string
 }
 
@@ -54,11 +53,12 @@ export function Login() {
       // stays flagged until change-password runs. Send it straight to the forced
       // screen instead of the app — RequireAuth would bounce it back here anyway.
       if (must_change_password) {
-        navigate('/change-password', { replace: true, state: { from: state?.from } })
+        navigate('/change-password', { replace: true })
         return
       }
-      // Otherwise return the user to the page that bounced them here, if any.
-      navigate(state?.from ?? '/', { replace: true })
+      // Every successful sign-in starts from the same orientation point, even if
+      // a protected deep link originally sent the user to this screen.
+      navigate('/', { replace: true })
     } catch (err) {
       // The backend's own wording — "invalid email or password", "account is
       // disabled" — is written to be shown as-is, so it goes straight in.

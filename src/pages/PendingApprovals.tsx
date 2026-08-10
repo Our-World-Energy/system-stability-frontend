@@ -5,7 +5,11 @@ import { cn } from '@/lib/utils'
 import { Pagination } from '@/components/ui/Pagination'
 import { ReviewRequestDialog } from '@/components/credentials/admin/ReviewRequestDialog'
 import { RotationQueue } from '@/components/credentials/admin/RotationQueue'
-import { usePendingRequests, useRefreshPendingRequestsOnStats } from '@/hooks/useRequests'
+import {
+  usePendingRequests,
+  usePendingRotationRequests,
+  useRefreshPendingRequestsOnStats,
+} from '@/hooks/useRequests'
 import { usePendingStats } from '@/hooks/useStats'
 import { useAuthStore } from '@/store/auth'
 import { DEFAULT_PAGE_SIZE, requestErrorMessage } from '@/lib/api/requests'
@@ -55,6 +59,10 @@ export function PendingApprovals() {
 
   const stats = usePendingStats()
   const queue = usePendingRequests(page, DEFAULT_PAGE_SIZE)
+  // Keep the first rotation page warm for org admins while the access tab is
+  // selected. Once the rotation tab opens, RotationQueue becomes the single
+  // active observer for the same cache entry, avoiding duplicate polling timers.
+  usePendingRotationRequests(1, DEFAULT_PAGE_SIZE, isOrgAdmin && view !== 'rotation')
   // A live pending-stats push means a request was just submitted/approved/denied,
   // so pull the queue fresh rather than waiting for the next poll.
   useRefreshPendingRequestsOnStats()
