@@ -20,16 +20,12 @@ export const endpoints = {
     /** Replace the encrypted secret, and optionally amend metadata. */
     rotate: 'credential-manager/rotate-credential',
     /**
-     * Executive / Management ask that a credential be rotated to a new secret they
-     * supply — they cannot rotate directly. The new value is encrypted client-side,
-     * exactly like create/rotate; an admin then applies it.
-     *
-     * NOT BUILT YET on the backend — this is the shape the frontend sends, for the
-     * backend to implement against:
-     *   POST { credential_id, encrypted_secret, justification } → { status, message, data }
-     * Correcting this string is the only change needed here once the route lands.
+     * Executive / Management propose a rotation with a new secret they supply —
+     * they cannot rotate directly. Encrypted client-side like create/rotate; an
+     * org admin then approves and applies it.
+     * POST `{ credential_id, encrypted_secret, justification }`.
      */
-    requestRotation: 'credential-manager/request-rotation',
+    requestRotation: 'credential-manager/submit-rotation-request',
     /** Hard delete — not recoverable. */
     delete: 'credential-manager/delete-credential',
     /**
@@ -40,10 +36,14 @@ export const endpoints = {
 
     /** Ask for access to a credential. Auto-grants come back already granted. */
     submitRequest: 'credential-manager/submit-request',
-    /** Admin: approve or deny a pending request. */
+    /** Admin: approve or deny a pending access request. */
     reviewRequest: 'credential-manager/review-request',
-    /** Admin: the approval queue, oldest first. */
+    /** Admin: the access-request approval queue, oldest first. */
     pendingRequests: 'credential-manager/get-pending-requests',
+    /** Org admin: the rotation-request approval queue. POST `{ page, page_size }`. */
+    pendingRotationRequests: 'credential-manager/get-pending-rotation-requests',
+    /** Org admin: approve or deny a rotation request. POST `{ request_id, action }`. */
+    reviewRotationRequest: 'credential-manager/review-rotation-request',
     /** Request history — all users for an admin, own requests otherwise. */
     requestLogs: 'credential-manager/get-request-logs',
 

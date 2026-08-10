@@ -11,9 +11,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   DEFAULT_PAGE_SIZE,
   getPendingRequests,
+  getPendingRotationRequests,
   getRequestLogs,
   requestErrorMessage,
   reviewRequest,
+  reviewRotationRequest,
   submitAccessRequest,
 } from '@/lib/api/requests'
 import type { AccessRequestDraft, RequestLogFilters, ReviewAction } from '@/lib/api/requests'
@@ -93,6 +95,41 @@ export function usePendingRequests(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
     // Keep the previous page on screen while the next one loads, so paging does
     // not blank the table.
     placeholderData: (previous) => previous,
+  })
+}
+
+/** The rotation-request approval queue (org admin only). */
+export function usePendingRotationRequests(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
+  return useQuery({
+    queryKey: requestKeys.rotationPending(page, pageSize),
+    queryFn: () => getPendingRotationRequests(page, pageSize),
+    refetchInterval: QUEUE_POLL_MS,
+    placeholderData: (previous) => previous,
+  })
+}
+
+interface ReviewRotationOptions {
+  onSuccess?: () => void
+}
+
+/** Approve or deny a rotation request; refreshes the queues on success. */
+export function useReviewRotationRequest({ onSuccess }: ReviewRotationOptions = {}) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (vars: { requestId: string; action: ReviewAction }) =>
+      reviewRotationRequest(vars.requestId, vars.action),
+    retry: false,
+    onSuccess: (result, vars) => {
+      notify.success(
+        result.message?.trim() ||
+          (vars.action === 'approve' ? 'Rotation request approved.' : 'Rotation request denied.'),
+      )
+      void queryClient.invalidateQueries({ queryKey: requestKeys.all })
+      onSuccess?.()
+    },
+    onError: (err) =>
+      notify.error(requestErrorMessage(err, 'The rotation review could not be recorded.')),
   })
 }
 

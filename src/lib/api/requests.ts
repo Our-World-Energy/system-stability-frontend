@@ -11,6 +11,7 @@ import type { ApiEnvelope } from './caller'
 import type {
   Paginated,
   PendingRequestItem,
+  PendingRotationRequestItem,
   RequestLogItem,
   RequestOutcome,
   RequestStatus,
@@ -174,6 +175,33 @@ export async function getPendingRequests(
     { page, page_size: pageSize },
   )
   return normalizePage(data, page, pageSize)
+}
+
+/** Oldest-first queue of rotation requests awaiting an org admin's decision. */
+export async function getPendingRotationRequests(
+  page = 1,
+  pageSize = DEFAULT_PAGE_SIZE,
+): Promise<Paginated<PendingRotationRequestItem>> {
+  const { data } = await stabilityCaller<Paginated<PendingRotationRequestItem>>(
+    endpoints.credentialManager.pendingRotationRequests,
+    { page, page_size: pageSize },
+  )
+  return normalizePage(data, page, pageSize)
+}
+
+/**
+ * Approve or deny a rotation request. The contract is just `{ request_id, action }`
+ * — no denial reason — so a deny is a plain confirm rather than a reason form.
+ */
+export async function reviewRotationRequest(
+  requestId: string,
+  action: ReviewAction,
+): Promise<ApiEnvelope<unknown>> {
+  if (!requestId) throw new Error('No request selected.')
+  return stabilityCaller<unknown>(endpoints.credentialManager.reviewRotationRequest, {
+    request_id: requestId,
+    action,
+  })
 }
 
 /** Filters accepted by the request history. All are optional. */
