@@ -5,7 +5,10 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Owe System Stability Platform</title>
-    <meta name="description" content="Owe System Stability — real-time monitoring, incident management, and performance analytics." />
+    <meta
+      name="description"
+      content="Owe System Stability — real-time monitoring, incident management, and performance analytics."
+    />
     <meta name="theme-color" content="#111319" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -13,6 +16,21 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
+
+    <!-- Google tag (gtag.js) — System Stability GA4 property only, never owehub's.
+         This id must stay identical to GA_MEASUREMENT_ID in
+         src/analytics/googleAnalytics.ts; a test fails if they drift apart. -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-HHY7CK0XT4"></script>
+    <script>
+      window.dataLayer = window.dataLayer || []
+      function gtag() {
+        dataLayer.push(arguments)
+      }
+      gtag('js', new Date())
+      // Page views are sent by hand from src/analytics — leaving the automatic
+      // ones on would count every SPA route change twice.
+      gtag('config', 'G-HHY7CK0XT4', { send_page_view: false })
+    </script>
   </head>
   <body>
     <div id="root"></div>

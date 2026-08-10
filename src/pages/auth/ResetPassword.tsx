@@ -1,32 +1,42 @@
-import { useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Check } from 'lucide-react'
 import { AuthShell } from '@/components/auth/AuthShell'
 import { PasswordInput } from '@/components/auth/AuthInput'
-import { AuthSubmit, BackToLogin } from '@/components/auth/AuthActions'
+import { AuthLink, AuthSubmit, BackToLogin } from '@/components/auth/AuthActions'
 import { AuthAlert, FieldError } from '@/components/auth/AuthFeedback'
 import { Field } from '@/components/ui/Field'
-import { authErrorMessage, resetPassword } from '@/lib/auth-api'
-import { clearResetFlow, readResetFlow } from '@/lib/auth-flow'
+import { toApiError } from '@/lib/api/caller'
+import { resetPassword } from '@/lib/api/user-management'
 
+/** Backend rule: at least 8 characters. */
 const MIN_LENGTH = 8
 
+/**
+ * The mailed link lands here as `/reset-password?token=…`. Everything the call
+ * needs is in that query param — there is no session and nothing carried over from
+ * the Forgot Password screen, so the page works in whichever browser the mail was
+ * opened in.
+ */
 export function ResetPassword() {
   const navigate = useNavigate()
-  const [flow] = useState(readResetFlow)
+  const [params] = useSearchParams()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  // Set when the backend rejects the token itself: nothing typed here can fix
+  // that, so the form is replaced with a way to request a fresh link.
+  const [linkDead, setLinkDead] = useState(false)
   // Validation messages appear only after a submit attempt, so the form doesn't
   // scold the user mid-typing.
   const [validated, setValidated] = useState(false)
+  // The token is single-use, so a second request with it always fails — even when
+  // the first one succeeded. `pending` alone is a render behind; this closes the
+  // gap for a double-click landing inside the same tick.
+  const spent = useRef(false)
 
-  // The reset token only exists after a verified OTP; without it this page can do
-  // nothing, so send the user back to the start of the flow. Bound to a local so
-  // the narrowing survives into the async submit handler.
-  const resetToken = flow?.resetToken
-  if (!resetToken) return <Navigate to="/forgot-password" replace />
+  const token = params.get('token')?.trim() ?? ''
 
   const tooShort = password.length > 0 && password.length < MIN_LENGTH
   const mismatch = confirm.length > 0 && password !== confirm
@@ -35,21 +45,43 @@ export function ResetPassword() {
   const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault()
     setValidated(true)
-    if (!canSubmit || pending) return
+    if (!canSubmit || pending || spent.current) return
 
+    spent.current = true
     setPending(true)
     setError(null)
     try {
-      await resetPassword(resetToken, password)
-      clearResetFlow()
+      await resetPassword(token, password)
       navigate('/login', {
         replace: true,
         state: { notice: 'Password updated. Sign in with your new password.' },
       })
     } catch (err) {
-      setError(authErrorMessage(err, 'Could not update your password. Please try again.'))
+      const apiError = toApiError(err)
+      setError(apiError.message)
+      // Unknown, expired and already-used tokens all come back with this one
+      // message — they are the same dead end from here, and the only way out is a
+      // new link. Anything else (too short, a 500) is worth another attempt.
+      setLinkDead(apiError.status === 400 && /invalid or expired/i.test(apiError.message))
+      spent.current = false
       setPending(false)
     }
+  }
+
+  if (!token || linkDead) {
+    return (
+      <AuthShell title="Reset Link Not Valid">
+        <AuthAlert>
+          {error ?? 'This password reset link is invalid or has expired. Request a new one.'}
+        </AuthAlert>
+        <div className="mt-7 flex justify-center">
+          <AuthLink to="/forgot-password" accent>
+            Request a new link
+          </AuthLink>
+        </div>
+        <BackToLogin />
+      </AuthShell>
+    )
   }
 
   return (

@@ -7,11 +7,13 @@ import { UserManagement } from './UserManagement'
 import {
   createUser,
   deleteUser,
+  getActiveUserStats,
   getMetadata,
   getUsers,
   updateUser,
 } from '@/lib/api/user-management'
 import type {
+  ActiveUserStatsData,
   GetUsersData,
   MetadataData,
   Role,
@@ -19,12 +21,13 @@ import type {
 } from '@/lib/api/user-management.types'
 import { ApiError } from '@/lib/api/caller'
 import { notify } from '@/lib/notify'
-import { activeUsersSeries } from '@/lib/active-users-data'
+import { activeUsersSeries, isoDay, parseIsoDay } from '@/lib/active-users-data'
 import { useAuthStore } from '@/store/auth'
 
 vi.mock('@/lib/api/user-management', () => ({
   getMetadata: vi.fn(),
   getUsers: vi.fn(),
+  getActiveUserStats: vi.fn(),
   createUser: vi.fn(),
   updateUser: vi.fn(),
   deleteUser: vi.fn(),
@@ -37,6 +40,7 @@ vi.mock('@/lib/notify', () => ({
 const mockNotify = vi.mocked(notify)
 const mockGetMetadata = vi.mocked(getMetadata)
 const mockGetUsers = vi.mocked(getUsers)
+const mockGetActiveUserStats = vi.mocked(getActiveUserStats)
 const mockCreateUser = vi.mocked(createUser)
 const mockUpdateUser = vi.mocked(updateUser)
 const mockDeleteUser = vi.mocked(deleteUser)
@@ -44,12 +48,7 @@ const mockDeleteUser = vi.mocked(deleteUser)
 const PAGE_SIZE = 5
 const ADMIN_EMAIL = 'bootstrap.admin@ourworldenergy.com'
 
-function role(
-  key: Role['key'],
-  name: string,
-  rank: number,
-  extra: Partial<Role> = {},
-): Role {
+function role(key: Role['key'], name: string, rank: number, extra: Partial<Role> = {}): Role {
   return {
     id: rank,
     key,
@@ -180,6 +179,34 @@ function renderPage() {
   )
 }
 
+/**
+ * A stats reply for whatever range was asked for: one point per day, counting up
+ * from 100 so each bucket is distinguishable in the hover readout.
+ */
+function activeStats({ start_date, end_date }: { start_date: string; end_date: string }) {
+  const days: string[] = []
+  // Local days throughout — `toISOString()` here would shift every date by one
+  // in any timezone east of Greenwich.
+  for (let d = parseIsoDay(start_date)!; isoDay(d) <= end_date; d.setDate(d.getDate() + 1)) {
+    days.push(isoDay(d))
+  }
+  const daily = days.map((date, i) => ({ date, active_users: 100 + i * 10 }))
+
+  const stats: ActiveUserStatsData = {
+    start_date,
+    end_date,
+    average_daily_active_users: 128,
+    peak_daily_active_users: 190,
+    percent_change_vs_previous_period: 2.1,
+    daily,
+    previous_period_daily: daily.map((point) => ({
+      ...point,
+      active_users: point.active_users - 5,
+    })),
+  }
+  return stats
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   useAuthStore.setState({
@@ -194,6 +221,7 @@ beforeEach(() => {
   })
   mockGetMetadata.mockResolvedValue(METADATA)
   mockGetUsers.mockImplementation(async (params = {}) => page(params))
+  mockGetActiveUserStats.mockImplementation(async (range) => activeStats(range))
 })
 afterEach(cleanup)
 
@@ -307,7 +335,9 @@ describe('User Management — registry', () => {
     await waitForRegistry()
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-    await waitFor(() => expect(mockGetUsers).toHaveBeenCalledWith({ page: 2, page_size: PAGE_SIZE }))
+    await waitFor(() =>
+      expect(mockGetUsers).toHaveBeenCalledWith({ page: 2, page_size: PAGE_SIZE }),
+    )
 
     fireEvent.click(screen.getByRole('button', { name: /Filter registry by role/i }))
     fireEvent.click(screen.getByRole('checkbox', { name: 'Organizational Admin' }))
@@ -385,8 +415,9 @@ describe('User Management — empty states', () => {
     await waitFor(() =>
       expect(mockGetUsers).toHaveBeenLastCalledWith({ page: 1, page_size: PAGE_SIZE }),
     )
-    expect((screen.getByRole('searchbox', { name: /Search registry/i }) as HTMLInputElement).value)
-      .toBe('')
+    expect(
+      (screen.getByRole('searchbox', { name: /Search registry/i }) as HTMLInputElement).value,
+    ).toBe('')
     await waitFor(() => expect(registryRows().length).toBe(PAGE_SIZE))
   })
 
@@ -516,9 +547,11 @@ describe('User Management — create', () => {
       target: { value: 'Sales' },
     })
     fireEvent.click(subDepartments())
-    expect(
-      screen.getAllByRole('checkbox').map((c) => c.parentElement?.textContent),
-    ).toEqual(['Business Development', 'Partner Success', 'Sales Operations'])
+    expect(screen.getAllByRole('checkbox').map((c) => c.parentElement?.textContent)).toEqual([
+      'Business Development',
+      'Partner Success',
+      'Sales Operations',
+    ])
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Partner Success' }))
     fireEvent.change(screen.getByRole('combobox', { name: /^department$/i }), {
@@ -711,7 +744,7 @@ describe('User Management — add-user field validation', () => {
 
   it('keeps what was typed when the create is rejected', async () => {
     // A duplicate email is a 409, and the admin needs their input back to fix it.
-    mockCreateUser.mockRejectedValue(new Error('a user with this email already exists'))
+    mockCreateUser.mockRejectedValue(new Error('A user with this email already exists'))
 
     renderPage()
     await waitForRegistry()
@@ -822,7 +855,7 @@ describe('User Management — add-user field validation', () => {
   })
 
   it('starts blank after a rejected create is dismissed', async () => {
-    mockCreateUser.mockRejectedValue(new Error('a user with this email already exists'))
+    mockCreateUser.mockRejectedValue(new Error('A user with this email already exists'))
     renderPage()
     await waitForRegistry()
 
@@ -886,7 +919,8 @@ describe('User Management — edit-user field validation', () => {
     }
   }
 
-  const saveButton = () => screen.getByRole('button', { name: /Save Changes/i }) as HTMLButtonElement
+  const saveButton = () =>
+    screen.getByRole('button', { name: /Save Changes/i }) as HTMLButtonElement
 
   it('applies the same phone rules as the add dialog', async () => {
     const setPhone = await openEdit('Priya Raman')
@@ -1254,8 +1288,12 @@ describe('User Management — active users chart', () => {
     fireEvent.click(pill('Today'))
     expect(pill('Today')).toHaveProperty('ariaPressed', 'true')
     expect(pill('Last 7 days')).toHaveProperty('ariaPressed', 'false')
-    // Hourly buckets, so the axis starts at midnight.
-    expect(screen.getByText('00:00')).toBeTruthy()
+    // Presets become concrete inclusive dates before anything is requested — the
+    // backend takes dates, never "today".
+    await waitFor(() => {
+      const [range] = mockGetActiveUserStats.mock.calls.at(-1)!
+      expect(range.start_date).toBe(range.end_date)
+    })
 
     fireEvent.click(pill('Custom range'))
     const from = screen.getByLabelText('from') as HTMLInputElement
@@ -1276,13 +1314,16 @@ describe('User Management — active users chart', () => {
     renderPage()
     await waitForRegistry()
 
-    const plot = screen.getByRole('img', { name: /Active users/i }).parentElement!
+    // The plot only exists once the range's counts have arrived.
+    const chart = await screen.findByRole('img', { name: /Active users/i })
+    const plot = chart.parentElement!
     // jsdom has no layout, so the cursor maths needs a box to measure against.
     plot.getBoundingClientRect = () => ({ left: 0, width: 600, top: 0, height: 208 }) as DOMRect
 
     // Queried within the plot, since the axis captions repeat the same labels.
     const readout = within(plot)
-    const week = activeUsersSeries('last_7_days', new Date()).points
+    // The same buckets the mocked API answered the default range with.
+    const week = activeUsersSeries(activeStats(mockGetActiveUserStats.mock.calls[0][0])).points
 
     // Far right of a 7-day window is today; far left is six days back.
     fireEvent.mouseMove(plot, { clientX: 600 })

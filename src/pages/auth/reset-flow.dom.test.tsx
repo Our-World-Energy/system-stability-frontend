@@ -3,29 +3,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { ForgotPassword } from './ForgotPassword'
-import { VerifyOtp } from './VerifyOtp'
 import { ResetPassword } from './ResetPassword'
-import { requestPasswordOtp, resetPassword, verifyPasswordOtp } from '@/lib/auth-api'
-import { readResetFlow, startResetFlow, setResetToken } from '@/lib/auth-flow'
+import { ApiError } from '@/lib/api/caller'
+import { forgotPassword, resetPassword } from '@/lib/api/user-management'
 
-vi.mock('@/lib/auth-api', () => ({
-  requestPasswordOtp: vi.fn(),
-  verifyPasswordOtp: vi.fn(),
+vi.mock('@/lib/api/user-management', () => ({
+  forgotPassword: vi.fn(),
   resetPassword: vi.fn(),
-  authErrorMessage: (_err: unknown, fallback: string) => fallback,
 }))
 
-const mockRequestOtp = vi.mocked(requestPasswordOtp)
-const mockVerifyOtp = vi.mocked(verifyPasswordOtp)
+const mockForgotPassword = vi.mocked(forgotPassword)
 const mockResetPassword = vi.mocked(resetPassword)
 
 const EMAIL = 'ops@ourworldenergy.com'
+const TOKEN = 'reset-token-xyz'
+/** The one message the backend returns for every address, real or not. */
+const GENERIC = 'if an account exists for this email, a password reset link has been sent'
 
 beforeEach(() => {
-  sessionStorage.clear()
   vi.clearAllMocks()
-  mockRequestOtp.mockResolvedValue(undefined)
-  mockVerifyOtp.mockResolvedValue('reset-token-xyz')
+  mockForgotPassword.mockResolvedValue(GENERIC)
   mockResetPassword.mockResolvedValue(undefined)
 })
 afterEach(cleanup)
@@ -35,7 +32,6 @@ function renderFlow(entry: string) {
     <MemoryRouter initialEntries={[entry]}>
       <Routes>
         <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/verify-otp" element={<VerifyOtp />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/login" element={<p>Login page</p>} />
       </Routes>
@@ -43,101 +39,68 @@ function renderFlow(entry: string) {
   )
 }
 
-/** Fill all six boxes at once, the way a paste behaves. */
-function enterCode(code: string) {
-  fireEvent.change(screen.getByLabelText('Digit 1 of 6'), { target: { value: code } })
+function fillPassword(value: string, confirmation = value) {
+  fireEvent.change(screen.getByLabelText(/^New Password/i), { target: { value } })
+  fireEvent.change(screen.getByLabelText(/Confirm New Password/i), {
+    target: { value: confirmation },
+  })
 }
 
 describe('Forgot Password', () => {
-  it('requests a code, records the flow, and moves to verification', async () => {
+  it('requests a link and shows the backend message as-is', async () => {
     renderFlow('/forgot-password')
 
     fireEvent.change(screen.getByLabelText(/Email Address/i), { target: { value: EMAIL } })
-    fireEvent.click(screen.getByRole('button', { name: /Request OTP/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Send Reset Link/i }))
 
-    await waitFor(() => expect(screen.getByText('OTP Verification')).toBeTruthy())
-    expect(mockRequestOtp).toHaveBeenCalledWith(EMAIL)
-    expect(readResetFlow()?.email).toBe(EMAIL)
+    await waitFor(() => expect(screen.getByRole('status')).toBeTruthy())
+    expect(mockForgotPassword).toHaveBeenCalledWith(EMAIL)
+    // Shown as sent, bar the capitalised first letter.
+    expect(screen.getByRole('status').textContent).toContain(GENERIC.slice(1))
   })
 
-  it('reports a send failure instead of advancing', async () => {
-    mockRequestOtp.mockRejectedValue(new Error('boom'))
+  it('keeps the form usable so a mistyped address can be corrected', async () => {
     renderFlow('/forgot-password')
 
     fireEvent.change(screen.getByLabelText(/Email Address/i), { target: { value: EMAIL } })
-    fireEvent.click(screen.getByRole('button', { name: /Request OTP/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Send Reset Link/i }))
+    await waitFor(() => expect(screen.getByRole('status')).toBeTruthy())
+
+    // Editing the address drops the confirmation — it described the previous send,
+    // not whatever is in the box now.
+    fireEvent.change(screen.getByLabelText(/Email Address/i), { target: { value: 'x@y.com' } })
+    expect(screen.queryByRole('status')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: /Send Reset Link/i }))
+    await waitFor(() => expect(mockForgotPassword).toHaveBeenCalledWith('x@y.com'))
+  })
+
+  it('reports a send failure', async () => {
+    mockForgotPassword.mockRejectedValue(new ApiError('http', 'request body is required', 400))
+    renderFlow('/forgot-password')
+
+    fireEvent.change(screen.getByLabelText(/Email Address/i), { target: { value: EMAIL } })
+    fireEvent.click(screen.getByRole('button', { name: /Send Reset Link/i }))
 
     await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy())
-    expect(screen.queryByText('OTP Verification')).toBeNull()
-    expect(readResetFlow()).toBeNull()
-  })
-})
-
-describe('OTP Verification', () => {
-  it('sends deep links back to the start when no flow is in progress', () => {
-    renderFlow('/verify-otp')
-    expect(screen.getByText('Forgot Password')).toBeTruthy()
-  })
-
-  it('shows the target address and the expiry countdown', () => {
-    startResetFlow(EMAIL)
-    renderFlow('/verify-otp')
-
-    expect(screen.getByText(EMAIL)).toBeTruthy()
-    expect(screen.getByText('02:00')).toBeTruthy()
-  })
-
-  it('verifies a complete code and advances to the new-password step', async () => {
-    startResetFlow(EMAIL)
-    renderFlow('/verify-otp')
-
-    enterCode('481902')
-
-    await waitFor(() => expect(screen.getByText('Create a New Password')).toBeTruthy())
-    expect(mockVerifyOtp).toHaveBeenCalledWith(EMAIL, '481902')
-    expect(readResetFlow()?.resetToken).toBe('reset-token-xyz')
-  })
-
-  it('clears a rejected code so it can be retyped', async () => {
-    mockVerifyOtp.mockRejectedValue(new Error('bad code'))
-    startResetFlow(EMAIL)
-    renderFlow('/verify-otp')
-
-    enterCode('000000')
-
-    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy())
-    expect((screen.getByLabelText('Digit 1 of 6') as HTMLInputElement).value).toBe('')
-    expect(screen.queryByText('Create a New Password')).toBeNull()
-  })
-
-  it('resend issues a fresh code', async () => {
-    startResetFlow(EMAIL)
-    renderFlow('/verify-otp')
-
-    fireEvent.click(screen.getByRole('button', { name: /Resend Code/i }))
-
-    await waitFor(() => expect(mockRequestOtp).toHaveBeenCalledWith(EMAIL))
+    expect(screen.getByRole('alert').textContent).toContain('request body is required')
+    expect(screen.queryByRole('status')).toBeNull()
   })
 })
 
 describe('Create a New Password', () => {
-  it('refuses to render without a verified reset token', () => {
-    startResetFlow(EMAIL) // Flow exists, but the OTP was never verified.
+  it('refuses to render a form without a token in the URL', () => {
     renderFlow('/reset-password')
-    expect(screen.getByText('Forgot Password')).toBeTruthy()
+
+    expect(screen.getByText('Reset Link Not Valid')).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Request a new link/i })).toBeTruthy()
+    expect(screen.queryByLabelText(/^New Password/i)).toBeNull()
   })
 
   it('rejects a mismatched confirmation without calling the API', () => {
-    startResetFlow(EMAIL)
-    setResetToken('reset-token-xyz')
-    renderFlow('/reset-password')
+    renderFlow(`/reset-password?token=${TOKEN}`)
 
-    fireEvent.change(screen.getByLabelText(/^New Password/i), {
-      target: { value: 'correct-horse' },
-    })
-    fireEvent.change(screen.getByLabelText(/Confirm New Password/i), {
-      target: { value: 'correct-hors' },
-    })
+    fillPassword('correct-horse', 'correct-hors')
     fireEvent.click(screen.getByRole('button', { name: /Reset Password/i }))
 
     expect(screen.getByText(/Both passwords must match/i)).toBeTruthy()
@@ -145,33 +108,63 @@ describe('Create a New Password', () => {
   })
 
   it('rejects a password under the minimum length', () => {
-    startResetFlow(EMAIL)
-    setResetToken('reset-token-xyz')
-    renderFlow('/reset-password')
+    renderFlow(`/reset-password?token=${TOKEN}`)
 
-    fireEvent.change(screen.getByLabelText(/^New Password/i), { target: { value: 'short' } })
-    fireEvent.change(screen.getByLabelText(/Confirm New Password/i), { target: { value: 'short' } })
+    fillPassword('short')
     fireEvent.click(screen.getByRole('button', { name: /Reset Password/i }))
 
     expect(screen.getByText(/at least 8 characters/i)).toBeTruthy()
     expect(mockResetPassword).not.toHaveBeenCalled()
   })
 
-  it('commits the new password, clears the flow, and returns to login', async () => {
-    startResetFlow(EMAIL)
-    setResetToken('reset-token-xyz')
-    renderFlow('/reset-password')
+  it('commits the new password with the URL token and returns to login', async () => {
+    renderFlow(`/reset-password?token=${TOKEN}`)
 
-    fireEvent.change(screen.getByLabelText(/^New Password/i), {
-      target: { value: 'correct-horse' },
-    })
-    fireEvent.change(screen.getByLabelText(/Confirm New Password/i), {
-      target: { value: 'correct-horse' },
-    })
+    fillPassword('correct-horse')
     fireEvent.click(screen.getByRole('button', { name: /Reset Password/i }))
 
     await waitFor(() => expect(screen.getByText('Login page')).toBeTruthy())
-    expect(mockResetPassword).toHaveBeenCalledWith('reset-token-xyz', 'correct-horse')
-    expect(readResetFlow()).toBeNull()
+    expect(mockResetPassword).toHaveBeenCalledWith(TOKEN, 'correct-horse')
+  })
+
+  it('sends the single-use token once however fast the button is clicked', async () => {
+    renderFlow(`/reset-password?token=${TOKEN}`)
+
+    fillPassword('correct-horse')
+    const submit = screen.getByRole('button', { name: /Reset Password/i })
+    // A second call with a spent token fails as "invalid or expired", which would
+    // report a failure for a reset that had in fact just succeeded.
+    fireEvent.click(submit)
+    fireEvent.click(submit)
+
+    await waitFor(() => expect(screen.getByText('Login page')).toBeTruthy())
+    expect(mockResetPassword).toHaveBeenCalledTimes(1)
+  })
+
+  it('swaps the form for a request-a-new-link exit when the token is rejected', async () => {
+    mockResetPassword.mockRejectedValue(new ApiError('http', 'invalid or expired token', 400))
+    renderFlow(`/reset-password?token=${TOKEN}`)
+
+    fillPassword('correct-horse')
+    fireEvent.click(screen.getByRole('button', { name: /Reset Password/i }))
+
+    await waitFor(() => expect(screen.getByText('Reset Link Not Valid')).toBeTruthy())
+    expect(screen.getByRole('alert').textContent).toContain('invalid or expired token')
+    fireEvent.click(screen.getByRole('link', { name: /Request a new link/i }))
+    expect(screen.getByText('Forgot Password')).toBeTruthy()
+  })
+
+  it('keeps the form for a failure the user can retry', async () => {
+    mockResetPassword.mockRejectedValue(new ApiError('http', 'failed to reset password', 500))
+    renderFlow(`/reset-password?token=${TOKEN}`)
+
+    fillPassword('correct-horse')
+    fireEvent.click(screen.getByRole('button', { name: /Reset Password/i }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy())
+    expect(screen.getByLabelText(/^New Password/i)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /Reset Password/i }))
+    await waitFor(() => expect(mockResetPassword).toHaveBeenCalledTimes(2))
   })
 })

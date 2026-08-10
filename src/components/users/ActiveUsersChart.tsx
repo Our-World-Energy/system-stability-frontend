@@ -1,7 +1,12 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { LoaderCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toApiError } from '@/lib/api/caller'
+import { useActiveUserStats } from '@/hooks/useUserManagement'
 import {
+  EMPTY_SERIES,
   activeUsersRanges,
+  activeUsersRequest,
   activeUsersSeries,
   defaultCustomRange,
   isoDay,
@@ -41,7 +46,7 @@ function smoothPath(pts: { x: number; y: number }[]): string {
  * (`preserveAspectRatio="none"`) with non-scaling strokes, so the curve fills any
  * card width without thinning the line.
  */
-export function ActiveUsersChart() {
+export function ActiveUsersChart({ enabled = true }: { enabled?: boolean }) {
   const gradientId = 'active-users-' + useId().replace(/:/g, '')
   // One clock for the whole render, so the series and the pickers' bounds agree.
   const now = useMemo(() => new Date(), [])
@@ -84,8 +89,26 @@ export function ActiveUsersChart() {
     setHovered(null)
   }
 
-  const series = useMemo(() => activeUsersSeries(range, now, custom), [range, now, custom])
-  const { points, previous, average, peak, changePercent, caption } = series
+  // Preset pills and the picker both resolve to concrete inclusive dates before
+  // anything is requested — the backend takes dates, not "last 7 days".
+  const request = useMemo(
+    () => activeUsersRequest(range, now, custom),
+    [range, now, custom.from, custom.to], // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const query = useActiveUserStats(request, enabled)
+  const error = query.error ? toApiError(query.error) : null
+
+  const series = useMemo(
+    () => (query.data ? activeUsersSeries(query.data) : EMPTY_SERIES),
+    [query.data],
+  )
+  const { points, previous, average, peak, changeLabel, changeDirection } = series
+  // Before the first response there is nothing to caption; say what was asked for
+  // rather than leaving the line blank while it loads.
+  const caption = series.caption || (request ? `${request.start_date} – ${request.end_date}` : '')
+  // A range that cannot be requested (an unparseable custom window) is the one
+  // empty state the API never gets a say in.
+  const invalidRange = request === null
 
   // A single bucket (custom range of one day, or the first hour of today) has no
   // line to draw — repeat it so the chart reads as a flat level, not as nothing.
@@ -145,8 +168,13 @@ export function ActiveUsersChart() {
           <h2 className="text-fg-muted font-mono text-[11px] font-semibold tracking-[0.08em] uppercase">
             Active Users
           </h2>
-          <p className="text-fg-subtle mt-1 font-mono text-[10px] tracking-[0.08em] uppercase">
+          <p className="text-fg-subtle mt-1 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.08em] uppercase">
             {caption}
+            {/* Refresh of a range that already has a curve: the chart stays put and
+                says it is working, rather than collapsing into the loading state. */}
+            {query.isFetching && points.length > 0 && (
+              <LoaderCircle aria-label="Refreshing" className="size-3 animate-spin" />
+            )}
           </p>
         </div>
         <div
@@ -186,15 +214,15 @@ export function ActiveUsersChart() {
           <p className="text-fg font-mono text-4xl font-bold tracking-tight">
             {average.toLocaleString()}
           </p>
-          {changePercent !== null && (
+          {changeLabel && (
             <p
               className={cn(
                 'font-mono text-sm font-semibold',
-                changePercent >= 0 ? 'text-primary-bright' : 'text-critical',
+                changeDirection === 'down' ? 'text-critical' : 'text-primary-bright',
               )}
+              title="Change against the previous period of the same length"
             >
-              {changePercent >= 0 ? '+' : ''}
-              {changePercent}%
+              {changeLabel}
             </p>
           )}
           <p className="text-fg-subtle font-mono text-[10px] tracking-[0.08em] uppercase">
@@ -236,10 +264,48 @@ export function ActiveUsersChart() {
       {/* `mt-auto` pins the plot to the bottom of the card, so it sits at the same
           height whether or not the custom-range pickers are taking up space above
           — and whatever slack the neighbouring card's height leaves stays above it. */}
-      {points.length === 0 ? (
-        <p className="text-fg-muted mt-auto grid h-52 place-items-center pt-4 font-mono text-sm">
-          No activity in this range
+      {/* An error while a curve is already on screen replaces nothing — the old
+          range is still true, and blanking it would lose more than it explains. */}
+      {error && points.length > 0 && (
+        <p role="alert" className="text-critical-bright mt-3 font-mono text-[11px]">
+          {error.message}{' '}
+          <button type="button" onClick={() => void query.refetch()} className="underline">
+            Retry
+          </button>
         </p>
+      )}
+
+      {points.length === 0 ? (
+        <div className="text-fg-muted mt-auto grid h-52 place-items-center pt-4 text-center font-mono text-sm">
+          {invalidRange ? (
+            <p>Select a valid range</p>
+          ) : query.isPending || query.isFetching ? (
+            <p role="status" className="flex items-center gap-2">
+              <LoaderCircle className="size-4 animate-spin" />
+              Loading active users…
+            </p>
+          ) : error ? (
+            <div role="alert" className="grid justify-items-center gap-2">
+              <p className="text-critical-bright max-w-xs">
+                {error.status === 403
+                  ? 'Active user analytics are available to organizational admins only.'
+                  : error.message}
+              </p>
+              {error.status !== 403 && (
+                <button
+                  type="button"
+                  onClick={() => void query.refetch()}
+                  className="border-line text-fg-muted hover:border-line-bright hover:text-fg rounded-full border px-2.5 py-1 font-mono text-[11px] transition-colors"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
+          ) : (
+            // A zero-filled series is a real answer from the backend, not a failure.
+            <p>No activity in this range</p>
+          )}
+        </div>
       ) : (
         <div className="mt-auto pt-4">
           <div

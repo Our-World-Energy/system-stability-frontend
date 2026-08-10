@@ -1,74 +1,147 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_CUSTOM_DAYS,
+  activeUsersRequest,
   activeUsersSeries,
   clampCustomRange,
   defaultCustomRange,
   isoDay,
+  parseIsoDay,
 } from './active-users-data'
+import type { ActiveUserStatsData } from './api/user-management.types'
 
 // Pinned clock: Monday 3 August 2026, 09:30 local.
 const NOW = new Date(2026, 7, 3, 9, 30)
 
-describe('activeUsersSeries', () => {
-  it('buckets today by hour, up to the current hour', () => {
-    const series = activeUsersSeries('today', NOW)
+function stats(overrides: Partial<ActiveUserStatsData> = {}): ActiveUserStatsData {
+  return {
+    start_date: '2026-08-01',
+    end_date: '2026-08-03',
+    average_daily_active_users: 900,
+    peak_daily_active_users: 1000,
+    percent_change_vs_previous_period: 2.1,
+    daily: [
+      { date: '2026-08-01', active_users: 800 },
+      { date: '2026-08-02', active_users: 900 },
+      { date: '2026-08-03', active_users: 1000 },
+    ],
+    previous_period_daily: [
+      { date: '2026-07-29', active_users: 700 },
+      { date: '2026-07-30', active_users: 800 },
+      { date: '2026-07-31', active_users: 900 },
+    ],
+    ...overrides,
+  }
+}
 
-    expect(series.granularity).toBe('hour')
-    expect(series.points).toHaveLength(10) // 00:00 … 09:00
-    expect(series.points[0].label).toBe('00:00')
-    expect(series.points.at(-1)!.label).toBe('09:00')
-    // Compared against the same hours yesterday, so the windows are equal length.
-    expect(series.previous).toHaveLength(series.points.length)
+describe('activeUsersRequest', () => {
+  it('asks for a single day for today', () => {
+    // Local calendar day, not UTC: at 09:30 those agree, but the helper must not
+    // be reaching for toISOString either way.
+    expect(activeUsersRequest('today', NOW)).toEqual({
+      start_date: '2026-08-03',
+      end_date: '2026-08-03',
+    })
   })
 
-  it('covers the trailing week, ending today', () => {
-    const series = activeUsersSeries('last_7_days', NOW)
-
-    expect(series.granularity).toBe('day')
-    expect(series.points).toHaveLength(7)
-    expect(series.points[0].label).toBe('28 Jul')
-    expect(series.points.at(-1)!.label).toBe('3 Aug')
-    expect(series.caption).toBe('28 Jul – 3 Aug 2026')
-    // The comparison window is the seven days immediately before.
-    expect(series.previous).toHaveLength(7)
-    expect(series.previous.at(-1)!.label).toBe('27 Jul')
+  it('makes the trailing week inclusive of both ends', () => {
+    expect(activeUsersRequest('last_7_days', NOW)).toEqual({
+      start_date: '2026-07-28',
+      end_date: '2026-08-03',
+    })
   })
 
   it('runs this month from the first to today', () => {
-    const series = activeUsersSeries('this_month', NOW)
-
-    expect(series.points).toHaveLength(3) // 1–3 August
-    expect(series.points[0].label).toBe('1 Aug')
-    expect(series.caption).toBe('1 Aug – 3 Aug 2026')
+    expect(activeUsersRequest('this_month', NOW)).toEqual({
+      start_date: '2026-08-01',
+      end_date: '2026-08-03',
+    })
   })
 
-  it('is deterministic, so a range renders the same values every time', () => {
-    const a = activeUsersSeries('last_7_days', NOW)
-    const b = activeUsersSeries('last_7_days', NOW)
-
-    expect(a.points).toEqual(b.points)
-    expect(a.average).toBe(b.average)
-    expect(a.peak).toBeGreaterThanOrEqual(a.average)
+  it('sends a custom window exactly as picked', () => {
+    expect(activeUsersRequest('custom', NOW, { from: '2026-07-20', to: '2026-07-24' })).toEqual({
+      start_date: '2026-07-20',
+      end_date: '2026-07-24',
+    })
   })
 
-  it('honours a custom range, inclusive of both ends', () => {
-    const series = activeUsersSeries('last_7_days', NOW, undefined)
-    const custom = activeUsersSeries('custom', NOW, { from: '2026-07-20', to: '2026-07-24' })
-
-    expect(custom.points).toHaveLength(5)
-    expect(custom.points[0].label).toBe('20 Jul')
-    expect(custom.points.at(-1)!.label).toBe('24 Jul')
-    // A different window means different numbers than the default range.
-    expect(custom.average).not.toBe(series.average)
+  it('clamps a custom window before it reaches the wire', () => {
+    // A future end date would be a valid request the backend answers with zeros.
+    expect(activeUsersRequest('custom', NOW, { from: '2026-08-01', to: '2026-12-25' })).toEqual({
+      start_date: '2026-08-01',
+      end_date: '2026-08-03',
+    })
   })
 
-  it('reports an empty series for an unparseable custom range', () => {
-    const series = activeUsersSeries('custom', NOW, { from: '', to: '2026-07-24' })
+  it('refuses an unparseable custom window rather than sending a 400', () => {
+    expect(activeUsersRequest('custom', NOW, { from: '', to: '2026-07-24' })).toBeNull()
+  })
+})
 
-    expect(series.points).toEqual([])
+describe('activeUsersSeries', () => {
+  it('labels both series by date and keeps them index-aligned', () => {
+    const series = activeUsersSeries(stats())
+
+    expect(series.points.map((p) => p.label)).toEqual(['1 Aug', '2 Aug', '3 Aug'])
+    expect(series.points.map((p) => p.value)).toEqual([800, 900, 1000])
+    expect(series.previous).toHaveLength(series.points.length)
+    expect(series.previous[0].label).toBe('29 Jul')
+  })
+
+  it('takes the summary figures from the backend rather than recomputing them', () => {
+    // Deliberately inconsistent with `daily`: whatever the backend says wins,
+    // because it is the same number the rest of the product reports.
+    const series = activeUsersSeries(
+      stats({ average_daily_active_users: 42, peak_daily_active_users: 77 }),
+    )
+
+    expect(series.average).toBe(42)
+    expect(series.peak).toBe(77)
+  })
+
+  it('formats the change badge with its direction', () => {
+    expect(activeUsersSeries(stats()).changeLabel).toBe('+2.1%')
+    expect(activeUsersSeries(stats()).changeDirection).toBe('up')
+
+    const down = activeUsersSeries(stats({ percent_change_vs_previous_period: -3.45 }))
+    expect(down.changeLabel).toBe('-3.5%')
+    expect(down.changeDirection).toBe('down')
+
+    const flat = activeUsersSeries(stats({ percent_change_vs_previous_period: 0 }))
+    expect(flat.changeLabel).toBe('0.0%')
+    expect(flat.changeDirection).toBe('flat')
+  })
+
+  it('captions a range, and a single day without repeating it', () => {
+    expect(activeUsersSeries(stats()).caption).toBe('1 Aug – 3 Aug 2026')
+    expect(
+      activeUsersSeries(stats({ start_date: '2026-08-03', end_date: '2026-08-03' })).caption,
+    ).toBe('3 Aug 2026')
+  })
+
+  it('keeps an all-zero series, which is real data and not an error', () => {
+    const series = activeUsersSeries(
+      stats({
+        average_daily_active_users: 0,
+        peak_daily_active_users: 0,
+        percent_change_vs_previous_period: 0,
+        daily: [
+          { date: '2026-08-01', active_users: 0 },
+          { date: '2026-08-02', active_users: 0 },
+        ],
+      }),
+    )
+
+    expect(series.points).toHaveLength(2)
     expect(series.average).toBe(0)
-    expect(series.changePercent).toBeNull()
+  })
+})
+
+describe('parseIsoDay', () => {
+  it('rejects a date that matches the shape but is not on the calendar', () => {
+    expect(parseIsoDay('2026-02-31')).toBeNull()
+    expect(parseIsoDay('2026-13-01')).toBeNull()
+    expect(isoDay(parseIsoDay('2024-02-29')!)).toBe('2024-02-29') // Leap day is real.
   })
 })
 

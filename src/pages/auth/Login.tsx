@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { KeyRound, Mail } from 'lucide-react'
 import { AuthShell } from '@/components/auth/AuthShell'
@@ -7,6 +7,7 @@ import { AuthLink, AuthSubmit } from '@/components/auth/AuthActions'
 import { AuthAlert } from '@/components/auth/AuthFeedback'
 import { Field } from '@/components/ui/Field'
 import { toApiError } from '@/lib/api/caller'
+import { takeSessionNotice } from '@/lib/auth-storage'
 import { useAuthStore } from '@/store/auth'
 
 /** Location state set by RequireAuth (where to return to) and by ResetPassword. */
@@ -24,7 +25,18 @@ export function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  // Why the app bounced them here, if it did: an expired token, or access changed
+  // out from under them by an admin. Left by `endSession` on the way out.
+  const [signedOut, setSignedOut] = useState<string | null>(null)
   const passwordRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    // Reading it clears it, so it shows once. Guarded rather than assigned
+    // straight through: StrictMode runs this effect twice in dev, and the second
+    // run finds nothing left to read.
+    const notice = takeSessionNotice()
+    if (notice) setSignedOut(notice)
+  }, [])
 
   const state = location.state as LoginRouteState | null
   const canSubmit = email.trim().length > 0 && password.length > 0
@@ -69,6 +81,9 @@ export function Login() {
             {state.notice}
           </AuthAlert>
         )}
+        {/* Dropped as soon as they try again: by then it is explaining a sign-out
+            they have already answered, and any new error belongs in its place. */}
+        {signedOut && !error && <AuthAlert className="mb-6">{signedOut}</AuthAlert>}
         {error && <AuthAlert className="mb-6">{error}</AuthAlert>}
 
         <div className="space-y-5">

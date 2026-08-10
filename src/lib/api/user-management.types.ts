@@ -203,3 +203,34 @@ export interface MetadataData {
   departments: Department[]
   platforms: Platform[]
 }
+
+/* ── 8. POST /get-active-user-stats ───────────────────────────────────────── */
+
+/** Inclusive `YYYY-MM-DD` bounds. Both required; `end_date` may not precede `start_date`. */
+export interface ActiveUserStatsRequest {
+  start_date: string
+  end_date: string
+}
+
+/** One day's count. The backend zero-fills days with no activity. */
+export interface ActiveUserPoint {
+  date: string
+  active_users: number
+}
+
+/**
+ * Active users for the requested range, with the equally long period before it.
+ *
+ * The summary figures are computed server-side from the same rows — recomputing
+ * them in the browser would be a second source of truth that drifts. `daily` and
+ * `previous_period_daily` are equal-length and compared by index, each point
+ * keeping its own date for the tooltip.
+ */
+export interface ActiveUserStatsData extends ActiveUserStatsRequest {
+  average_daily_active_users: number
+  peak_daily_active_users: number
+  /** 0 when the previous period had no data, rather than a divide-by-zero. */
+  percent_change_vs_previous_period: number
+  daily: ActiveUserPoint[]
+  previous_period_daily: ActiveUserPoint[]
+}
