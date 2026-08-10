@@ -6,14 +6,15 @@ import { cn } from '@/lib/utils'
 import { copyText } from '@/lib/clipboard'
 import { formatCountdown } from '@/lib/format'
 import { notify } from '@/lib/notify'
-import type { RevealedCredential } from '@/lib/api/credentials'
+import { useRevealSecret } from '@/hooks/useCredentials'
+import { twoFactorOptions, type CredentialDetails } from '@/lib/api/credentials'
 
 interface CredentialSecretModalProps {
   open: boolean
-  /** True while the secret is still being fetched and decrypted. */
+  /** True while the non-secret credential details are being fetched. */
   loading: boolean
-  /** The decrypted details, once available. */
-  details: RevealedCredential | null
+  /** The non-secret details shown before the user explicitly copies. */
+  details: CredentialDetails | null
   /** Name to show in the header while the fetch is in flight. */
   credentialName?: string
   /**
@@ -26,9 +27,9 @@ interface CredentialSecretModalProps {
 }
 
 /**
- * Reveal dialog for a credential secret. The plaintext is *never shown* — it can
- * only be copied to the clipboard — so it exists on screen at no point and in
- * memory (the parent's `details`) only while the dialog is open.
+ * Credential details dialog with an explicit, audited copy action. Opening the
+ * dialog never fetches the secret. Each Copy Password click requests and decrypts
+ * it, writes it to the clipboard, then immediately clears the mutation result.
  *
  * When `expiresAt` is set the copy is time-boxed: a live countdown warns the user,
  * and once the window closes the copy is disabled so a stale secret can't leave
@@ -44,11 +45,12 @@ export function CredentialSecretModal({
 }: CredentialSecretModalProps) {
   const [copied, setCopied] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  const secretRequest = useRevealSecret()
 
   const hasTimer = typeof expiresAt === 'number'
   const remaining = hasTimer ? Math.max(0, expiresAt - now) : Infinity
   const expired = remaining <= 0
-  const canCopy = Boolean(details) && !expired
+  const canCopy = Boolean(details) && !expired && !secretRequest.isPending
 
   // A live clock, but only while it can change anything — an open, time-boxed dialog.
   useEffect(() => {
@@ -65,20 +67,36 @@ export function CredentialSecretModal({
 
   const copy = async () => {
     if (!canCopy || !details) return
-    const ok = await copyText(details.secret)
-    if (!ok) {
-      notify.error('The secret could not be copied to your clipboard.')
-      return
+    try {
+      // Do not reuse a previous result: this request is the backend's audit event
+      // and must happen for every explicit copy click.
+      const plaintext = await secretRequest.mutateAsync(details.credential_id)
+      // The network/decryption step may outlast the remaining grant window. Keep
+      // the existing rule that no plaintext reaches the clipboard after expiry.
+      if (typeof expiresAt === 'number' && expiresAt <= Date.now()) {
+        notify.error('The access window closed before the password could be copied.')
+        return
+      }
+      const ok = await copyText(plaintext)
+      if (!ok) {
+        notify.error('The secret could not be copied to your clipboard.')
+        return
+      }
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // useRevealSecret owns the user-facing API/decryption error toast.
+    } finally {
+      // Never retain the decrypted value in React Query's mutation result.
+      secretRequest.reset()
     }
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
   }
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Credential Secret"
+      title="Credential Details"
       subtitle={details?.name || credentialName || 'Copy the password securely'}
       icon={
         <span className="bg-primary/15 text-primary-bright grid size-9 shrink-0 place-items-center rounded-full">
@@ -94,7 +112,7 @@ export function CredentialSecretModal({
       {loading || !details ? (
         <div className="text-fg-muted flex items-center justify-center gap-2.5 py-12 font-mono text-sm">
           <Loader2 className="size-4 animate-spin" />
-          Decrypting secret…
+          Loading credential details…
         </div>
       ) : (
         <div className="space-y-5">
@@ -104,6 +122,11 @@ export function CredentialSecretModal({
             <Detail label="Name" value={details.name} />
             <Detail label="Username" value={details.username} />
             <Detail label="URL" value={details.url} full />
+            <Detail
+              label="Two-Factor Authentication"
+              value={formatTwoFactor(details.two_factor_type)}
+              full
+            />
             {details.notes && <Detail label="Notes" value={details.notes} full />}
           </div>
 
@@ -137,8 +160,14 @@ export function CredentialSecretModal({
                 className="shrink-0 py-2 text-xs"
                 aria-label="Copy password to clipboard"
               >
-                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-                {copied ? 'Copied' : 'Copy Password'}
+                {secretRequest.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : copied ? (
+                  <Check className="size-4" />
+                ) : (
+                  <Copy className="size-4" />
+                )}
+                {secretRequest.isPending ? 'Copying…' : copied ? 'Copied' : 'Copy Password'}
               </Button>
             </div>
             <p className="text-fg-subtle mt-2 text-xs">
@@ -148,6 +177,13 @@ export function CredentialSecretModal({
         </div>
       )}
     </Modal>
+  )
+}
+
+function formatTwoFactor(type?: string): string | undefined {
+  if (!type) return undefined
+  return (
+    twoFactorOptions.find((option) => option.value === type)?.label ?? type.replaceAll('_', ' ')
   )
 }
 

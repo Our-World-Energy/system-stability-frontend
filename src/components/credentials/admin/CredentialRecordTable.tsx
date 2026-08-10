@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { KeyRound, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatDuration, formatTimestamp } from '@/lib/format'
-import { useRevealCredentialDetails } from '@/hooks/useCredentials'
-import type { RevealedCredential } from '@/lib/api/credentials'
+import { useCredentialDetails } from '@/hooks/useCredentials'
+import type { CredentialDetails } from '@/lib/api/credentials'
 import type { Credential } from '@/lib/api/types'
 import { CredentialSecretModal } from '@/components/credentials/CredentialSecretModal'
 import { RowActions, type RecordAction, type RecordPermissions } from './RowActions'
@@ -109,33 +109,30 @@ export function CredentialRecordTable({
 }
 
 /**
- * Masked secret that opens the shared reveal dialog.
+ * Masked secret that opens the shared credential details dialog.
  *
- * The value is never rendered here or in the dialog — it can only be copied — so
- * it exists on screen at no point and in memory only while the dialog is open.
- *
- * This relies on the `get-credential-secret` route returning `encrypted_secret`
- * (see `endpoints.credentialManager.secret`) and on the RSA private key being
- * present to decrypt it; either gap fails the click with a plain sentence.
+ * Opening calls get-credential-details only. The shared dialog reserves
+ * get-credential-secret for each explicit Copy Password click so backend audit
+ * logging corresponds to real copy attempts.
  */
 function SecretCell({ record }: { record: Credential }) {
   const [open, setOpen] = useState(false)
-  const [details, setDetails] = useState<RevealedCredential | null>(null)
-  const reveal = useRevealCredentialDetails({ onSuccess: setDetails })
+  const [details, setDetails] = useState<CredentialDetails | null>(null)
+  const detailsRequest = useCredentialDetails({ onSuccess: setDetails })
 
   const openModal = () => {
-    if (reveal.isPending) return
+    if (detailsRequest.isPending) return
     setDetails(null)
     setOpen(true)
-    // A fetch/decrypt failure toasts via the hook; drop the dialog rather than
-    // leaving it spinning.
-    reveal.mutate(record.id, { onError: () => setOpen(false) })
+    // A fetch failure toasts via the hook; drop the dialog rather than leaving it
+    // spinning.
+    detailsRequest.mutate(record.id, { onError: () => setOpen(false) })
   }
 
   const close = () => {
     setOpen(false)
     setDetails(null)
-    reveal.reset()
+    detailsRequest.reset()
   }
 
   return (
@@ -148,14 +145,14 @@ function SecretCell({ record }: { record: Credential }) {
       </span>
       <button
         onClick={openModal}
-        disabled={reveal.isPending}
-        aria-label={`View secret for ${record.name}`}
-        title="View & copy secret"
+        disabled={detailsRequest.isPending}
+        aria-label={`View credential details for ${record.name}`}
+        title="View credential details"
         className={cn(
           'hover:bg-surface-3 text-fg-subtle hover:text-fg grid size-7 shrink-0 place-items-center rounded-md transition-colors disabled:cursor-not-allowed',
         )}
       >
-        {reveal.isPending ? (
+        {detailsRequest.isPending ? (
           <Loader2 className="size-4 animate-spin" />
         ) : (
           <KeyRound className="size-4" />
@@ -165,7 +162,7 @@ function SecretCell({ record }: { record: Credential }) {
       {/* Admin access is not time-boxed, so no `expiresAt` — copy stays available. */}
       <CredentialSecretModal
         open={open}
-        loading={reveal.isPending}
+        loading={detailsRequest.isPending}
         details={details}
         credentialName={record.name}
         onClose={close}

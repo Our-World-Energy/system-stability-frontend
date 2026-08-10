@@ -28,9 +28,11 @@ export const endpoints = {
     requestRotation: 'credential-manager/submit-rotation-request',
     /** Hard delete — not recoverable. */
     delete: 'credential-manager/delete-credential',
+    /** Return non-secret fields for the credential details dialog. POST `{ id }`. */
+    details: 'credential-manager/get-credential-details',
     /**
-     * Return a credential's stored `encrypted_secret` so an admin can open it
-     * locally. POST `{ id }` → `{ data: { credential_id, encrypted_secret } }`.
+     * Return a credential's stored `encrypted_secret` for an explicit copy action.
+     * POST `{ id }` → `{ data: { credential_id, encrypted_secret } }`.
      */
     secret: 'credential-manager/get-credential-secret',
 

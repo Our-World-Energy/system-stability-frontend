@@ -576,50 +576,39 @@ export async function revealCredentialSecret(id: string): Promise<string> {
   return decryptSecret(envelope)
 }
 
-/** A credential's details plus its decrypted secret, for the requester reveal dialog. */
-export interface RevealedCredential {
+/** Non-secret fields returned by get-credential-details for the copy dialog. */
+export interface CredentialDetails {
   credential_id: string
   name?: string
   username?: string
   url?: string
   notes?: string
-  /** Decrypted plaintext. Produced on demand and never cached — see `revealCredentialDetails`. */
-  secret: string
+  two_factor_type?: string
 }
 
 /**
- * Fetch a credential's stored secret *and* the descriptive fields the reveal
- * route returns alongside it (name, username, url, notes), decrypting the secret
- * in the browser.
- *
- * Same guarantee and same precondition as `revealCredentialSecret`: the plaintext
- * is handed back once and never cached, and decryption needs the RSA private key
- * that only local development carries — a missing key surfaces as a plain
- * sentence, not a silent failure.
+ * Fetch only the descriptive fields used to open the credential dialog. The
+ * secret endpoint is deliberately not touched here: it is reserved for an
+ * explicit click on Copy Password so every copy attempt is audited server-side.
  */
-export async function revealCredentialDetails(id: string): Promise<RevealedCredential> {
+export async function getCredentialDetails(id: string): Promise<CredentialDetails> {
   if (!id) throw new Error('No credential selected.')
 
   const { data } = await stabilityCaller<Record<string, unknown> | null>(
-    endpoints.credentialManager.secret,
+    endpoints.credentialManager.details,
     { id },
   )
-  const envelope = extractSecretEnvelope(data)
-  if (!envelope) {
-    throw new Error('The service did not return a stored secret for this credential.')
-  }
-  const secret = await decryptSecret(envelope)
+  if (!data) throw new Error('The service did not return details for this credential.')
 
-  const body = (data ?? {}) as Record<string, unknown>
-  const text = (value: unknown) =>
-    typeof value === 'string' && value.trim() ? value : undefined
+  const body = data as Record<string, unknown>
+  const text = (value: unknown) => (typeof value === 'string' && value.trim() ? value : undefined)
   return {
     credential_id: text(body.credential_id) ?? id,
     name: text(body.name),
     username: text(body.username),
     url: text(body.url),
     notes: text(body.notes),
-    secret,
+    two_factor_type: text(body.two_factor_type),
   }
 }
 

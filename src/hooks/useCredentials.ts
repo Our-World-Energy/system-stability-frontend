@@ -15,15 +15,15 @@ import {
   credentialErrorMessage,
   deleteCredential,
   getCredentialAuditLogs,
+  getCredentialDetails,
   requestCredentialRotation,
-  revealCredentialDetails,
   revealCredentialSecret,
   rotateCredential,
   searchCredentials,
 } from '@/lib/api/credentials'
 import type {
   CredentialAuditLogFilters,
-  RevealedCredential,
+  CredentialDetails,
   RotateCredentialDraft,
   RotationRequestDraft,
 } from '@/lib/api/credentials'
@@ -126,15 +126,14 @@ interface RevealOptions {
 }
 
 /**
- * Fetch and decrypt a credential's secret for a one-off use — the admin copy
- * button.
+ * Fetch and decrypt a credential's secret for one explicit copy attempt.
  *
  * Deliberately a mutation rather than a query: a query would park the plaintext
  * in the React Query cache, where it would linger and be replayed to any later
  * subscriber. Here it is produced on demand and handed to `onSuccess`.
  *
  * The mutation still holds the value in `mutation.data` afterwards, so callers
- * should `reset()` once they have used it — see `SecretCell`.
+ * should `reset()` once they have used it — see `CredentialSecretModal`.
  */
 export function useRevealSecret({ onSuccess }: RevealOptions = {}) {
   return useMutation({
@@ -146,25 +145,22 @@ export function useRevealSecret({ onSuccess }: RevealOptions = {}) {
   })
 }
 
-interface RevealDetailsOptions {
-  onSuccess?: (details: RevealedCredential) => void
+interface CredentialDetailsOptions {
+  onSuccess?: (details: CredentialDetails) => void
 }
 
 /**
- * Fetch and decrypt a credential's secret *with* its descriptive fields, for the
- * requester's reveal dialog (auto-access or a granted request).
- *
- * A mutation for the same reason as `useRevealSecret`: the plaintext is produced
- * on demand and handed to `onSuccess` rather than parked in the query cache. The
- * caller holds it only while the dialog is open and drops it on close.
+ * Fetch the non-secret fields needed to open the credential details dialog.
+ * Kept as an event-driven mutation because the dialog should load only when the
+ * user asks to view it, not when search results render.
  */
-export function useRevealCredentialDetails({ onSuccess }: RevealDetailsOptions = {}) {
+export function useCredentialDetails({ onSuccess }: CredentialDetailsOptions = {}) {
   return useMutation({
-    mutationFn: (id: string) => revealCredentialDetails(id),
+    mutationFn: (id: string) => getCredentialDetails(id),
     retry: false,
     onSuccess: (details) => onSuccess?.(details),
     onError: (err) =>
-      notify.error(credentialErrorMessage(err, 'The secret could not be retrieved.')),
+      notify.error(credentialErrorMessage(err, 'The credential details could not be retrieved.')),
   })
 }
 

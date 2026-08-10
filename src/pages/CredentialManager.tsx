@@ -9,13 +9,13 @@ import { RequestApprovedModal } from '@/components/credentials/RequestApprovedMo
 import { CredentialSecretModal } from '@/components/credentials/CredentialSecretModal'
 import { RequestRotationModal } from '@/components/credentials/RequestRotationModal'
 import { RotateCredentialModal } from '@/components/credentials/admin/RotateCredentialModal'
-import { useCredentialSearch, useRevealCredentialDetails } from '@/hooks/useCredentials'
+import { useCredentialDetails, useCredentialSearch } from '@/hooks/useCredentials'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { usePendingStats } from '@/hooks/useStats'
 import { useAuthStore } from '@/store/auth'
 import { canRequestRotation, canRotateCredentials } from '@/lib/credential-permissions'
 import { credentialErrorMessage } from '@/lib/api/credentials'
-import type { RevealedCredential } from '@/lib/api/credentials'
+import type { CredentialDetails } from '@/lib/api/credentials'
 import type { Credential, Grant } from '@/lib/api/types'
 
 /**
@@ -40,12 +40,11 @@ export function CredentialManager() {
   const [requestFor, setRequestFor] = useState<Credential | null>(null)
   const [viewing, setViewing] = useState<ActiveGrant | null>(null)
 
-  // Reveal dialog: the credential whose secret is being shown, and the decrypted
-  // details once they arrive. Both are cleared on close so the plaintext never
-  // outlives the dialog.
+  // Details dialog: opening fetches only descriptive fields. The shared dialog
+  // requests the secret separately on every explicit copy click.
   const [revealFor, setRevealFor] = useState<Credential | null>(null)
-  const [revealed, setRevealed] = useState<RevealedCredential | null>(null)
-  const revealSecret = useRevealCredentialDetails({ onSuccess: setRevealed })
+  const [details, setDetails] = useState<CredentialDetails | null>(null)
+  const detailsRequest = useCredentialDetails({ onSuccess: setDetails })
 
   // Role shapes the per-row rotation controls on this requester view:
   //   Platform / Dev admins rotate directly; Management proposes a rotation.
@@ -79,19 +78,19 @@ export function CredentialManager() {
   }, [])
 
   const openReveal = (credential: Credential) => {
-    setRevealed(null)
+    setDetails(null)
     setRevealFor(credential)
-    revealSecret.mutate(credential.id, {
-      // A fetch/decrypt failure toasts via the hook; drop the dialog rather than
-      // leaving it spinning.
+    detailsRequest.mutate(credential.id, {
+      // A details failure toasts via the hook; drop the dialog rather than leaving
+      // it spinning.
       onError: () => setRevealFor(null),
     })
   }
 
   const closeReveal = () => {
     setRevealFor(null)
-    setRevealed(null)
-    revealSecret.reset()
+    setDetails(null)
+    detailsRequest.reset()
   }
 
   const expiryMap = useMemo(() => {
@@ -174,16 +173,14 @@ export function CredentialManager() {
 
       <CredentialSecretModal
         open={revealFor !== null}
-        loading={revealSecret.isPending}
-        details={revealed}
+        loading={detailsRequest.isPending}
+        details={details}
         credentialName={revealFor?.name}
         expiresAt={revealFor ? accessExpiry(revealFor, grants) : null}
         onClose={closeReveal}
       />
 
-      {rotateFor && (
-        <RotateCredentialModal record={rotateFor} onClose={() => setRotateFor(null)} />
-      )}
+      {rotateFor && <RotateCredentialModal record={rotateFor} onClose={() => setRotateFor(null)} />}
       {rotationFor && (
         <RequestRotationModal record={rotationFor} onClose={() => setRotationFor(null)} />
       )}
