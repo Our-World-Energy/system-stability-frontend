@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildReviewRotationRequestPayload,
   buildSubmitRequestPayload,
   emptyAccessRequestDraft,
   hasRequestErrors,
@@ -70,5 +71,28 @@ describe('buildSubmitRequestPayload', () => {
   it('omits the beneficiary entirely rather than sending an empty string', () => {
     const payload = buildSubmitRequestPayload(validDraft({ beneficiaryEmail: '   ' }))
     expect(payload).not.toHaveProperty('beneficiary_email')
+  })
+})
+
+describe('buildReviewRotationRequestPayload', () => {
+  it('keeps the approval payload unchanged', () => {
+    expect(buildReviewRotationRequestPayload('rotation-1', 'approve')).toEqual({
+      request_id: 'rotation-1',
+      action: 'approve',
+    })
+  })
+
+  it('includes a trimmed denial_reason when denying', () => {
+    expect(
+      buildReviewRotationRequestPayload('rotation-1', 'deny', '  Secret does not meet policy.  '),
+    ).toEqual({
+      request_id: 'rotation-1',
+      action: 'deny',
+      denial_reason: 'Secret does not meet policy.',
+    })
+  })
+
+  it('rejects a denial without a reason before calling the API', () => {
+    expect(() => buildReviewRotationRequestPayload('rotation-1', 'deny', '   ')).toThrow(/reason/i)
   })
 })

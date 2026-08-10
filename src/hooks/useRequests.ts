@@ -117,8 +117,8 @@ export function useReviewRotationRequest({ onSuccess }: ReviewRotationOptions = 
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (vars: { requestId: string; action: ReviewAction }) =>
-      reviewRotationRequest(vars.requestId, vars.action),
+    mutationFn: (vars: { requestId: string; action: ReviewAction; denialReason?: string }) =>
+      reviewRotationRequest(vars.requestId, vars.action, vars.denialReason),
     retry: false,
     onSuccess: (result, vars) => {
       notify.success(

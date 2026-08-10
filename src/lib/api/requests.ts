@@ -189,19 +189,41 @@ export async function getPendingRotationRequests(
   return normalizePage(data, page, pageSize)
 }
 
-/**
- * Approve or deny a rotation request. The contract is just `{ request_id, action }`
- * — no denial reason — so a deny is a plain confirm rather than a reason form.
- */
+export interface ReviewRotationRequestPayload {
+  request_id: string
+  action: ReviewAction
+  denial_reason?: string
+}
+
+/** Build and validate the rotation-review payload. */
+export function buildReviewRotationRequestPayload(
+  requestId: string,
+  action: ReviewAction,
+  denialReason = '',
+): ReviewRotationRequestPayload {
+  if (!requestId) throw new Error('No request selected.')
+  const reason = denialReason.trim()
+  if (action === 'deny' && !reason) {
+    throw new Error('Give a reason for denying this rotation request.')
+  }
+
+  return {
+    request_id: requestId,
+    action,
+    ...(action === 'deny' ? { denial_reason: reason } : {}),
+  }
+}
+
+/** Approve or deny a rotation request; denials require a stored reason. */
 export async function reviewRotationRequest(
   requestId: string,
   action: ReviewAction,
+  denialReason = '',
 ): Promise<ApiEnvelope<unknown>> {
-  if (!requestId) throw new Error('No request selected.')
-  return stabilityCaller<unknown>(endpoints.credentialManager.reviewRotationRequest, {
-    request_id: requestId,
-    action,
-  })
+  return stabilityCaller<unknown>(
+    endpoints.credentialManager.reviewRotationRequest,
+    buildReviewRotationRequestPayload(requestId, action, denialReason),
+  )
 }
 
 /** Filters accepted by the request history. All are optional. */

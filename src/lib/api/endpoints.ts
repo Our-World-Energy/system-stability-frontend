@@ -44,7 +44,7 @@ export const endpoints = {
     pendingRequests: 'credential-manager/get-pending-requests',
     /** Org admin: the rotation-request approval queue. POST `{ page, page_size }`. */
     pendingRotationRequests: 'credential-manager/get-pending-rotation-requests',
-    /** Org admin: approve or deny a rotation request. POST `{ request_id, action }`. */
+    /** Org admin: review a rotation request. Denials also require `denial_reason`. */
     reviewRotationRequest: 'credential-manager/review-rotation-request',
     /** Request history — all users for an admin, own requests otherwise. */
     requestLogs: 'credential-manager/get-request-logs',

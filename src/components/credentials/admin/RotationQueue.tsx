@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { AlertTriangle, CheckCircle2, Clock, Loader2, RotateCw, XCircle } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { Field, controlClass } from '@/components/ui/Field'
 import { Pagination } from '@/components/ui/Pagination'
 import { cn } from '@/lib/utils'
 import { usePendingRotationRequests, useReviewRotationRequest } from '@/hooks/useRequests'
-import { DEFAULT_PAGE_SIZE, requestErrorMessage } from '@/lib/api/requests'
+import { DEFAULT_PAGE_SIZE, requestErrorMessage, requestLimits } from '@/lib/api/requests'
 import type { ReviewAction } from '@/lib/api/requests'
 import {
   formatTimestamp,
@@ -187,10 +188,7 @@ function RotationRow({
   )
 }
 
-/**
- * Confirm approving or denying a rotation request. The contract carries no denial
- * reason, so a deny is a plain confirmation rather than a reason form.
- */
+/** Confirm a rotation decision, requiring a stored reason for denials. */
 function ReviewRotationDialog({
   request,
   action,
@@ -200,9 +198,22 @@ function ReviewRotationDialog({
   action: ReviewAction
   onClose: () => void
 }) {
+  const [reason, setReason] = useState('')
+  const [submitted, setSubmitted] = useState(false)
   const mutation = useReviewRotationRequest({ onSuccess: onClose })
   const busy = mutation.isPending
   const denying = action === 'deny'
+  const reasonMissing = denying && !reason.trim()
+
+  const submit = () => {
+    setSubmitted(true)
+    if (reasonMissing || busy) return
+    mutation.mutate({
+      requestId: request.id,
+      action,
+      ...(denying ? { denialReason: reason } : {}),
+    })
+  }
 
   return (
     <Modal
@@ -225,7 +236,7 @@ function ReviewRotationDialog({
             Cancel
           </Button>
           <Button
-            onClick={() => !busy && mutation.mutate({ requestId: request.id, action })}
+            onClick={submit}
             disabled={busy}
             className={cn(denying && 'bg-critical/80 text-fg hover:bg-critical active:bg-critical')}
           >
@@ -248,6 +259,26 @@ function ReviewRotationDialog({
           </p>
           <p className="text-fg mt-1 text-sm leading-relaxed">{request.justification}</p>
         </div>
+
+        {denying && (
+          <Field label="Denial Reason" htmlFor="rotation-denial-reason" required>
+            <textarea
+              id="rotation-denial-reason"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              rows={3}
+              maxLength={requestLimits.denialReasonMaxLength}
+              placeholder="Explain why this rotation request is being turned down…"
+              disabled={busy}
+              className={cn(controlClass, 'resize-none py-2.5')}
+            />
+            {submitted && reasonMissing && (
+              <p className="text-critical-bright mt-1.5 font-mono text-xs">
+                A reason is required to deny a rotation request.
+              </p>
+            )}
+          </Field>
+        )}
       </div>
     </Modal>
   )
