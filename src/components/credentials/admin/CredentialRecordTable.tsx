@@ -19,7 +19,7 @@ interface CredentialRecordTableProps {
   error?: string | null
 }
 
-const columns = ['Name & Tags', 'Status', 'Owner', 'Elevation', 'Last Rotated', 'Secret', 'Actions']
+const columns = ['Name & Tags', 'Status', 'Elevation', 'Last Rotated', 'Secret', 'Actions']
 
 /** Admin record list with per-row rotate/purge actions. */
 export function CredentialRecordTable({
@@ -85,7 +85,6 @@ export function CredentialRecordTable({
                     </span>
                   </span>
                 </td>
-                <td className="text-fg-muted px-4 py-3.5 font-mono">{record.username || '—'}</td>
                 <td className="text-fg-muted px-4 py-3.5 font-mono">
                   {formatDuration(record.elevation_duration_seconds)}
                 </td>

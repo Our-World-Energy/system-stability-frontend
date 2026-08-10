@@ -67,9 +67,12 @@ describe('initialsFrom / formatUserRef', () => {
     expect(initialsFrom('   ')).toBe('??')
   })
 
-  it('shows a numeric user id in directory style rather than inventing a name', () => {
+  it('shows a name string as-is, a numeric id in directory style, else Unknown', () => {
+    expect(formatUserRef('Test User')).toBe('Test User')
     expect(formatUserRef(1)).toBe('USR_1')
+    expect(formatUserRef('')).toBe('Unknown')
     expect(formatUserRef(undefined)).toBe('Unknown')
+    expect(formatUserRef(null)).toBe('Unknown')
   })
 })
 

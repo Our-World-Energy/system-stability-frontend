@@ -120,7 +120,8 @@ export interface PendingRequestItem {
   id: string
   credential_id: string
   credential_name: string
-  requested_by: number
+  /** A display name from the backend (older shapes sent a numeric id). */
+  requested_by: string | number
   reason_category: string
   justification: string
   beneficiary_email?: string | null
@@ -137,7 +138,7 @@ export interface PendingRotationRequestItem {
   /** Always 'rotation' for this queue; carried through from the backend. */
   request_type: string
   credential_name: string
-  requested_by: number
+  requested_by: string | number
   reason_category: string
   justification: string
   requested_at: string
@@ -152,12 +153,12 @@ export interface RequestLogItem {
   credential_name: string
   credential_tags?: string[]
   elevation_duration_seconds: number
-  requested_by: number
+  requested_by: string | number
   beneficiary_email?: string | null
   reason_category: string
   justification: string
   status: RequestStatus
-  reviewed_by?: number
+  reviewed_by?: string | number
   denial_reason?: string | null
   requested_at: string
   reviewed_at?: string

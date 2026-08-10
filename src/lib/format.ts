@@ -83,12 +83,14 @@ export function initialsFrom(label: string): string {
 }
 
 /**
- * Display name for a numeric user id. The credential-manager routes identify
- * people by id only — there is no user lookup on this service — so the id is
- * shown in the directory style the designs use rather than invented into a name.
+ * Display label for a user reference. The credential-manager routes now return a
+ * human name string (e.g. "Test User"); an older shape sent a numeric id, shown in
+ * the directory style ("USR_1"). Anything empty falls back to "Unknown".
  */
-export function formatUserRef(id?: number | null): string {
-  return typeof id === 'number' ? `USR_${id}` : 'Unknown'
+export function formatUserRef(value?: string | number | null): string {
+  if (typeof value === 'number') return `USR_${value}`
+  if (typeof value === 'string' && value.trim()) return value.trim()
+  return 'Unknown'
 }
 
 /** One decimal place, trailing ".0" removed: 85.7 → "85.7%", 94 → "94%". */
