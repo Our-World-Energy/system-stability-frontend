@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import {
   Copy,
   Eye,
+  History,
   KeyRound,
   Pencil,
   Plus,
@@ -13,79 +14,92 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatTimestamp, initialsFrom } from '@/lib/format'
-import { credentialAuditEvents, type CredentialAuditAction } from '@/lib/credential-audit-data'
+import { Pagination } from '@/components/ui/Pagination'
+import { useCredentialAuditLogs } from '@/hooks/useCredentials'
+import { DEFAULT_CREDENTIAL_AUDIT_PAGE_SIZE, credentialErrorMessage } from '@/lib/api/credentials'
+import type { CredentialAuditAction } from '@/lib/api/types'
 
 /** Per-action display: label, icon, and the pill palette. */
-const actionMeta: Record<CredentialAuditAction, { label: string; icon: LucideIcon; cls: string }> = {
-  created: { label: 'Created', icon: Plus, cls: 'text-healthy border-healthy/25 bg-healthy/10' },
-  viewed: { label: 'Viewed', icon: Eye, cls: 'text-primary-bright border-primary/25 bg-primary/10' },
-  copied: { label: 'Copied', icon: Copy, cls: 'text-degraded border-degraded/30 bg-degraded/10' },
-  rotated: {
-    label: 'Rotated',
-    icon: RotateCw,
-    cls: 'text-primary-bright border-primary/25 bg-primary/10',
-  },
-  updated: { label: 'Updated', icon: Pencil, cls: 'text-fg border-line-bright bg-surface-3' },
-  deleted: {
-    label: 'Deleted',
-    icon: Trash2,
-    cls: 'text-critical-bright border-critical/30 bg-critical/10',
-  },
-  requested: {
-    label: 'Requested',
-    icon: KeyRound,
-    cls: 'text-fg-muted border-line-bright bg-surface-3',
-  },
-  approved: {
-    label: 'Approved',
-    icon: ShieldCheck,
-    cls: 'text-healthy border-healthy/25 bg-healthy/10',
-  },
-  denied: { label: 'Denied', icon: ShieldX, cls: 'text-critical-bright border-critical/30 bg-critical/10' },
-}
+const actionMeta: Record<CredentialAuditAction, { label: string; icon: LucideIcon; cls: string }> =
+  {
+    created: { label: 'Created', icon: Plus, cls: 'text-healthy border-healthy/25 bg-healthy/10' },
+    viewed: {
+      label: 'Viewed',
+      icon: Eye,
+      cls: 'text-primary-bright border-primary/25 bg-primary/10',
+    },
+    copied: { label: 'Copied', icon: Copy, cls: 'text-degraded border-degraded/30 bg-degraded/10' },
+    rotated: {
+      label: 'Rotated',
+      icon: RotateCw,
+      cls: 'text-primary-bright border-primary/25 bg-primary/10',
+    },
+    updated: { label: 'Updated', icon: Pencil, cls: 'text-fg border-line-bright bg-surface-3' },
+    deleted: {
+      label: 'Deleted',
+      icon: Trash2,
+      cls: 'text-critical-bright border-critical/30 bg-critical/10',
+    },
+    requested: {
+      label: 'Requested',
+      icon: KeyRound,
+      cls: 'text-fg-muted border-line-bright bg-surface-3',
+    },
+    approved: {
+      label: 'Approved',
+      icon: ShieldCheck,
+      cls: 'text-healthy border-healthy/25 bg-healthy/10',
+    },
+    denied: {
+      label: 'Denied',
+      icon: ShieldX,
+      cls: 'text-critical-bright border-critical/30 bg-critical/10',
+    },
+  }
 
 const columns = ['Actor', 'Action', 'Credential', 'Detail', 'Timestamp']
 
 type ActionFilter = CredentialAuditAction | 'all'
 
+const actionFilters = Object.keys(actionMeta) as CredentialAuditAction[]
+
 /**
  * Org-admin audit trail for the credential manager: who created, viewed, copied,
  * rotated or removed each credential, and every request decision alongside.
  *
- * Reads placeholder data for now (see `credential-audit-data`); the view is ready
- * to point at the live feed the moment it exists.
+ * Data is supplied by get-audit-logs; pagination and action filtering stay on the
+ * server so the count and rows describe the full audit history.
  */
 export function CredentialAuditLog() {
   const [filter, setFilter] = useState<ActionFilter>('all')
+  const [page, setPage] = useState(1)
+  const logs = useCredentialAuditLogs({
+    page,
+    pageSize: DEFAULT_CREDENTIAL_AUDIT_PAGE_SIZE,
+    action: filter === 'all' ? undefined : filter,
+  })
+  const events = logs.data?.items ?? []
+  const total = logs.data?.total ?? 0
 
-  const events = credentialAuditEvents
-  const visible = useMemo(
-    () => (filter === 'all' ? events : events.filter((e) => e.action === filter)),
-    [events, filter],
-  )
-
-  // Only offer filters for actions actually present, in a stable order.
-  const presentActions = useMemo(() => {
-    const order = Object.keys(actionMeta) as CredentialAuditAction[]
-    const seen = new Set(events.map((e) => e.action))
-    return order.filter((a) => seen.has(a))
-  }, [events])
+  const changeFilter = (next: ActionFilter) => {
+    setFilter(next)
+    setPage(1)
+  }
 
   return (
     <div className="space-y-6">
-      <div className="border-degraded/30 bg-degraded/5 text-degraded flex items-center gap-2 rounded-lg border px-3 py-2 font-mono text-[11px]">
-        <span className="bg-degraded size-1.5 rounded-full" />
-        Preview — sample data. The live audit feed will be wired in once its API is available.
-      </div>
-
       <div className="flex flex-wrap gap-2">
-        <FilterChip active={filter === 'all'} onClick={() => setFilter('all')}>
+        <FilterChip active={filter === 'all'} onClick={() => changeFilter('all')}>
           All Events
         </FilterChip>
-        {presentActions.map((action) => {
+        {actionFilters.map((action) => {
           const { label, icon: Icon } = actionMeta[action]
           return (
-            <FilterChip key={action} active={filter === action} onClick={() => setFilter(action)}>
+            <FilterChip
+              key={action}
+              active={filter === action}
+              onClick={() => changeFilter(action)}
+            >
               <Icon className="size-3" />
               {label}
             </FilterChip>
@@ -97,7 +111,7 @@ export function CredentialAuditLog() {
         <div className="border-line flex items-center justify-between border-b px-5 py-4">
           <h2 className="text-fg text-sm font-semibold">Credential Audit Log</h2>
           <span className="text-fg-subtle font-mono text-[10px] tracking-[0.08em] uppercase">
-            {visible.length} {visible.length === 1 ? 'event' : 'events'}
+            {total} {total === 1 ? 'event' : 'events'}
           </span>
         </div>
 
@@ -116,7 +130,7 @@ export function CredentialAuditLog() {
               </tr>
             </thead>
             <tbody>
-              {visible.map((event) => (
+              {events.map((event) => (
                 <tr
                   key={event.id}
                   className="border-line hover:bg-surface-2 border-b transition-colors last:border-0"
@@ -124,12 +138,12 @@ export function CredentialAuditLog() {
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-2.5">
                       <span className="bg-primary/15 text-primary-bright grid size-8 shrink-0 place-items-center rounded-full font-mono text-[10px] font-bold">
-                        {initialsFrom(event.actor)}
+                        {initialsFrom(event.actor_name)}
                       </span>
                       <div className="min-w-0">
-                        <p className="text-fg truncate font-medium">{event.actor}</p>
+                        <p className="text-fg truncate font-medium">{event.actor_name}</p>
                         <p className="text-fg-subtle truncate font-mono text-[10px] tracking-[0.06em] uppercase">
-                          {event.actorRole}
+                          {formatActorRole(event.actor_role)}
                         </p>
                       </div>
                     </div>
@@ -138,38 +152,64 @@ export function CredentialAuditLog() {
                     <ActionPill action={event.action} />
                   </td>
                   <td className="px-4 py-3.5">
-                    <p className="text-fg-muted font-mono">{event.credentialName}</p>
+                    <p className="text-fg-muted font-mono">{event.credential_name}</p>
                   </td>
                   <td className="max-w-sm px-4 py-3.5">
                     <p className="text-fg-muted truncate" title={event.detail}>
                       {event.detail}
                     </p>
-                    {event.ip && (
-                      <p className="text-fg-subtle mt-0.5 font-mono text-[10px]">from {event.ip}</p>
+                    {event.ip_address && (
+                      <p className="text-fg-subtle mt-0.5 font-mono text-[10px]">
+                        from {event.ip_address}
+                      </p>
                     )}
                   </td>
                   <td className="text-fg-muted px-4 py-3.5 font-mono whitespace-nowrap">
-                    {formatTimestamp(event.at)}
+                    {formatTimestamp(event.created_at)}
                   </td>
                 </tr>
               ))}
-              {visible.length === 0 && (
+              {events.length === 0 && (
                 <tr>
                   <td colSpan={columns.length} className="px-4 py-16 text-center">
-                    <p className="text-fg-muted font-mono text-sm">No events for this filter</p>
+                    <p
+                      className={cn(
+                        'font-mono text-sm',
+                        logs.isError ? 'text-critical-bright' : 'text-fg-muted',
+                      )}
+                    >
+                      {logs.isError
+                        ? credentialErrorMessage(logs.error, 'The audit log could not be loaded.')
+                        : logs.isLoading
+                          ? 'Loading audit log…'
+                          : 'No events for this filter'}
+                    </p>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+
+        <div className="border-line flex items-center justify-end border-t px-5 py-4">
+          <Pagination
+            page={page}
+            pageSize={logs.data?.page_size ?? DEFAULT_CREDENTIAL_AUDIT_PAGE_SIZE}
+            total={total}
+            onPageChange={setPage}
+            className="font-mono text-xs"
+          />
+        </div>
       </section>
     </div>
   )
 }
 
-function ActionPill({ action }: { action: CredentialAuditAction }) {
-  const { label, icon: Icon, cls } = actionMeta[action]
+function ActionPill({ action }: { action: string }) {
+  const known = actionMeta[action as CredentialAuditAction]
+  const label = known?.label ?? formatAction(action)
+  const Icon = known?.icon ?? History
+  const cls = known?.cls ?? 'text-fg-muted border-line-bright bg-surface-3'
   return (
     <span
       className={cn(
@@ -182,6 +222,15 @@ function ActionPill({ action }: { action: CredentialAuditAction }) {
       {label}
     </span>
   )
+}
+
+function formatActorRole(role: string): string {
+  return role.replaceAll('_', ' ')
+}
+
+function formatAction(action: string): string {
+  if (!action) return 'Unknown'
+  return action.replaceAll('_', ' ').replace(/^./, (letter) => letter.toUpperCase())
 }
 
 function FilterChip({

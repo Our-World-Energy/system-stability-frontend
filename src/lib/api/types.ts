@@ -115,6 +115,34 @@ export interface Paginated<T> {
   items: T[]
 }
 
+/** Actions currently exposed by the credential audit-log filters. */
+export type CredentialAuditAction =
+  | 'created'
+  | 'viewed'
+  | 'copied'
+  | 'rotated'
+  | 'updated'
+  | 'deleted'
+  | 'requested'
+  | 'approved'
+  | 'denied'
+
+/** A row returned by get-audit-logs. */
+export interface CredentialAuditLogItem {
+  id: number
+  actor_user_id: number
+  actor_name: string
+  actor_role: string
+  /** Kept open-ended so a newly introduced backend action still renders safely. */
+  action: string
+  credential_id: string
+  credential_name: string
+  detail: string
+  metadata: Record<string, unknown> | null
+  ip_address: string | null
+  created_at: string
+}
+
 /** A row in the admin approval queue (get-pending-requests). */
 export interface PendingRequestItem {
   id: string

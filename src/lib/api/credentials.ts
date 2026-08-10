@@ -14,7 +14,7 @@ import { SecretCryptoError } from '@/lib/crypto/keys'
 import { ApiError, stabilityCaller } from './caller'
 import { endpoints } from './endpoints'
 import type { ApiEnvelope } from './caller'
-import type { Credential } from './types'
+import type { Credential, CredentialAuditAction, CredentialAuditLogItem, Paginated } from './types'
 
 /* ── Options ──────────────────────────────────────────────────────────────── */
 
@@ -281,6 +281,48 @@ export async function searchCredentials(q: string): Promise<Credential[]> {
     q: term,
   })
   return data ?? []
+}
+
+/* ── Audit log ────────────────────────────────────────────────────────────── */
+
+export const DEFAULT_CREDENTIAL_AUDIT_PAGE_SIZE = 50
+
+export interface CredentialAuditLogFilters {
+  page?: number
+  pageSize?: number
+  action?: CredentialAuditAction
+}
+
+/** Build the POST body while omitting an unset action filter. */
+export function buildCredentialAuditLogPayload(
+  filters: CredentialAuditLogFilters = {},
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    page: filters.page ?? 1,
+    page_size: filters.pageSize ?? DEFAULT_CREDENTIAL_AUDIT_PAGE_SIZE,
+  }
+  if (filters.action) payload.action = filters.action
+  return payload
+}
+
+/** Org-wide credential audit history, optionally narrowed to one action. */
+export async function getCredentialAuditLogs(
+  filters: CredentialAuditLogFilters = {},
+): Promise<Paginated<CredentialAuditLogItem>> {
+  const payload = buildCredentialAuditLogPayload(filters)
+  const page = payload.page as number
+  const pageSize = payload.page_size as number
+  const { data } = await stabilityCaller<Paginated<CredentialAuditLogItem>>(
+    endpoints.credentialManager.auditLogs,
+    payload,
+  )
+
+  return {
+    total: data?.total ?? 0,
+    page: data?.page ?? page,
+    page_size: data?.page_size ?? pageSize,
+    items: data?.items ?? [],
+  }
 }
 
 /* ── Rotate ───────────────────────────────────────────────────────────────── */

@@ -15,6 +15,12 @@ export const credentialKeys = {
   search: (q: string) => [...credentialKeys.all, 'search', q] as const,
 }
 
+export const credentialAuditKeys = {
+  all: ['credential-audit-logs'] as const,
+  list: (page: number, pageSize: number, action?: string) =>
+    [...credentialAuditKeys.all, page, pageSize, action ?? 'all'] as const,
+}
+
 export const requestKeys = {
   all: ['requests'] as const,
   pending: (page: number, pageSize: number) =>

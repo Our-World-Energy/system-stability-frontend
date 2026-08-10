@@ -46,6 +46,8 @@ export const endpoints = {
     reviewRotationRequest: 'credential-manager/review-rotation-request',
     /** Request history — all users for an admin, own requests otherwise. */
     requestLogs: 'credential-manager/get-request-logs',
+    /** Org admin: credential action history. POST `{ page, page_size, action? }`. */
+    auditLogs: 'credential-manager/get-audit-logs',
 
     /** Header metrics for the approval queue. GET SSE stream, not a POST. */
     pendingStats: 'credential-manager/get-pending-stats',

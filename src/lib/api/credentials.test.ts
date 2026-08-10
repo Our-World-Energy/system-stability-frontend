@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildCredentialAuditLogPayload,
   buildCreateCredentialPayload,
   buildRotatePayload,
   emptyCredentialDraft,
@@ -11,6 +12,20 @@ import {
   validateRotateDraft,
 } from './credentials'
 import type { CredentialDraft, RotateCredentialDraft } from './credentials'
+
+describe('buildCredentialAuditLogPayload', () => {
+  it('uses the API pagination defaults and omits an unset action', () => {
+    expect(buildCredentialAuditLogPayload()).toEqual({ page: 1, page_size: 50 })
+  })
+
+  it('maps page size and action to the documented wire keys', () => {
+    expect(buildCredentialAuditLogPayload({ page: 2, pageSize: 25, action: 'viewed' })).toEqual({
+      page: 2,
+      page_size: 25,
+      action: 'viewed',
+    })
+  })
+})
 
 /** A draft that passes validation, so each test can break exactly one thing. */
 function validDraft(overrides: Partial<CredentialDraft> = {}): CredentialDraft {

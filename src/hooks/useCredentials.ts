@@ -11,8 +11,10 @@
 import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  DEFAULT_CREDENTIAL_AUDIT_PAGE_SIZE,
   credentialErrorMessage,
   deleteCredential,
+  getCredentialAuditLogs,
   requestCredentialRotation,
   revealCredentialDetails,
   revealCredentialSecret,
@@ -20,13 +22,17 @@ import {
   searchCredentials,
 } from '@/lib/api/credentials'
 import type {
+  CredentialAuditLogFilters,
   RevealedCredential,
   RotateCredentialDraft,
   RotationRequestDraft,
 } from '@/lib/api/credentials'
-import { credentialKeys } from '@/lib/api/query-keys'
+import { credentialAuditKeys, credentialKeys } from '@/lib/api/query-keys'
 import { notify } from '@/lib/notify'
 import type { Credential } from '@/lib/api/types'
+
+/** Audit history is reviewed rather than watched live, so poll gently. */
+const AUDIT_LOGS_POLL_MS = 180_000
 
 /**
  * Live credential search.
@@ -51,11 +57,26 @@ export function useCredentialSearch(query: string) {
   // effect keys on the error, so a persistent failure toasts once, not per render.
   useEffect(() => {
     if (result.isError) {
-      notify.error(credentialErrorMessage(result.error, 'Credential search failed. Please try again.'))
+      notify.error(
+        credentialErrorMessage(result.error, 'Credential search failed. Please try again.'),
+      )
     }
   }, [result.isError, result.error])
 
   return result
+}
+
+/** Org-wide credential action history. */
+export function useCredentialAuditLogs(filters: CredentialAuditLogFilters = {}) {
+  const page = filters.page ?? 1
+  const pageSize = filters.pageSize ?? DEFAULT_CREDENTIAL_AUDIT_PAGE_SIZE
+
+  return useQuery({
+    queryKey: credentialAuditKeys.list(page, pageSize, filters.action),
+    queryFn: () => getCredentialAuditLogs({ ...filters, page, pageSize }),
+    refetchInterval: AUDIT_LOGS_POLL_MS,
+    placeholderData: (previous) => previous,
+  })
 }
 
 interface RotateOptions {
