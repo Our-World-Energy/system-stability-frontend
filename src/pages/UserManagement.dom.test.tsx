@@ -148,7 +148,10 @@ const ALL_USERS: UserRecord[] = [
     department: { id: 9, name: 'Technology' },
     sub_departments: [{ id: 36, department_id: 9, name: 'Technology' }],
   }),
-  ...Array.from({ length: 11 }, (_, i) => user({ id: i + 4 })),
+  // A stored number that does not pass the current rule — the registry predates
+  // it. Opening this row's edit dialog must show the problem where it happened.
+  user({ id: 4, phone_number: '12345' }),
+  ...Array.from({ length: 10 }, (_, i) => user({ id: i + 5 })),
 ]
 
 /** Slice ALL_USERS the way get-users would, so paging assertions are meaningful. */
@@ -942,6 +945,23 @@ describe('User Management — edit-user field validation', () => {
     setPhone('919876543210') // 12
     expect(screen.queryByText(/10–15 digits/)).toBeNull()
     expect(saveButton().disabled).toBe(false)
+  })
+
+  it('flags a stored invalid phone number under the phone field, not at the foot of the form', async () => {
+    // The value was not typed just now, so waiting for a blur that may never come
+    // would leave the only explanation in the grey summary line at the bottom.
+    renderPage()
+    await waitForRegistry()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit User 4' }))
+
+    const messages = screen.getAllByText(/10–15 digits/)
+    expect(messages).toHaveLength(1) // Not repeated in the footer summary.
+    expect(messages[0].id).toBe('user-phone-error')
+    expect(messages[0].className).toMatch(/text-critical/)
+    expect(screen.getByLabelText(/phone number/i).getAttribute('aria-describedby')).toBe(
+      'user-phone-error',
+    )
+    expect(saveButton().disabled).toBe(true)
   })
 
   it('applies the name rules on edit too', async () => {

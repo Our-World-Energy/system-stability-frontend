@@ -27,6 +27,20 @@ const SUMMARY_ORDER = [
   'platforms',
 ] as const satisfies readonly UserFormField[]
 
+/**
+ * The text fields that arrived already filled — the edit dialog's prefill of an
+ * existing record. Only the three with a message slot of their own: marking a
+ * dropdown touched would drop its problem out of the summary line with nowhere
+ * else for it to appear.
+ */
+function prefilled(form: UserFormValues): Partial<Record<UserFormField, boolean>> {
+  const touched: Partial<Record<UserFormField, boolean>> = {}
+  if (form.fullName.trim()) touched.fullName = true
+  if (form.email.trim()) touched.email = true
+  if (form.phoneNumber?.trim()) touched.phoneNumber = true
+  return touched
+}
+
 interface Option {
   /** What goes on the wire — a role/platform key, or an exact department name. */
   value: string
@@ -78,8 +92,14 @@ export function UserFormFields({ form, onChange, metadata, variant }: UserFormFi
     keystroke — "Email must contain an @" while someone is still typing the local
     part is noise. The submit button is disabled throughout either way, and the
     dialog shows the first outstanding problem underneath it, so nothing is hidden.
+
+    A value the dialog opened with is the exception, and it is what the edit form is
+    made of: nobody is mid-typing it, so a problem with it belongs under its own
+    control straight away rather than as a line at the foot of the form.
   */
-  const [touched, setTouched] = useState<Partial<Record<UserFormField, boolean>>>({})
+  const [touched, setTouched] = useState<Partial<Record<UserFormField, boolean>>>(() =>
+    prefilled(form),
+  )
   // The edit dialog locks the email, so it must not be able to block Save either.
   const errors = validateUserForm(form, { emailLocked: !creating })
   const errorFor = (field: UserFormField) => (touched[field] ? errors[field] : undefined)
@@ -91,15 +111,13 @@ export function UserFormFields({ form, onChange, metadata, variant }: UserFormFi
     own to put a message. Skipping fields that already show their error inline
     keeps the same sentence from appearing twice on screen.
   */
-  const summary = SUMMARY_ORDER.map((field) =>
-    touched[field] ? undefined : errors[field],
-  ).find(Boolean)
+  const summary = SUMMARY_ORDER.map((field) => (touched[field] ? undefined : errors[field])).find(
+    Boolean,
+  )
 
   /** `aria-invalid` plus a pointer at the message `Field` renders. */
   const errorProps = (id: string, field: UserFormField) =>
-    errorFor(field)
-      ? ({ 'aria-invalid': true, 'aria-describedby': `${id}-error` } as const)
-      : {}
+    errorFor(field) ? ({ 'aria-invalid': true, 'aria-describedby': `${id}-error` } as const) : {}
 
   const roleOptions = useMemo<Option[]>(
     () => byRankDescending(metadata.roles).map((r) => ({ value: r.key, label: r.name })),
@@ -139,9 +157,7 @@ export function UserFormFields({ form, onChange, metadata, variant }: UserFormFi
   const toggle = (key: 'subDepartments' | 'platforms', value: string) => {
     const current = form[key] ?? []
     onChange({
-      [key]: current.includes(value)
-        ? current.filter((v) => v !== value)
-        : [...current, value],
+      [key]: current.includes(value) ? current.filter((v) => v !== value) : [...current, value],
     })
   }
 
@@ -216,15 +232,14 @@ export function UserFormFields({ form, onChange, metadata, variant }: UserFormFi
           className={cn(
             controlClass,
             'h-11 font-mono',
-            !creating &&
-              'text-fg-muted cursor-not-allowed focus:border-line focus:ring-0',
+            !creating && 'text-fg-muted focus:border-line cursor-not-allowed focus:ring-0',
           )}
           {...errorProps('user-email', 'email')}
         />
         {!creating && (
           <p className="text-fg-subtle mt-2 text-xs">
-            Fixed after the account is created — the password email only ever goes to the
-            original address.
+            Fixed after the account is created — the password email only ever goes to the original
+            address.
           </p>
         )}
       </Field>
@@ -267,9 +282,7 @@ export function UserFormFields({ form, onChange, metadata, variant }: UserFormFi
               options={subDepartmentOptions}
               onToggle={(value) => toggle('subDepartments', value)}
               disabled={!form.department}
-              placeholder={
-                form.department ? 'Entire department' : 'Select a department first'
-              }
+              placeholder={form.department ? 'Entire department' : 'Select a department first'}
             />
           </div>
         </div>
@@ -300,8 +313,7 @@ export function UserFormFields({ form, onChange, metadata, variant }: UserFormFi
 
       {isGlobalRole(form.role) && (
         <p className="border-line-bright/70 text-fg-muted rounded-lg border border-dashed p-3 text-[13px] leading-relaxed">
-          This role's access is organization-wide, so it takes no department or
-          platform scoping.
+          This role's access is organization-wide, so it takes no department or platform scoping.
         </p>
       )}
 
@@ -402,7 +414,10 @@ function MultiSelect({
           {summary || placeholder}
         </span>
         <ChevronDown
-          className={cn('text-fg-subtle size-4 shrink-0 transition-transform', open && 'rotate-180')}
+          className={cn(
+            'text-fg-subtle size-4 shrink-0 transition-transform',
+            open && 'rotate-180',
+          )}
         />
       </button>
 
