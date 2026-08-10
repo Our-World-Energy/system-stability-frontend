@@ -37,9 +37,13 @@ export interface ActiveUsersSeries {
   points: ActiveUsersPoint[]
   /** The equally long window immediately before, for the comparison line. */
   previous: ActiveUsersPoint[]
+  /** Every day's count added up — the headline figure. */
+  total: number
+  /** Backend's average per day across the window. */
   average: number
   peak: number
-  /** Change in average against `previous`, already formatted, e.g. "+2.1%". */
+  /** Change in total against `previous`, already formatted, e.g. "+2.1%". Null
+   *  when the previous window has no activity to compare against. */
   changeLabel: string | null
   /** Sign of that change, for the colour. */
   changeDirection: 'up' | 'down' | 'flat'
@@ -163,24 +167,50 @@ function caption(start: string, end: string): string {
   return `${dayLabel(from)} – ${dayLabel(to)} ${to.getFullYear()}`
 }
 
+function sum(points: ActiveUsersPoint[]): number {
+  return points.reduce((running, point) => running + point.value, 0)
+}
+
 /**
  * The chart's view of one API response.
  *
  * The two series are compared by index, which is what the backend guarantees:
  * equal lengths, zero-filled, previous period immediately before this one. Each
  * point keeps its own label so the tooltip can name both dates.
+ *
+ * The headline is the TOTAL over the window, not the backend's
+ * `average_daily_active_users`: a widening range would otherwise shrink the
+ * number it reports, because the quiet days get averaged in — nine users today
+ * reads as 1.3 across a week in which the other six days were empty.
+ *
+ * Worth knowing what that total is: it adds daily counts, so somebody active on
+ * three days counts three times. It is user-days, not distinct people. Only GA4
+ * can deduplicate people across a range, and the daily rows the backend stores
+ * cannot be made to answer it — so a wider window always reads higher here.
+ * `average` is kept alongside for the same reason it always was.
  */
 export function activeUsersSeries(data: ActiveUserStatsData): ActiveUsersSeries {
-  const change = data.percent_change_vs_previous_period
+  const points = toPoints(data.daily ?? [])
+  const previous = toPoints(data.previous_period_daily ?? [])
+
+  // Compared on the same basis as the headline. The backend's
+  // `percent_change_vs_previous_period` is an average-against-average figure, so
+  // showing it next to a total would have the badge disagreeing with the number
+  // above it.
+  const total = sum(points)
+  const previousTotal = sum(previous)
+  const change = previousTotal ? ((total - previousTotal) / previousTotal) * 100 : null
+
   return {
-    points: toPoints(data.daily ?? []),
-    previous: toPoints(data.previous_period_daily ?? []),
+    points,
+    previous,
+    total,
     average: data.average_daily_active_users,
     peak: data.peak_daily_active_users,
-    // A backend 0 means "nothing to compare against" as well as "no change", and
-    // it sends the same 0 for both — so both render as a flat 0.0%.
-    changeLabel: `${change > 0 ? '+' : ''}${change.toFixed(1)}%`,
-    changeDirection: change > 0 ? 'up' : change < 0 ? 'down' : 'flat',
+    // No badge at all when the previous window was empty — every increase from
+    // nothing is infinite, and "+0.0%" would read as "no change".
+    changeLabel: change === null ? null : `${change > 0 ? '+' : ''}${change.toFixed(1)}%`,
+    changeDirection: !change ? 'flat' : change > 0 ? 'up' : 'down',
     caption: caption(data.start_date, data.end_date),
   }
 }
@@ -189,6 +219,7 @@ export function activeUsersSeries(data: ActiveUserStatsData): ActiveUsersSeries 
 export const EMPTY_SERIES: ActiveUsersSeries = {
   points: [],
   previous: [],
+  total: 0,
   average: 0,
   peak: 0,
   changeLabel: null,
