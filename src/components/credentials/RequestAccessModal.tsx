@@ -3,7 +3,7 @@ import { KeyRound, Loader2, Mail } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
-import { cn } from '@/lib/utils'
+import { cn, stripLeadingWhitespace } from '@/lib/utils'
 import { formatDuration } from '@/lib/format'
 import { useSubmitRequest } from '@/hooks/useRequests'
 import {
@@ -134,7 +134,9 @@ export function RequestAccessModal({ credential, onClose, onSubmitted }: Request
                 id="request-beneficiary"
                 type="email"
                 value={draft.beneficiaryEmail}
-                onChange={(e) => setDraft((d) => ({ ...d, beneficiaryEmail: e.target.value }))}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, beneficiaryEmail: stripLeadingWhitespace(e.target.value) }))
+                }
                 placeholder="j.smith@ourworldenergy.com"
                 disabled={busy}
                 className="border-line bg-input text-fg placeholder:text-fg-subtle focus:border-primary focus:ring-primary/20 h-10 w-full rounded-lg border pr-3 pl-9 font-mono text-sm transition-colors outline-none focus:ring-2"
@@ -151,7 +153,9 @@ export function RequestAccessModal({ credential, onClose, onSubmitted }: Request
           <textarea
             id="request-justification"
             value={draft.justification}
-            onChange={(e) => setDraft((d) => ({ ...d, justification: e.target.value }))}
+            onChange={(e) =>
+              setDraft((d) => ({ ...d, justification: stripLeadingWhitespace(e.target.value) }))
+            }
             rows={4}
             maxLength={requestLimits.justificationMaxLength}
             placeholder="Describe why this elevation is needed, and reference any change ticket…"

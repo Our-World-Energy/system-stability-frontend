@@ -8,6 +8,7 @@
   only handles what is specific to it — closing a dialog, clearing a selection.
 */
 
+import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   credentialErrorMessage,
@@ -36,7 +37,7 @@ import type { Credential } from '@/lib/api/types'
  */
 export function useCredentialSearch(query: string) {
   const term = query.trim()
-  return useQuery({
+  const result = useQuery({
     queryKey: credentialKeys.search(term),
     queryFn: () => searchCredentials(term),
     enabled: term.length > 0,
@@ -45,6 +46,16 @@ export function useCredentialSearch(query: string) {
     staleTime: 10_000,
     placeholderData: (previous) => previous,
   })
+
+  // Surface a failed search as a toast, not just the inline table message — the
+  // effect keys on the error, so a persistent failure toasts once, not per render.
+  useEffect(() => {
+    if (result.isError) {
+      notify.error(credentialErrorMessage(result.error, 'Credential search failed. Please try again.'))
+    }
+  }, [result.isError, result.error])
+
+  return result
 }
 
 interface RotateOptions {

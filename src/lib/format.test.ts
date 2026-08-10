@@ -40,10 +40,10 @@ describe('waitSeverity', () => {
 })
 
 describe('formatTimestamp', () => {
-  it('renders an RFC3339 stamp as the audit-log format', () => {
+  it('renders an RFC3339 stamp as the audit-log format (MM-DD-YYYY)', () => {
     // Built from local parts so the assertion holds in any timezone.
     const date = new Date(2026, 7, 3, 13, 13, 19)
-    expect(formatTimestamp(date.toISOString())).toBe('2026-08-03 13:13:19')
+    expect(formatTimestamp(date.toISOString())).toBe('08-03-2026 13:13:19')
   })
 
   it('never renders a blank cell for missing or unparseable input', () => {

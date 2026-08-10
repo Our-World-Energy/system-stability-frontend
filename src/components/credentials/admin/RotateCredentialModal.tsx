@@ -4,7 +4,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Field, controlClass } from '@/components/ui/Field'
 import { Select } from '@/components/ui/Select'
-import { cn } from '@/lib/utils'
+import { cn, stripLeadingWhitespace } from '@/lib/utils'
 import { formatTimestamp } from '@/lib/format'
 import { useRotateCredential } from '@/hooks/useCredentials'
 import { isEncryptionConfigured } from '@/lib/crypto/keys'
@@ -135,7 +135,7 @@ export function RotateCredentialModal({ record, onClose, onRotated }: RotateCred
                   <input
                     id="rotate-username"
                     value={draft.username}
-                    onChange={(e) => set('username', e.target.value)}
+                    onChange={(e) => set('username', stripLeadingWhitespace(e.target.value))}
                     placeholder={record.username || 'Unchanged'}
                     autoComplete="off"
                     maxLength={credentialLimits.usernameMaxLength}
@@ -147,7 +147,7 @@ export function RotateCredentialModal({ record, onClose, onRotated }: RotateCred
                   <input
                     id="rotate-url"
                     value={draft.url}
-                    onChange={(e) => set('url', e.target.value)}
+                    onChange={(e) => set('url', stripLeadingWhitespace(e.target.value))}
                     placeholder={record.url || 'Unchanged'}
                     inputMode="url"
                     disabled={busy}
@@ -178,7 +178,7 @@ export function RotateCredentialModal({ record, onClose, onRotated }: RotateCred
                     id="rotate-approver"
                     type="email"
                     value={draft.twoFactorApprover}
-                    onChange={(e) => set('twoFactorApprover', e.target.value)}
+                    onChange={(e) => set('twoFactorApprover', stripLeadingWhitespace(e.target.value))}
                     placeholder={
                       draft.twoFactorType === 'unchanged'
                         ? 'Unchanged'
@@ -200,7 +200,7 @@ export function RotateCredentialModal({ record, onClose, onRotated }: RotateCred
                 <textarea
                   id="rotate-notes"
                   value={draft.notes}
-                  onChange={(e) => set('notes', e.target.value)}
+                  onChange={(e) => set('notes', stripLeadingWhitespace(e.target.value))}
                   rows={3}
                   maxLength={credentialLimits.notesMaxLength}
                   placeholder="e.g. Rotated after incident INC-4471"

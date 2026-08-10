@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { Search, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, stripLeadingWhitespace } from '@/lib/utils'
 
 interface CredentialSearchInputProps {
   value: string
@@ -35,7 +35,7 @@ export function CredentialSearchInput({
         // eslint-disable-next-line jsx-a11y/no-autofocus
         autoFocus={autoFocus}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(stripLeadingWhitespace(e.target.value))}
         placeholder={placeholder}
         className={cn(
           'border-line bg-input text-fg placeholder:text-fg-subtle focus:border-primary focus:ring-primary/20 h-11 w-full rounded-lg border pl-10 font-mono text-sm transition-colors outline-none focus:ring-2',

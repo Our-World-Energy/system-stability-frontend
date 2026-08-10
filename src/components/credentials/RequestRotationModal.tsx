@@ -3,7 +3,7 @@ import { KeyRound, Loader2, RotateCw, TriangleAlert } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Field, controlClass } from '@/components/ui/Field'
-import { cn } from '@/lib/utils'
+import { cn, stripLeadingWhitespace } from '@/lib/utils'
 import { formatDuration } from '@/lib/format'
 import { useRequestRotation } from '@/hooks/useCredentials'
 import { isEncryptionConfigured } from '@/lib/crypto/keys'
@@ -128,7 +128,7 @@ export function RequestRotationModal({ record, onClose }: RequestRotationModalPr
           <textarea
             id="rotate-request-justification"
             value={draft.justification}
-            onChange={(e) => set('justification', e.target.value)}
+            onChange={(e) => set('justification', stripLeadingWhitespace(e.target.value))}
             rows={3}
             maxLength={1000}
             placeholder="Describe why this rotation is needed…"

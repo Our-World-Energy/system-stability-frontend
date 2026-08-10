@@ -21,8 +21,10 @@ export function formatTimestamp(iso?: string | null): string {
   const date = toDate(iso)
   if (!date) return '—'
   const pad = (n: number) => String(n).padStart(2, '0')
+  // MM-DD-YYYY, then the clock. The date portion stays 10 chars + a space, so
+  // `formatClock`'s slice(11) still lands on the time.
   return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+    `${pad(date.getMonth() + 1)}-${pad(date.getDate())}-${date.getFullYear()} ` +
     `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
   )
 }

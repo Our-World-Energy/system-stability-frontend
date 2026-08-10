@@ -4,7 +4,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Field, controlClass } from '@/components/ui/Field'
 import { Select } from '@/components/ui/Select'
-import { cn } from '@/lib/utils'
+import { cn, stripLeadingWhitespace } from '@/lib/utils'
 import { useCreateCredential } from '@/hooks/useCreateCredential'
 import { useUserMetadata } from '@/hooks/useUserManagement'
 import { isEncryptionConfigured } from '@/lib/crypto/keys'
@@ -155,7 +155,7 @@ export function CreateCredentialModal({ open, onClose, onCreated }: CreateCreden
             <input
               id="cred-name"
               value={draft.name}
-              onChange={(e) => set('name', e.target.value)}
+              onChange={(e) => set('name', stripLeadingWhitespace(e.target.value))}
               placeholder="e.g. Production DB Key"
               maxLength={credentialLimits.nameMaxLength}
               disabled={busy}
@@ -167,8 +167,8 @@ export function CreateCredentialModal({ open, onClose, onCreated }: CreateCreden
             <input
               id="cred-username"
               value={draft.username}
-              onChange={(e) => set('username', e.target.value)}
-              placeholder="admin_svc_prod"
+              onChange={(e) => set('username', stripLeadingWhitespace(e.target.value))}
+              placeholder="username"
               autoComplete="off"
               maxLength={credentialLimits.usernameMaxLength}
               disabled={busy}
@@ -193,7 +193,7 @@ export function CreateCredentialModal({ open, onClose, onCreated }: CreateCreden
           <input
             id="cred-url"
             value={draft.url}
-            onChange={(e) => set('url', e.target.value)}
+            onChange={(e) => set('url', stripLeadingWhitespace(e.target.value))}
             placeholder="https://db-cluster-01.internal.net"
             inputMode="url"
             disabled={busy}
@@ -229,7 +229,7 @@ export function CreateCredentialModal({ open, onClose, onCreated }: CreateCreden
             {platformCustom && (
               <input
                 value={draft.platformOther}
-                onChange={(e) => set('platformOther', e.target.value)}
+                onChange={(e) => set('platformOther', stripLeadingWhitespace(e.target.value))}
                 placeholder="Platform name"
                 aria-label="Other platform name"
                 maxLength={credentialLimits.nameMaxLength}
@@ -296,7 +296,7 @@ export function CreateCredentialModal({ open, onClose, onCreated }: CreateCreden
               id="cred-approver"
               type="email"
               value={draft.twoFactorApprover}
-              onChange={(e) => set('twoFactorApprover', e.target.value)}
+              onChange={(e) => set('twoFactorApprover', stripLeadingWhitespace(e.target.value))}
               // The contract stores the approver as an email, not a display name.
               placeholder={
                 draft.twoFactorType === 'none' ? 'Not required' : 'e.g. raj@ourworldenergy.com'
@@ -312,7 +312,7 @@ export function CreateCredentialModal({ open, onClose, onCreated }: CreateCreden
           <textarea
             id="cred-notes"
             value={draft.notes}
-            onChange={(e) => set('notes', e.target.value)}
+            onChange={(e) => set('notes', stripLeadingWhitespace(e.target.value))}
             rows={3}
             maxLength={credentialLimits.notesMaxLength}
             placeholder="Additional context regarding access rotation policies…"
