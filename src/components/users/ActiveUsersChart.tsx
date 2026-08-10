@@ -102,7 +102,10 @@ export function ActiveUsersChart({ enabled = true }: { enabled?: boolean }) {
     () => (query.data ? activeUsersSeries(query.data) : EMPTY_SERIES),
     [query.data],
   )
-  const { points, previous, average, peak, changeLabel, changeDirection } = series
+  const { points, previous, total, average, peak, changeLabel, changeDirection } = series
+  // The backend's average can carry decimals (9 users over 7 days is 1.286); one
+  // is as much as a per-day figure is ever read to.
+  const perDay = Math.round(average * 10) / 10
   // Before the first response there is nothing to caption; say what was asked for
   // rather than leaving the line blank while it loads.
   const caption = series.caption || (request ? `${request.start_date} – ${request.end_date}` : '')
@@ -211,8 +214,11 @@ export function ActiveUsersChart({ enabled = true }: { enabled?: boolean }) {
           key={`stats-${animationKey}`}
           className="animate-fade-in mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1"
         >
+          {/* The total over the window, so widening the range can only ever raise
+              it. An average here shrinks as quiet days are added, which reads as
+              the number going down when more days are asked for. */}
           <p className="text-fg font-mono text-4xl font-bold tracking-tight">
-            {average.toLocaleString()}
+            {total.toLocaleString()}
           </p>
           {changeLabel && (
             <p
@@ -226,7 +232,7 @@ export function ActiveUsersChart({ enabled = true }: { enabled?: boolean }) {
             </p>
           )}
           <p className="text-fg-subtle font-mono text-[10px] tracking-[0.08em] uppercase">
-            avg · peak {peak.toLocaleString()}
+            total · {perDay.toLocaleString()} avg/day · peak {peak.toLocaleString()}
           </p>
         </div>
 
@@ -319,7 +325,7 @@ export function ActiveUsersChart({ enabled = true }: { enabled?: boolean }) {
               className="h-full w-full"
               fill="none"
               role="img"
-              aria-label={`Active users, ${caption}: ${average.toLocaleString()} on average, peaking at ${peak.toLocaleString()}`}
+              aria-label={`Active users, ${caption}: ${total.toLocaleString()} in total, ${perDay.toLocaleString()} a day on average, peaking at ${peak.toLocaleString()}`}
             >
               <defs>
                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">

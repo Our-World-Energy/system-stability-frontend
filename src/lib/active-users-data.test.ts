@@ -88,28 +88,65 @@ describe('activeUsersSeries', () => {
     expect(series.previous[0].label).toBe('29 Jul')
   })
 
-  it('takes the summary figures from the backend rather than recomputing them', () => {
-    // Deliberately inconsistent with `daily`: whatever the backend says wins,
-    // because it is the same number the rest of the product reports.
-    const series = activeUsersSeries(
-      stats({ average_daily_active_users: 42, peak_daily_active_users: 77 }),
+  it('totals the window, so a wider range never reports a smaller number', () => {
+    const day = activeUsersSeries(
+      stats({ daily: [{ date: '2026-08-03', active_users: 9 }], previous_period_daily: [] }),
+    )
+    // The same nine users, with six quiet days added around them. Averaging gave
+    // 1.286 here, which read as the count having dropped.
+    const week = activeUsersSeries(
+      stats({
+        average_daily_active_users: 1.2857,
+        daily: [
+          { date: '2026-07-28', active_users: 0 },
+          { date: '2026-07-29', active_users: 0 },
+          { date: '2026-08-03', active_users: 9 },
+        ],
+      }),
     )
 
-    expect(series.average).toBe(42)
-    expect(series.peak).toBe(77)
+    expect(day.total).toBe(9)
+    expect(week.total).toBe(9)
+    // The backend's per-day average is still carried, for the sub-line.
+    expect(week.average).toBeCloseTo(1.2857)
   })
 
-  it('formats the change badge with its direction', () => {
-    expect(activeUsersSeries(stats()).changeLabel).toBe('+2.1%')
-    expect(activeUsersSeries(stats()).changeDirection).toBe('up')
+  it('keeps the peak the backend reported', () => {
+    expect(activeUsersSeries(stats({ peak_daily_active_users: 77 })).peak).toBe(77)
+  })
 
-    const down = activeUsersSeries(stats({ percent_change_vs_previous_period: -3.45 }))
-    expect(down.changeLabel).toBe('-3.5%')
+  it('compares totals, not averages, so the badge agrees with the headline', () => {
+    // 2700 against 2400 — the backend's own percentage is against averages and
+    // would be a different number beside a total.
+    const up = activeUsersSeries(stats({ percent_change_vs_previous_period: 99 }))
+    expect(up.changeLabel).toBe('+12.5%')
+    expect(up.changeDirection).toBe('up')
+
+    const down = activeUsersSeries(
+      stats({
+        daily: [{ date: '2026-08-01', active_users: 90 }],
+        previous_period_daily: [{ date: '2026-07-31', active_users: 100 }],
+      }),
+    )
+    expect(down.changeLabel).toBe('-10.0%')
     expect(down.changeDirection).toBe('down')
 
-    const flat = activeUsersSeries(stats({ percent_change_vs_previous_period: 0 }))
+    const flat = activeUsersSeries(
+      stats({
+        daily: [{ date: '2026-08-01', active_users: 100 }],
+        previous_period_daily: [{ date: '2026-07-31', active_users: 100 }],
+      }),
+    )
     expect(flat.changeLabel).toBe('0.0%')
     expect(flat.changeDirection).toBe('flat')
+  })
+
+  it('shows no badge when the previous window was empty', () => {
+    // Every rise from nothing is infinite, and "+0.0%" would claim no change.
+    const series = activeUsersSeries(stats({ previous_period_daily: [] }))
+
+    expect(series.changeLabel).toBeNull()
+    expect(series.changeDirection).toBe('flat')
   })
 
   it('captions a range, and a single day without repeating it', () => {
@@ -133,6 +170,7 @@ describe('activeUsersSeries', () => {
     )
 
     expect(series.points).toHaveLength(2)
+    expect(series.total).toBe(0)
     expect(series.average).toBe(0)
   })
 })
