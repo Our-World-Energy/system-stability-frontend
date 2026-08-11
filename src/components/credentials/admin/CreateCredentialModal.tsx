@@ -12,15 +12,9 @@ import {
   credentialLimits,
   emptyCredentialDraft,
   hasErrors,
-  twoFactorOptions,
   validateCredentialDraft,
 } from '@/lib/api/credentials'
-import type {
-  CreatedCredential,
-  CredentialDraft,
-  CredentialErrors,
-  TwoFactorType,
-} from '@/lib/api/credentials'
+import type { CreatedCredential, CredentialDraft, CredentialErrors } from '@/lib/api/credentials'
 import { SecretInput } from './SecretInput'
 
 /** Sentinel `<option>` value ("Other") that switches the platform control to free text. */
@@ -281,14 +275,10 @@ export function CreateCredentialModal({ open, onClose, onCreated }: CreateCreden
             <Select
               id="cred-2fa"
               value={draft.twoFactorType}
-              onChange={(v) => set('twoFactorType', v as TwoFactorType)}
+              onChange={() => set('twoFactorType', 'none')}
               disabled={busy}
             >
-              {twoFactorOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
+              <option value="none">None</option>
             </Select>
           </Field>
           <Field label="2FA Approver" htmlFor="cred-approver">

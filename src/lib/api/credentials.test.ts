@@ -135,6 +135,8 @@ describe('buildCreateCredentialPayload', () => {
     expect(payload.platform_other).toBe('')
     expect(payload.department_id).toBeNull()
     expect(payload.is_dev).toBe(false)
+    expect(payload.two_factor_type).toBe('none')
+    expect(payload.two_factor_approver).toBe('')
   })
 
   it('sends platform_id and blanks platform_other for a catalog pick', () => {

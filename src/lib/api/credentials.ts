@@ -121,7 +121,7 @@ export function emptyCredentialDraft(): CredentialDraft {
     isDev: false,
     // Not on the form — see the note on CredentialDraft.
     tags: [],
-    twoFactorType: 'totp',
+    twoFactorType: 'none',
     twoFactorApprover: '',
     elevationDurationSeconds: DEFAULT_ELEVATION_SECONDS,
     autoGrant: false,

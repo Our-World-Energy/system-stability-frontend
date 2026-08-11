@@ -56,8 +56,6 @@ function fillValidForm() {
   type(/username/i, 'admin@ourworldenergy.com')
   type(/^secret \/ password/i, SECRET)
   type(/^url/i, 'https://console.aws.amazon.com')
-  // 2FA defaults to TOTP, which makes the approver required.
-  type(/2fa approver/i, 'raj@ourworldenergy.com')
 }
 
 const submit = () => fireEvent.click(screen.getByRole('button', { name: /create credential/i }))
@@ -103,6 +101,17 @@ describe('CreateCredentialModal', () => {
     expect(controls).toHaveLength(labels.length)
   })
 
+  it('offers only None for 2FA when creating a credential', () => {
+    renderModal()
+
+    const twoFactor = screen.getByLabelText('2FA Type') as HTMLSelectElement
+    expect(twoFactor.value).toBe('none')
+    expect(Array.from(twoFactor.options, (option) => [option.value, option.text])).toEqual([
+      ['none', 'None'],
+    ])
+    expect(screen.getByLabelText('2FA Approver')).toHaveProperty('disabled', true)
+  })
+
   it('sends the encrypted secret and never the plaintext', async () => {
     const { onCreated, onClose } = renderModal()
     fillValidForm()
@@ -117,8 +126,8 @@ describe('CreateCredentialModal', () => {
       username: 'admin@ourworldenergy.com',
       encrypted_secret: FAKE_ENVELOPE,
       url: 'https://console.aws.amazon.com',
-      two_factor_type: 'totp',
-      two_factor_approver: 'raj@ourworldenergy.com',
+      two_factor_type: 'none',
+      two_factor_approver: '',
       // Off-form fields still have to reach the handler at their defaults.
       tags: [],
       elevation_duration_seconds: 3600,
@@ -201,30 +210,6 @@ describe('CreateCredentialModal', () => {
     expect(screen.getByText(/a credential name is required/i)).toBeTruthy()
     expect(screen.getByText(/a secret value is required/i)).toBeTruthy()
     expect(stabilityCaller).not.toHaveBeenCalled()
-  })
-
-  it('requires the approver to be an email while a second factor is set', () => {
-    renderModal()
-    fillValidForm()
-    type(/2fa approver/i, 'Sarah Jenkins')
-    submit()
-
-    expect(screen.getByText(/approver as an email/i)).toBeTruthy()
-    expect(stabilityCaller).not.toHaveBeenCalled()
-  })
-
-  it('stops asking for an approver when the second factor is set to none', async () => {
-    renderModal()
-    fillValidForm()
-    type(/2fa approver/i, '')
-    fireEvent.change(screen.getByLabelText(/2fa type/i), { target: { value: 'none' } })
-    submit()
-
-    await waitFor(() => expect(stabilityCaller).toHaveBeenCalledTimes(1))
-    expect(stabilityCaller.mock.calls[0][1]).toMatchObject({
-      two_factor_type: 'none',
-      two_factor_approver: '',
-    })
   })
 
   it('rejects a URL that is not http(s)', () => {
