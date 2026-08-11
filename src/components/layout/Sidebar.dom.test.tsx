@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { navItems, navItemsForRole } from '@/lib/navigation'
 import { useAuthStore } from '@/store/auth'
@@ -60,5 +60,30 @@ describe('Sidebar navigation', () => {
     renderAs('standard_user')
 
     expect(shownLabels()).toEqual(navItemsForRole('standard_user'))
+  })
+})
+
+describe('Sidebar user chip', () => {
+  it('links the chip to the account page and labels it on hover', () => {
+    renderAs('standard_user')
+
+    // Two rails render — the desktop one and the mobile drawer — so both chips
+    // are present; either is enough to prove the wiring.
+    const links = screen.getAllByRole('link', { name: /someone@ourworldenergy.com/i })
+    expect(links.length).toBeGreaterThan(0)
+    expect(links[0].getAttribute('href')).toBe('/account')
+    expect(screen.getAllByRole('tooltip')[0].textContent).toContain('My Account')
+  })
+
+  it('confirms before logging out, and does nothing until confirmed', () => {
+    renderAs('standard_user')
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Log out/i })[0])
+
+    const dialog = screen.getByRole('dialog', { name: /Confirm log out/i })
+    expect(useAuthStore.getState().token).toBe('token')
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Log out$/i }))
+    expect(useAuthStore.getState().token).toBeNull()
   })
 })

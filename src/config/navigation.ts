@@ -107,4 +107,7 @@ export const pageNavigation = [
   { path: '/audit-log', navbarTitle: 'Audit Log' },
   { path: '/baselines', navbarTitle: 'Performance Baselines' },
   { path: '/settings', navbarTitle: 'Settings' },
+  // No sidebar entry: reached from the user chip at the foot of the sidebar, the
+  // way an account page usually is. Every role has one of these.
+  { path: '/account', navbarTitle: 'Account Settings' },
 ] satisfies readonly PageNavigationConfig[]

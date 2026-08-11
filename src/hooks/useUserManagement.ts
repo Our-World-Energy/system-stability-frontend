@@ -92,6 +92,29 @@ export function useActiveUserStats(range: ActiveUserStatsRequest | null, enabled
   })
 }
 
+/**
+ * The signed-in user's own registry row.
+ *
+ * There is no "me" route: the login JWT carries an email and a role and nothing
+ * else, so a full name or a phone number can only come from the registry. get-users
+ * is org_admin-only, which means this resolves for an admin and 403s for everyone
+ * else — a real outcome the caller renders, not a failure to retry. `search` is a
+ * partial match, so the row still has to be picked out by exact email.
+ */
+export function useMyProfile(email: string | null | undefined) {
+  return useQuery({
+    queryKey: userKeys.me(email ?? ''),
+    queryFn: async () => {
+      const { users } = await getUsers({ search: email!, page_size: 25 })
+      const mine = users.find((u) => u.email.toLowerCase() === email!.toLowerCase())
+      return mine ?? null
+    },
+    enabled: Boolean(email),
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+}
+
 /** Invalidate the registry and the role counts together. */
 function useRefreshRegistry() {
   const queryClient = useQueryClient()
