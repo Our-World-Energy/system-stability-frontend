@@ -31,6 +31,7 @@ export function Login() {
   // Why the app bounced them here, if it did: an expired token, or access changed
   // out from under them by an admin. Left by `endSession` on the way out.
   const [signedOut, setSignedOut] = useState<string | null>(null)
+  const emailRef = useRef<HTMLInputElement>(null)
   const passwordRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -41,17 +42,48 @@ export function Login() {
     if (notice) setSignedOut(notice)
   }, [])
 
+  /*
+    Adopt whatever the browser filled in.
+
+    Chrome and most password managers write straight to the input's value without
+    firing an event React listens for, so the form can look complete while state
+    is still empty. Re-checked shortly after mount as well, because a manager can
+    fill a beat after the page settles.
+  */
+  useEffect(() => {
+    const adopt = () => {
+      const filledEmail = emailRef.current?.value
+      const filledPassword = passwordRef.current?.value
+      if (filledEmail) setEmail((current) => (current === filledEmail ? current : filledEmail))
+      if (filledPassword)
+        setPassword((current) => (current === filledPassword ? current : filledPassword))
+    }
+    adopt()
+    const timer = setTimeout(adopt, 300)
+    return () => clearTimeout(timer)
+  }, [])
+
   const state = location.state as LoginRouteState | null
-  const canSubmit = email.trim().length > 0 && password.length > 0
 
   const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault()
-    if (!canSubmit || pending) return
+    if (pending) return
+
+    // The inputs, not the state, are the source of truth at this moment: an
+    // autofill React never heard about is still a filled form, and refusing to
+    // send it is the bug this reads around.
+    const typedEmail = (emailRef.current?.value ?? email).trim()
+    const typedPassword = passwordRef.current?.value ?? password
+    if (!typedEmail || !typedPassword) {
+      setError('Enter your email address and password.')
+      ;(typedEmail ? passwordRef : emailRef).current?.focus()
+      return
+    }
 
     setPending(true)
     setError(null)
     try {
-      const { must_change_password } = await logIn(email.trim(), password, remember)
+      const { must_change_password } = await logIn(typedEmail, typedPassword, remember)
 
       // An account created by an admin starts on a backend-generated password, and
       // stays flagged until change-password runs. Send it straight to the forced
@@ -94,6 +126,7 @@ export function Login() {
           <Field label="Email Address" htmlFor="email">
             <AuthInput
               id="email"
+              ref={emailRef}
               icon={Mail}
               type="email"
               autoComplete="email"
@@ -142,10 +175,11 @@ export function Login() {
           </AuthLink>
         </div>
 
+        {/* Never disabled on the strength of what React thinks is in the fields —
+            it cannot see an autofill, and a button that looks broken is worse than
+            one that answers with "enter your email address and password". */}
         <div className="mt-6">
-          <AuthSubmit pending={pending} disabled={!canSubmit}>
-            {pending ? 'Signing in…' : 'Login'}
-          </AuthSubmit>
+          <AuthSubmit pending={pending}>{pending ? 'Signing in…' : 'Login'}</AuthSubmit>
         </div>
       </form>
     </AuthShell>

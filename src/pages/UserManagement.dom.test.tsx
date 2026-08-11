@@ -235,16 +235,12 @@ function registryRows() {
     .slice(1)
 }
 
-/**
- * Wait for the first get-users response to paint.
- *
- * Given a longer window than the 1s default: this is the widest file in the suite
- * and the page now runs three queries at once, so on a loaded machine the first
- * rows can miss a one-second deadline while the table is still on its loading row.
- * A slow paint is not the failure any of these tests are looking for.
- */
+/** Wait for the first get-users response to paint. */
 async function waitForRegistry() {
-  await waitFor(() => expect(registryRows().length).toBe(PAGE_SIZE), { timeout: 5000 })
+  // The window comes from `src/test-setup.ts`, which widens it suite-wide: this
+  // file runs three queries per render and its paints can outlast Testing
+  // Library's one-second default on a loaded machine.
+  await waitFor(() => expect(registryRows().length).toBe(PAGE_SIZE))
 }
 
 async function openAddUser() {
