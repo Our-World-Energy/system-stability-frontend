@@ -17,11 +17,24 @@ import {
 
 const W = 600
 const H = 240
+/** Breathing room kept above and below the curve, inside the viewBox. */
+const PAD = 12
 
-/** Cardinal-spline path through `pts`, which gives the design's soft S-curve. */
+/**
+ * Cardinal-spline path through `pts`, which gives the design's soft S-curve.
+ *
+ * The control points are clamped to the plot band, and that is not cosmetic. A
+ * cardinal spline overshoots on a sharp change — a drop to zero after a busy day
+ * sends the curve well below the lowest point — and anything past the viewBox is
+ * clipped by the SVG viewport, which broke the line and cut the bottom off the
+ * filled area, showing the page through the gap. A Bézier stays inside the convex
+ * hull of its control points, so clamping those to [PAD, H - PAD] is what keeps
+ * the whole curve on screen and continuous.
+ */
 function smoothPath(pts: { x: number; y: number }[]): string {
   if (pts.length < 2) return ''
   const tension = 0.2
+  const clampY = (y: number) => Math.min(Math.max(y, PAD), H - PAD)
   let d = `M${pts[0].x.toFixed(2)},${pts[0].y.toFixed(2)}`
   for (let i = 0; i < pts.length - 1; i++) {
     const prev = pts[i - 1] ?? pts[i]
@@ -29,9 +42,9 @@ function smoothPath(pts: { x: number; y: number }[]): string {
     const next = pts[i + 1]
     const after = pts[i + 2] ?? next
     const c1x = curr.x + (next.x - prev.x) * tension
-    const c1y = curr.y + (next.y - prev.y) * tension
+    const c1y = clampY(curr.y + (next.y - prev.y) * tension)
     const c2x = next.x - (after.x - curr.x) * tension
-    const c2y = next.y - (after.y - curr.y) * tension
+    const c2y = clampY(next.y - (after.y - curr.y) * tension)
     d += ` C${c1x.toFixed(2)},${c1y.toFixed(2)} ${c2x.toFixed(2)},${c2y.toFixed(2)} ${next.x.toFixed(2)},${next.y.toFixed(2)}`
   }
   return d
@@ -41,8 +54,9 @@ function smoothPath(pts: { x: number; y: number }[]): string {
  * Active users over a selectable window, as a filled area chart against the
  * equivalent previous window.
  *
- * "Today" buckets by hour and the other ranges by day; both series share one
- * scale so the comparison line is meaningful. The SVG stretches to its container
+ * Every range buckets by day — GA4 daily rows are all the backend keeps, so
+ * "Today" is a single bucket. Both series share one scale, so the comparison line
+ * is meaningful against the current one. The SVG stretches to its container
  * (`preserveAspectRatio="none"`) with non-scaling strokes, so the curve fills any
  * card width without thinning the line.
  */
@@ -125,7 +139,9 @@ export function ActiveUsersChart({ enabled = true }: { enabled?: boolean }) {
   const project = (series: ActiveUsersPoint[]) =>
     series.map((p, i) => ({
       x: series.length === 1 ? W / 2 : (i / (series.length - 1)) * W,
-      y: H - ((p.value - min) / spread) * (H - 24) - 12,
+      // The band the clamp in `smoothPath` holds the curve inside: PAD at the top
+      // for the peak, PAD at the bottom so a zero day still draws a visible line.
+      y: H - PAD - ((p.value - min) / spread) * (H - 2 * PAD),
     }))
 
   const line = smoothPath(project(drawn))
