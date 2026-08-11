@@ -82,7 +82,10 @@ export function PasswordInput(props: PasswordInputProps) {
           title="Hold to show password"
           className="text-fg-muted hover:text-fg focus-visible:ring-primary/30 grid size-8 place-items-center rounded-md transition-colors outline-none focus-visible:ring-2"
         >
-          {revealed ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
+          {/* The glyph shows the current state, not the action: struck through
+              while the password is hidden, open while it is legible. Same way
+              round as the credential manager's secret field. */}
+          {revealed ? <Eye className="size-[18px]" /> : <EyeOff className="size-[18px]" />}
         </button>
       }
       {...props}
