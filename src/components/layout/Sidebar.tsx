@@ -78,7 +78,14 @@ function initialsOf(name: string) {
   return name.slice(0, 2).toUpperCase()
 }
 
-function UserChip({ collapsed }: { collapsed: boolean }) {
+function UserChip({
+  collapsed,
+  onNavigate,
+}: {
+  collapsed: boolean
+  /** Dismisses the mobile drawer, the same as the nav links above do. */
+  onNavigate?: () => void
+}) {
   const navigate = useNavigate()
   const { token, user, signOut } = useAuthStore()
   const [confirming, setConfirming] = useState(false)
@@ -91,6 +98,9 @@ function UserChip({ collapsed }: { collapsed: boolean }) {
 
   const handleSignOut = () => {
     setConfirming(false)
+    // `mobileOpen` outlives a client-side navigation, so a drawer left open here
+    // would still be open on the next sign-in.
+    onNavigate?.()
     signOut()
     navigate('/login', { replace: true })
   }
@@ -123,6 +133,9 @@ function UserChip({ collapsed }: { collapsed: boolean }) {
         >
           <Link
             to="/account"
+            // The drawer overlays the page it just navigated to, so it has to
+            // close itself — no route change unmounts it.
+            onClick={onNavigate}
             className={cn(
               'hover:bg-surface flex min-w-0 flex-1 items-center gap-3 rounded-lg transition-colors',
               collapsed ? 'flex-none' : '-m-1 p-1',
@@ -220,7 +233,7 @@ export function Sidebar() {
             </button>
           </div>
           <NavList collapsed={false} onNavigate={closeMobile} />
-          <UserChip collapsed={false} />
+          <UserChip collapsed={false} onNavigate={closeMobile} />
         </aside>
       </div>
     </>
