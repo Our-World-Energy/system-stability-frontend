@@ -28,6 +28,18 @@ export interface JwtClaims {
    * read defensively rather than assumed.
    */
   user_id?: number
+  /**
+   * Profile fields, if the token carries them. The tokens this backend issued as
+   * of writing did not — get-users was the only source, and that is org_admin-only,
+   * which left every other role with no way to see their own name or phone.
+   *
+   * Read under both the snake_case and bare spellings a backend might pick, so
+   * adding either claim server-side lights this up with no frontend change.
+   */
+  full_name?: string
+  name?: string
+  phone_number?: string
+  phone?: string
   /** Seconds since the epoch, per the JWT spec. */
   exp?: number
   iat?: number
@@ -71,6 +83,30 @@ export function readJwtClaims(token: string | null | undefined): JwtClaims | nul
     return claims as JwtClaims
   } catch {
     return null
+  }
+}
+
+/** Whatever the token itself can say about its holder, beyond email and role. */
+export interface TokenProfile {
+  fullName: string | null
+  phoneNumber: string | null
+}
+
+/**
+ * The profile fields carried in the token, if any.
+ *
+ * The fallback for every role that cannot read the registry: `get-users` is
+ * org_admin-only, so for a platform admin (or anyone below) this is the only
+ * source of their own name and phone number that exists client-side. Both are
+ * null when the token carries neither, which is a real answer — the account page
+ * says so rather than inventing a value.
+ */
+export function tokenProfile(token: string | null | undefined): TokenProfile {
+  const claims = readJwtClaims(token)
+  const text = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : null)
+  return {
+    fullName: text(claims?.full_name) ?? text(claims?.name),
+    phoneNumber: text(claims?.phone_number) ?? text(claims?.phone),
   }
 }
 

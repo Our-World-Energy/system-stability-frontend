@@ -82,9 +82,12 @@ export function UserRegistryTable({
   // the table sits between the header and the footer and never reaches the corners.
   return (
     <section className="border-line bg-surface rounded-lg border">
-      <header className="border-line flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
+      <header className="border-line flex flex-wrap items-center justify-between gap-3 border-b px-4 py-4 sm:px-5">
         <h2 className="text-fg text-sm font-semibold">User Registry</h2>
-        <div className="flex items-center gap-2">
+        {/* Wraps on a phone — the three controls are wider than the card there, and
+            were spilling past its right edge. The search box takes a row of its
+            own, and the filter and Add User share the next one. */}
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <SearchBox query={query} onQueryChange={onQueryChange} />
           <RoleFilter
             roles={roles}
@@ -246,7 +249,9 @@ function EmptyState({
 
       <div>
         <p className="text-fg text-sm font-semibold">
-          {filtering ? 'No users match this search or filter' : 'No users have been provisioned yet'}
+          {filtering
+            ? 'No users match this search or filter'
+            : 'No users have been provisioned yet'}
         </p>
         <p className="text-fg-muted mx-auto mt-1 max-w-[46ch] text-[13px] leading-relaxed">
           {filtering
@@ -312,7 +317,7 @@ function SearchBox({
   onQueryChange: (query: string) => void
 }) {
   return (
-    <div className="relative">
+    <div className="relative w-full sm:w-auto">
       <Search className="text-fg-subtle pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
       <input
         type="search"
@@ -320,7 +325,7 @@ function SearchBox({
         aria-label="Search registry"
         placeholder="Search name or email…"
         onChange={(e) => onQueryChange(e.target.value)}
-        className="border-line bg-input text-fg placeholder:text-fg-subtle focus:border-primary focus:ring-primary/20 h-9 w-52 rounded-lg border pr-3 pl-9 text-sm transition-colors outline-none focus:ring-2 sm:w-64"
+        className="border-line bg-input text-fg placeholder:text-fg-subtle focus:border-primary focus:ring-primary/20 h-9 w-full rounded-lg border pr-3 pl-9 text-sm transition-colors outline-none focus:ring-2 sm:w-64"
       />
     </div>
   )

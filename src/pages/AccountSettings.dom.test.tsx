@@ -50,6 +50,11 @@ function found(users: UserRecord[]): GetUsersData {
   return { total: users.length, page: 1, page_size: 25, users }
 }
 
+/** A token whose payload carries `claims`, shaped the way the backend issues one. */
+function tokenFor(claims: Record<string, unknown>): string {
+  return `header.${btoa(JSON.stringify(claims)).replace(/=+$/, '')}.signature`
+}
+
 function renderPage(entry = '/account') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
   return render(
@@ -104,12 +109,31 @@ describe('Account Settings — my profile', () => {
     expect(screen.queryByText('Someone Else')).toBeNull()
   })
 
+  it('reads name and phone off the token when the registry is closed to this role', async () => {
+    // A platform admin cannot call get-users, so claims are the only self-readable
+    // source of their own details. Whichever spelling the backend picks.
+    useAuthStore.setState({
+      token: tokenFor({
+        email: EMAIL,
+        role: 'platform_admin',
+        full_name: 'Shubham Kumar',
+        phone: '11213314314',
+      }),
+    })
+    mockGetUsers.mockRejectedValue(new ApiError('http', 'forbidden', 403))
+    renderPage()
+
+    await waitFor(() => expect(screen.getAllByText('Shubham Kumar').length).toBe(2))
+    expect(screen.getByText('11213314314')).toBeTruthy()
+    expect(screen.queryByText(/only an organizational admin can read/i)).toBeNull()
+  })
+
   it('falls back to the session identity when the registry is closed to this role', async () => {
     // get-users is org_admin-only; a 403 is an answer, not a failure.
     mockGetUsers.mockRejectedValue(new ApiError('http', 'forbidden', 403))
     renderPage()
 
-    await waitFor(() => expect(screen.getAllByText(/Not available to your role/i).length).toBe(2))
+    await waitFor(() => expect(screen.getAllByText(/Ask an admin/i).length).toBe(2))
     // Email and role come from the token, so they are always shown — here in the
     // Email field, and again as the banner's fallback for the unavailable name.
     expect(screen.getAllByText(EMAIL).length).toBeGreaterThan(0)

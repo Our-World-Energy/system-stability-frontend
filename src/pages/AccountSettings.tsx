@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { KeyRound, LoaderCircle, LogOut, ShieldAlert, UserRound } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { toApiError } from '@/lib/api/caller'
 import { useMyProfile } from '@/hooks/useUserManagement'
 import { formatTimestamp } from '@/lib/format'
+import { tokenProfile } from '@/lib/jwt'
 import type { UserRecord } from '@/lib/api/user-management.types'
 import { useAuthStore } from '@/store/auth'
 
@@ -44,6 +45,7 @@ export function AccountSettings() {
   const [params, setParams] = useSearchParams()
   const [confirmingLogout, setConfirmingLogout] = useState(false)
   const user = useAuthStore((s) => s.user)
+  const token = useAuthStore((s) => s.token)
   const signOut = useAuthStore((s) => s.signOut)
 
   // In the URL rather than component state, so a refresh keeps the panel open and
@@ -57,6 +59,23 @@ export function AccountSettings() {
   const record = profileQuery.data ?? null
   const profileError = profileQuery.error ? toApiError(profileQuery.error) : null
 
+  /*
+    Two sources, in order of authority.
+
+    The registry row is the real record, but get-users is org_admin-only — so for a
+    platform admin, a management user or a standard user it 403s and there is
+    nothing behind it. The token is the fallback: whatever the backend chose to put
+    in the claims, which is the only self-readable profile data a non-admin has.
+
+    Read from the token rather than the cached `auth-user` blob beside it, so a
+    session that predates a claim being added still picks it up.
+  */
+  const fromToken = useMemo(() => tokenProfile(token), [token])
+  const fullName = record?.full_name ?? fromToken.fullName
+  const phoneNumber = record?.phone_number ?? fromToken.phoneNumber
+  // Only then is "your role cannot read this" the honest explanation for a blank.
+  const registryClosed = Boolean(profileError)
+
   const toLogin = (notice?: string) => {
     signOut()
     navigate('/login', { replace: true, state: notice ? { notice } : undefined })
@@ -68,7 +87,9 @@ export function AccountSettings() {
         aria-label="Account sections"
         className="border-line border-b p-3 lg:border-r lg:border-b-0"
       >
-        <ul className="flex gap-2 lg:flex-col">
+        {/* A row above the panel on small screens, a rail beside it on desktop.
+            Wraps rather than overflowing when three items don't fit a phone. */}
+        <ul className="flex flex-wrap gap-2 lg:flex-col lg:flex-nowrap">
           {TABS.map(({ id, label, icon: Icon }) => (
             <li key={id}>
               <button
@@ -109,31 +130,37 @@ export function AccountSettings() {
               My Profile
             </h2>
 
-            <IdentityCard user={user} record={record} loading={profileQuery.isPending} />
+            <IdentityCard
+              email={email}
+              fullName={fullName}
+              roleLabel={record?.role.name ?? user?.roleLabel ?? null}
+              loading={profileQuery.isPending}
+            />
 
             <Card title="Personal Information">
-              {/* Name and phone live only in the registry, which is an admin read —
-                  so for anyone else this card is email and role, and says why. */}
               <div className="grid gap-5 sm:grid-cols-2">
                 <ReadOnlyField
                   label="Name"
-                  value={record?.full_name}
+                  value={fullName ?? undefined}
                   loading={profileQuery.isPending}
-                  missing={profileError ? 'Not available to your role' : '—'}
+                  missing={registryClosed ? 'Ask an admin' : '—'}
                 />
                 <ReadOnlyField label="Email" value={email ?? undefined} mono />
                 <ReadOnlyField
                   label="Phone Number"
-                  value={record?.phone_number}
+                  value={phoneNumber ?? undefined}
                   loading={profileQuery.isPending}
-                  missing={profileError ? 'Not available to your role' : 'Not set'}
+                  missing={registryClosed ? 'Ask an admin' : 'Not set'}
                   mono
                 />
               </div>
 
               <p className="text-fg-subtle mt-5 text-xs">
-                {profileError?.status === 403
-                  ? 'Your name and phone number are held in the user registry, which only an organizational admin can read. Ask one to check or change them.'
+                {registryClosed && !fullName && !phoneNumber
+                  ? // Not a bug to hide: the registry is the only place these are
+                    // kept, only an org admin can read it, and this session's token
+                    // carries neither claim.
+                    'Your name and phone number are held in the user registry, which only an organizational admin can read. Ask one to check or change them.'
                   : 'Maintained by an organizational admin in User Management — including your email, which is fixed once the account exists.'}
               </p>
             </Card>
@@ -214,18 +241,20 @@ const labelClass = 'text-fg-muted text-[13px]'
 
 /** The name/role banner at the top of the profile panel. */
 function IdentityCard({
-  user,
-  record,
+  email,
+  fullName,
+  roleLabel,
   loading,
 }: {
-  user: { email: string; roleLabel: string } | null
-  record: UserRecord | null
+  email: string | null
+  fullName: string | null
+  roleLabel: string | null
   loading: boolean
 }) {
-  // The registry's full name when it is readable, the session's email otherwise —
-  // never a placeholder, since this is the one line that says who is signed in.
-  const name = record?.full_name || user?.email || 'Not signed in'
-  const role = record?.role.name ?? user?.roleLabel ?? '—'
+  // Falls back to the email rather than a placeholder: this is the one line that
+  // says who is signed in, and it must never be guesswork.
+  const name = fullName || email || 'Not signed in'
+  const role = roleLabel ?? '—'
 
   return (
     <div className="border-line bg-surface-2 flex items-center gap-4 rounded-xl border p-5">
