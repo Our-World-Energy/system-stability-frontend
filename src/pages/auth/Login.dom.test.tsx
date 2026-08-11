@@ -58,17 +58,44 @@ function fillAndSubmit(email = 'ops@ourworldenergy.com', password = 'hunter2!!')
 }
 
 describe('Login page', () => {
-  it('keeps the action disabled until both fields are filled', () => {
+  it('stays pressable, and names what is missing rather than sitting there greyed out', () => {
+    // Disabling on React's view of the fields made the button look broken after a
+    // browser autofill, which React never hears about.
     renderLogin()
-    expect(submit().disabled).toBe(true)
+    expect(submit().disabled).toBe(false)
+
+    fireEvent.click(submit())
+    expect(screen.getByRole('alert').textContent).toMatch(/enter your email address and password/i)
+    expect(mockLogin).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(screen.getByLabelText(/Email Address/i))
 
     fireEvent.change(screen.getByLabelText(/Email Address/i), {
       target: { value: 'ops@ourworldenergy.com' },
     })
-    expect(submit().disabled).toBe(true)
+    fireEvent.click(submit())
+    expect(mockLogin).not.toHaveBeenCalled()
+    // Straight to the box that is still empty.
+    expect(document.activeElement).toBe(screen.getByLabelText(/Secure Password/i))
+  })
 
-    fireEvent.change(screen.getByLabelText(/Secure Password/i), { target: { value: 'hunter2!!' } })
-    expect(submit().disabled).toBe(false)
+  it('sends what the browser autofilled, event or no event', async () => {
+    mockLogin.mockResolvedValue({
+      token: TOKEN,
+      expires_at: '2026-08-12T00:00:00Z',
+      must_change_password: false,
+    })
+    renderLogin()
+
+    // Autofill as Chrome does it: the input's value is set, and nothing React
+    // listens for is dispatched.
+    ;(screen.getByLabelText(/Email Address/i) as HTMLInputElement).value = 'ops@ourworldenergy.com'
+    ;(screen.getByLabelText(/Secure Password/i) as HTMLInputElement).value = 'hunter2!!'
+
+    fireEvent.click(submit())
+
+    await waitFor(() =>
+      expect(mockLogin).toHaveBeenCalledWith('ops@ourworldenergy.com', 'hunter2!!'),
+    )
   })
 
   it('stores the session and lands on the dashboard', async () => {
@@ -160,9 +187,10 @@ describe('Login page', () => {
     expect(emailField.value).toBe('ops@ourworldenergy.com')
 
     // The form is usable again rather than stuck in its pending state.
-    expect(submit().disabled).toBe(true) // password is empty
-    fireEvent.change(passwordField, { target: { value: 'right-password' } })
     expect(submit().disabled).toBe(false)
+    fireEvent.change(passwordField, { target: { value: 'right-password' } })
+    fireEvent.click(submit())
+    await waitFor(() => expect(mockLogin).toHaveBeenCalledTimes(2))
   })
 
   it('surfaces a disabled account as the backend phrases it', async () => {
