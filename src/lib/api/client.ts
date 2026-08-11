@@ -26,7 +26,7 @@
 
 import axios from 'axios'
 import type { AxiosInstance } from 'axios'
-import { SESSION_ENDED_NOTICE, TOKEN_KEY, endSession } from '@/lib/auth-storage'
+import { SESSION_ENDED_NOTICE, TOKEN_KEY, endSession, readSession } from '@/lib/auth-storage'
 
 /** Same-origin prefix the dev proxy and the Vercel rewrite both understand. */
 export const STABILITY_PROXY_PREFIX = '/stability'
@@ -52,12 +52,13 @@ export const userManagementBaseUrl: string =
  * session is gone. The caller still gets the rejection so a form can stop its
  * pending state and render the backend's message.
  *
- * localStorage is read per request rather than captured once, so a token stored
- * after this module loaded (i.e. the login that just happened) is still picked up.
+ * Storage is read per request rather than captured once, so a token stored after
+ * this module loaded (i.e. the login that just happened) is still picked up —
+ * including which of the two stores "Remember me" put it in.
  */
 function withSession(instance: AxiosInstance): AxiosInstance {
   instance.interceptors.request.use((config) => {
-    const token = localStorage.getItem(TOKEN_KEY)
+    const token = readSession(TOKEN_KEY)
     if (token) config.headers.Authorization = `Bearer ${token}`
     return config
   })

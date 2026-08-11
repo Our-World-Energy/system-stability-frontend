@@ -7,7 +7,7 @@ import { AuthLink, AuthSubmit } from '@/components/auth/AuthActions'
 import { AuthAlert } from '@/components/auth/AuthFeedback'
 import { Field } from '@/components/ui/Field'
 import { toApiError } from '@/lib/api/caller'
-import { takeSessionNotice } from '@/lib/auth-storage'
+import { isRemembered, rememberedEmail, takeSessionNotice } from '@/lib/auth-storage'
 import { useAuthStore } from '@/store/auth'
 
 /** Location state used by ResetPassword and session-expiry notices. */
@@ -20,8 +20,12 @@ export function Login() {
   const location = useLocation()
   const logIn = useAuthStore((s) => s.logIn)
 
-  const [email, setEmail] = useState('')
+  // Prefilled from the last remembered sign-in, so the common case is one field
+  // and a button. Only ever the address — a stored password would be a liability
+  // with no upside, since the browser's own password manager does that job better.
+  const [email, setEmail] = useState(rememberedEmail)
   const [password, setPassword] = useState('')
+  const [remember, setRemember] = useState(isRemembered)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   // Why the app bounced them here, if it did: an expired token, or access changed
@@ -47,7 +51,7 @@ export function Login() {
     setPending(true)
     setError(null)
     try {
-      const { must_change_password } = await logIn(email.trim(), password)
+      const { must_change_password } = await logIn(email.trim(), password, remember)
 
       // An account created by an admin starts on a backend-generated password, and
       // stays flagged until change-password runs. Send it straight to the forced
@@ -93,7 +97,8 @@ export function Login() {
               icon={Mail}
               type="email"
               autoComplete="email"
-              autoFocus
+              // The caret starts wherever there is still something to type.
+              autoFocus={!email}
               placeholder="Email Address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -105,6 +110,7 @@ export function Login() {
               id="password"
               ref={passwordRef}
               autoComplete="current-password"
+              autoFocus={Boolean(email)}
               placeholder="••••••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -112,7 +118,25 @@ export function Login() {
           </Field>
         </div>
 
-        <div className="mt-3 flex justify-end">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          {/*
+            Two things at once, which is what the control is worth here: it keeps
+            the session in localStorage rather than sessionStorage, so closing the
+            browser does not end it, and it offers this address back next time.
+            Unticked, the session dies with the tab — the borrowed-machine case.
+
+            It cannot extend the session beyond the token's own 8 hours; the API
+            issues no refresh token, so that would need a backend change.
+          */}
+          <label className="text-fg-muted hover:text-fg flex cursor-pointer items-center gap-2 font-mono text-[13px] transition-colors">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="accent-primary-bright size-4 cursor-pointer"
+            />
+            Remember me
+          </label>
           <AuthLink to="/forgot-password" icon={KeyRound} accent>
             Forgot Password?
           </AuthLink>

@@ -1,8 +1,19 @@
 /*
-  Storage keys shared by the axios interceptors and the auth store.
+  Where the session lives, and the keys it lives under.
 
-  They live in their own module so `lib/api/client.ts` can end the session on a 401
-  without importing the store (which imports axios back — a cycle).
+  Its own module so `lib/api/client.ts` can end the session on a 401 without
+  importing the store (which imports axios back — a cycle).
+
+  Two stores, chosen by the login screen's "Remember me":
+
+    checked (default) → localStorage, so the session survives closing the browser,
+                        up to the token's own 8-hour expiry
+    unchecked         → sessionStorage, so it dies with the tab — the shared or
+                        borrowed machine case
+
+  Everything reads through `readSession`, which tries both. That matters for the
+  axios interceptor: it cannot know which box was ticked, and the answer can change
+  between sign-ins within one page load.
 */
 
 /** Bearer token. Read by the axios request interceptor on every call. */
@@ -41,12 +52,89 @@ export const SESSION_NOTICE_KEY = 'auth-session-notice'
 export const SESSION_ENDED_NOTICE =
   'You were signed out because your session expired or your access was changed. Please sign in again.'
 
-/** Drop every trace of the current session from localStorage. */
+/**
+ * Whether the last sign-in asked to be remembered, and the address it used.
+ *
+ * Both are preferences rather than session data: they stay in localStorage
+ * whichever store the session went to, and they survive signing out — forgetting
+ * the address on sign-out is precisely what the box is there to prevent.
+ */
+export const REMEMBER_KEY = 'auth-remember'
+export const REMEMBERED_EMAIL_KEY = 'auth-remembered-email'
+
+/** Every key that belongs to a session, in both stores. */
+const SESSION_KEYS = [TOKEN_KEY, USER_KEY, EXPIRES_KEY, MUST_CHANGE_KEY] as const
+
+/** Private browsing can refuse storage outright; a session in memory still works. */
+function safely<T>(read: () => T, fallback: T): T {
+  try {
+    return read()
+  } catch {
+    return fallback
+  }
+}
+
+/**
+ * A session value from whichever store holds it, localStorage first.
+ *
+ * Both are consulted rather than the remembered flag being trusted, so a stale
+ * preference can never point a reader at an empty store while the token sits in
+ * the other one.
+ */
+export function readSession(key: string): string | null {
+  return safely(() => localStorage.getItem(key) ?? sessionStorage.getItem(key), null)
+}
+
+/**
+ * Write a session value to the store `remember` selects, clearing the other so one
+ * key can never exist in both — a signed-out-but-remembered token in the store
+ * nobody is reading is exactly the bug this avoids.
+ */
+export function writeSession(key: string, value: string, remember = isRemembered()) {
+  safely(() => {
+    const [target, other] = remember
+      ? [localStorage, sessionStorage]
+      : [sessionStorage, localStorage]
+    target.setItem(key, value)
+    other.removeItem(key)
+  }, undefined)
+}
+
+export function removeSession(key: string) {
+  safely(() => {
+    localStorage.removeItem(key)
+    sessionStorage.removeItem(key)
+  }, undefined)
+}
+
+/** True when the last sign-in ticked "Remember me". Defaults to true — that is what the app did before the box existed. */
+export function isRemembered(): boolean {
+  return safely(() => localStorage.getItem(REMEMBER_KEY), null) !== 'false'
+}
+
+/** Record the choice, and the address to offer next time (only when remembering). */
+export function setRemembered(remember: boolean, email?: string) {
+  safely(() => {
+    localStorage.setItem(REMEMBER_KEY, String(remember))
+    const address = email?.trim()
+    if (remember && address) localStorage.setItem(REMEMBERED_EMAIL_KEY, address)
+    else localStorage.removeItem(REMEMBERED_EMAIL_KEY)
+  }, undefined)
+}
+
+/** The address to prefill the login form with, if there is one. */
+export function rememberedEmail(): string {
+  return safely(() => localStorage.getItem(REMEMBERED_EMAIL_KEY), null) ?? ''
+}
+
+/**
+ * Drop every trace of the current session, from both stores.
+ *
+ * The remembered address and the checkbox state are deliberately left alone: they
+ * describe how to sign in next time, not who is signed in now.
+ */
 export function clearStoredSession() {
-  localStorage.removeItem(TOKEN_KEY)
-  localStorage.removeItem(USER_KEY)
-  localStorage.removeItem(EXPIRES_KEY)
-  localStorage.removeItem(MUST_CHANGE_KEY)
+  for (const key of SESSION_KEYS) removeSession(key)
 }
 
 /** Set once a bounce is under way, so parallel 401s don't each fire a navigation. */
