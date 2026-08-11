@@ -1,5 +1,8 @@
-import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, LogOut, X } from 'lucide-react'
+import { ConfirmLogoutModal } from '@/components/auth/ConfirmLogoutModal'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { cn } from '@/lib/utils'
 import { activeNavItem } from '@/lib/navigation'
 import { useNavItems } from '@/hooks/useNavItems'
@@ -78,6 +81,7 @@ function initialsOf(name: string) {
 function UserChip({ collapsed }: { collapsed: boolean }) {
   const navigate = useNavigate()
   const { token, user, signOut } = useAuthStore()
+  const [confirming, setConfirming] = useState(false)
 
   // The login response carries no profile, so the session's identity is whatever
   // the JWT's claims held: an email and a role key. Falls back to a placeholder
@@ -86,19 +90,23 @@ function UserChip({ collapsed }: { collapsed: boolean }) {
   const role = user ? user.roleLabel : 'Grid Operations'
 
   const handleSignOut = () => {
+    setConfirming(false)
     signOut()
     navigate('/login', { replace: true })
   }
 
   const signOutButton = (
-    <button
-      onClick={handleSignOut}
-      title="Sign out"
-      aria-label="Sign out"
-      className="text-fg-muted hover:bg-surface hover:text-fg grid size-8 shrink-0 place-items-center rounded-lg transition-colors"
-    >
-      <LogOut className="size-4" />
-    </button>
+    <Tooltip label="Log out" side={collapsed ? 'right' : 'top'}>
+      <button
+        // Asks first: this button sits amongst the navigation, and a stray click
+        // would cost the user whatever they had half-finished.
+        onClick={() => setConfirming(true)}
+        aria-label="Log out"
+        className="text-fg-muted hover:bg-surface hover:text-fg grid size-8 shrink-0 place-items-center rounded-lg transition-colors"
+      >
+        <LogOut className="size-4" />
+      </button>
+    </Tooltip>
   )
 
   return (
@@ -106,18 +114,42 @@ function UserChip({ collapsed }: { collapsed: boolean }) {
       className={cn('border-line border-t p-3', collapsed && 'flex flex-col items-center gap-2')}
     >
       <div className={cn('flex items-center gap-3', collapsed && 'gap-0')}>
-        <div className="bg-primary/15 text-primary-bright flex size-9 shrink-0 items-center justify-center rounded-full font-mono text-xs font-bold">
-          {initialsOf(name)}
-        </div>
-        {!collapsed && (
-          <div className="min-w-0 flex-1">
-            <p className="text-fg truncate text-sm leading-tight font-medium">{name}</p>
-            <p className="text-fg-muted truncate text-xs leading-tight">{role}</p>
-          </div>
-        )}
+        {/* The chip is the way into the account page — where an account page is
+            normally found, and it has no sidebar entry of its own. */}
+        <Tooltip
+          label="My Account"
+          side={collapsed ? 'right' : 'top'}
+          className={collapsed ? 'flex-none' : 'min-w-0 flex-1'}
+        >
+          <Link
+            to="/account"
+            className={cn(
+              'hover:bg-surface flex min-w-0 flex-1 items-center gap-3 rounded-lg transition-colors',
+              collapsed ? 'flex-none' : '-m-1 p-1',
+            )}
+          >
+            <div className="bg-primary/15 text-primary-bright flex size-9 shrink-0 items-center justify-center rounded-full font-mono text-xs font-bold">
+              {initialsOf(name)}
+            </div>
+            {!collapsed && (
+              <div className="min-w-0 flex-1">
+                <p className="text-fg truncate text-sm leading-tight font-medium">{name}</p>
+                <p className="text-fg-muted truncate text-xs leading-tight">{role}</p>
+              </div>
+            )}
+          </Link>
+        </Tooltip>
         {!collapsed && token && signOutButton}
       </div>
       {collapsed && token && signOutButton}
+
+      {confirming && (
+        <ConfirmLogoutModal
+          email={user?.email}
+          onClose={() => setConfirming(false)}
+          onConfirm={handleSignOut}
+        />
+      )}
     </div>
   )
 }

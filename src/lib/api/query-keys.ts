@@ -42,6 +42,8 @@ export const userKeys = {
   /** GA4 active-user counts for one inclusive date range. */
   activeStats: (start: string, end: string) =>
     [...userKeys.all, 'active-stats', start, end] as const,
+  /** The signed-in user's own registry row, looked up by their email. */
+  me: (email: string) => [...userKeys.all, 'me', email] as const,
 }
 
 export const statsKeys = {

@@ -23,6 +23,7 @@ import { Analytics } from '@/pages/Analytics'
 import { Stability } from '@/pages/Stability'
 import { Performance } from '@/pages/Performance'
 import { Settings } from '@/pages/Settings'
+import { AccountSettings } from '@/pages/AccountSettings'
 import { CredentialManager } from '@/pages/CredentialManager'
 import { UserManagement } from '@/pages/UserManagement'
 import { RequestLogs } from '@/pages/RequestLogs'
@@ -100,6 +101,7 @@ export default function App() {
                 <Route path="credentials/admin/logs" element={<ActivityLedger />} />
                 <Route path="credentials/admin/pending" element={<PendingApprovals />} />
                 <Route path="settings" element={<Settings />} />
+                <Route path="account" element={<AccountSettings />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Route>
