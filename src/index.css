@@ -465,17 +465,34 @@
   which normalises the dash units so one dash always spans the whole line —
   otherwise the offset would depend on the path's geometric length, which differs
   per range and per card width.
+
+  The dash is dropped outright on the last frame, and that is the important part.
+  The active-users chart stretches its viewBox (`preserveAspectRatio="none"`) and
+  strokes with `vector-effect: non-scaling-stroke`, so the browser lays the dash
+  out along the *rendered* path while `pathLength` still normalises against the
+  *unstretched* one. On a wide card the rendered path is up to half as long again,
+  so a dash of "one path length" ran out before the end and left the tail of the
+  line missing — permanently, since `both` holds the final frame. Ending on
+  `stroke-dasharray: none` means the finished state is a plain solid stroke, with
+  no dash geometry left to come up short.
 */
 @keyframes draw-line {
   from {
-    stroke-dashoffset: 1;
+    stroke-dashoffset: 2;
+  }
+  99% {
+    stroke-dasharray: 2;
+    stroke-dashoffset: 0;
   }
   to {
+    stroke-dasharray: none;
     stroke-dashoffset: 0;
   }
 }
 .animate-draw-line {
-  stroke-dasharray: 1;
+  /* Two path lengths, not one: the same stretch that shortchanged the old dash
+     is covered twice over even before the final frame drops the dash entirely. */
+  stroke-dasharray: 2;
   animation: draw-line 0.55s ease-out both;
 }
 
