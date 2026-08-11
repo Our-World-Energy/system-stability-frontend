@@ -82,3 +82,78 @@ describe('takeSessionNotice', () => {
     expect(SESSION_ENDED_NOTICE).toMatch(/access was changed/i)
   })
 })
+
+describe('remember me', () => {
+  it('keeps a remembered session where a browser restart can find it', async () => {
+    const { TOKEN_KEY, readSession, writeSession } = await loadStorage()
+
+    writeSession(TOKEN_KEY, 'jwt', true)
+
+    expect(localStorage.getItem(TOKEN_KEY)).toBe('jwt')
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull()
+    expect(readSession(TOKEN_KEY)).toBe('jwt')
+  })
+
+  it('keeps an unremembered session in the tab, where closing it ends the session', async () => {
+    const { TOKEN_KEY, readSession, writeSession } = await loadStorage()
+
+    writeSession(TOKEN_KEY, 'jwt', false)
+
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBe('jwt')
+    expect(localStorage.getItem(TOKEN_KEY)).toBeNull()
+    // The axios interceptor cannot know which box was ticked, so it must find
+    // either one.
+    expect(readSession(TOKEN_KEY)).toBe('jwt')
+  })
+
+  it('never leaves the same key in both stores', async () => {
+    const { TOKEN_KEY, writeSession } = await loadStorage()
+
+    writeSession(TOKEN_KEY, 'remembered', true)
+    writeSession(TOKEN_KEY, 'this-tab-only', false)
+
+    // Otherwise a signed-out-but-remembered token would sit in the store nobody
+    // is reading, and come back on the next reload.
+    expect(localStorage.getItem(TOKEN_KEY)).toBeNull()
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBe('this-tab-only')
+  })
+
+  it('clears a session out of whichever store held it', async () => {
+    const { TOKEN_KEY, USER_KEY, clearStoredSession, writeSession } = await loadStorage()
+    writeSession(TOKEN_KEY, 'jwt', false)
+    writeSession(USER_KEY, '{}', true)
+
+    clearStoredSession()
+
+    expect(sessionStorage.getItem(TOKEN_KEY)).toBeNull()
+    expect(localStorage.getItem(USER_KEY)).toBeNull()
+  })
+
+  it('defaults to remembering, which is what the app did before the box existed', async () => {
+    const { isRemembered } = await loadStorage()
+    expect(isRemembered()).toBe(true)
+  })
+
+  it('offers the address back only while the box stays ticked', async () => {
+    const { isRemembered, rememberedEmail, setRemembered } = await loadStorage()
+
+    setRemembered(true, 'ops@ourworldenergy.com')
+    expect(rememberedEmail()).toBe('ops@ourworldenergy.com')
+    expect(isRemembered()).toBe(true)
+
+    setRemembered(false, 'ops@ourworldenergy.com')
+    expect(rememberedEmail()).toBe('')
+    expect(isRemembered()).toBe(false)
+  })
+
+  it('outlives signing out — it describes the next sign-in, not this one', async () => {
+    const { TOKEN_KEY, clearStoredSession, rememberedEmail, setRemembered, writeSession } =
+      await loadStorage()
+    setRemembered(true, 'ops@ourworldenergy.com')
+    writeSession(TOKEN_KEY, 'jwt', true)
+
+    clearStoredSession()
+
+    expect(rememberedEmail()).toBe('ops@ourworldenergy.com')
+  })
+})

@@ -7,6 +7,10 @@ import {
   TOKEN_KEY,
   USER_KEY,
   clearStoredSession,
+  readSession,
+  removeSession,
+  setRemembered,
+  writeSession,
 } from '@/lib/auth-storage'
 import { readJwtClaims } from '@/lib/jwt'
 
@@ -66,8 +70,14 @@ interface AuthState {
    */
   mustChangePassword: boolean
 
-  /** POST /login, then persist the session. Throws ApiError on failure. */
-  logIn: (email: string, password: string) => Promise<LoginData>
+  /**
+   * POST /login, then persist the session. Throws ApiError on failure.
+   *
+   * `remember` decides where the session is kept — localStorage across browser
+   * restarts, or sessionStorage for this tab only — and whether the address is
+   * offered back on the login screen next time.
+   */
+  logIn: (email: string, password: string, remember?: boolean) => Promise<LoginData>
   /** Persist a session from an already-obtained login response. */
   signIn: (data: LoginData) => void
   /** Called after change-password succeeds — reopens the app. */
@@ -77,30 +87,34 @@ interface AuthState {
 
 function readStoredUser(): AuthUser | null {
   try {
-    const raw = localStorage.getItem(USER_KEY)
+    const raw = readSession(USER_KEY)
     if (raw) return JSON.parse(raw) as AuthUser
   } catch {
     // Corrupt entry — fall through and re-derive from the token below.
   }
-  const token = localStorage.getItem(TOKEN_KEY)
+  const token = readSession(TOKEN_KEY)
   return token ? userFromToken(token) : null
 }
 
 /*
   Deliberately not using zustand's `persist`: the axios request interceptor reads
-  localStorage's `token` key directly, so localStorage stays the single source of
-  truth and the store writes through to it. Two persisted copies would drift.
+  the stored token directly, so web storage stays the single source of truth and
+  the store writes through to it. Two persisted copies would drift.
 */
 export const useAuthStore = create<AuthState>((set) => ({
-  token: localStorage.getItem(TOKEN_KEY),
+  token: readSession(TOKEN_KEY),
   user: readStoredUser(),
-  expiresAt: localStorage.getItem(EXPIRES_KEY),
-  mustChangePassword: localStorage.getItem(MUST_CHANGE_KEY) === 'true',
+  expiresAt: readSession(EXPIRES_KEY),
+  mustChangePassword: readSession(MUST_CHANGE_KEY) === 'true',
 
-  logIn: async (email, password) => {
+  logIn: async (email, password, remember = true) => {
     // Drop any stale session first, so a failed login cannot leave the previous
     // user's token attached to the next request.
     clearStoredSession()
+    // Recorded before the request, so `signIn` (and anything else writing session
+    // keys afterwards) already knows which store this session belongs in. The
+    // address is only kept when the box was ticked.
+    setRemembered(remember, email)
     const data = await loginRequest(email, password)
     useAuthStore.getState().signIn(data)
     return data
@@ -109,13 +123,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   signIn: ({ token, expires_at, must_change_password }) => {
     const user = userFromToken(token)
 
-    localStorage.setItem(TOKEN_KEY, token)
-    if (user) localStorage.setItem(USER_KEY, JSON.stringify(user))
-    else localStorage.removeItem(USER_KEY)
-    if (expires_at) localStorage.setItem(EXPIRES_KEY, expires_at)
+    writeSession(TOKEN_KEY, token)
+    if (user) writeSession(USER_KEY, JSON.stringify(user))
+    else removeSession(USER_KEY)
+    if (expires_at) writeSession(EXPIRES_KEY, expires_at)
     // Written as a string either way: an absent key would be indistinguishable
     // from "not yet known" on the next reload.
-    localStorage.setItem(MUST_CHANGE_KEY, String(Boolean(must_change_password)))
+    writeSession(MUST_CHANGE_KEY, String(Boolean(must_change_password)))
 
     set({
       token,
@@ -126,7 +140,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   clearMustChangePassword: () => {
-    localStorage.setItem(MUST_CHANGE_KEY, 'false')
+    writeSession(MUST_CHANGE_KEY, 'false')
     set({ mustChangePassword: false })
   },
 

@@ -25,6 +25,7 @@ const TOKEN = tokenFor('ops@ourworldenergy.com', 'org_admin')
 
 beforeEach(() => {
   localStorage.clear()
+  sessionStorage.clear()
   useAuthStore.setState({
     token: null,
     user: null,
@@ -235,5 +236,72 @@ describe('Login page', () => {
     // Switching windows can swallow the key-up, so blur is the backstop.
     fireEvent.blur(eye())
     expect(field.type).toBe('password')
+  })
+})
+
+describe('Login — remember me', () => {
+  const rememberBox = () => screen.getByLabelText(/Remember me/i) as HTMLInputElement
+
+  it('is ticked by default, which is how the app behaved before the box existed', () => {
+    renderLogin()
+    expect(rememberBox().checked).toBe(true)
+  })
+
+  it('keeps a remembered session where a browser restart finds it', async () => {
+    mockLogin.mockResolvedValue({
+      token: TOKEN,
+      expires_at: '2026-08-12T00:00:00Z',
+      must_change_password: false,
+    })
+    renderLogin()
+    fillAndSubmit()
+
+    await waitFor(() => expect(screen.getByText('Dashboard')).toBeTruthy())
+    expect(localStorage.getItem('token')).toBe(TOKEN)
+    expect(sessionStorage.getItem('token')).toBeNull()
+    // Offered back next time, so the usual case is password-and-go.
+    expect(localStorage.getItem('auth-remembered-email')).toBe('ops@ourworldenergy.com')
+  })
+
+  it('confines an unremembered session to the tab, and forgets the address', async () => {
+    mockLogin.mockResolvedValue({
+      token: TOKEN,
+      expires_at: '2026-08-12T00:00:00Z',
+      must_change_password: false,
+    })
+    renderLogin()
+    fireEvent.click(rememberBox())
+    fillAndSubmit()
+
+    await waitFor(() => expect(screen.getByText('Dashboard')).toBeTruthy())
+    // Closing the tab is what ends this one — the borrowed-machine case.
+    expect(sessionStorage.getItem('token')).toBe(TOKEN)
+    expect(localStorage.getItem('token')).toBeNull()
+    expect(localStorage.getItem('auth-remembered-email')).toBeNull()
+  })
+
+  it('prefills a remembered address and puts the caret in the password box', () => {
+    localStorage.setItem('auth-remember', 'true')
+    localStorage.setItem('auth-remembered-email', 'ops@ourworldenergy.com')
+    renderLogin()
+
+    expect((screen.getByLabelText(/Email Address/i) as HTMLInputElement).value).toBe(
+      'ops@ourworldenergy.com',
+    )
+    expect(document.activeElement).toBe(screen.getByLabelText(/Secure Password/i))
+  })
+
+  it('never stores the password', async () => {
+    mockLogin.mockResolvedValue({
+      token: TOKEN,
+      expires_at: '2026-08-12T00:00:00Z',
+      must_change_password: false,
+    })
+    renderLogin()
+    fillAndSubmit('ops@ourworldenergy.com', 'hunter2!!')
+
+    await waitFor(() => expect(screen.getByText('Dashboard')).toBeTruthy())
+    const everything = JSON.stringify({ ...localStorage, ...sessionStorage })
+    expect(everything).not.toContain('hunter2!!')
   })
 })

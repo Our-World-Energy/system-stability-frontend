@@ -14,7 +14,7 @@
   drop the way EventSource would.
 */
 
-import { TOKEN_KEY, clearStoredSession } from '@/lib/auth-storage'
+import { TOKEN_KEY, clearStoredSession, readSession } from '@/lib/auth-storage'
 import { stabilityBaseUrl } from './client'
 import { endpoints } from './endpoints'
 import type { PendingStats } from './types'
@@ -153,7 +153,7 @@ function scheduleReconnect(): void {
 async function connect(): Promise<void> {
   if (!running) return
   controller = new AbortController()
-  const token = localStorage.getItem(TOKEN_KEY)
+  const token = readSession(TOKEN_KEY)
 
   try {
     const res = await fetch(pendingStatsStreamUrl, {
