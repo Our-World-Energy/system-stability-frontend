@@ -4,40 +4,12 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
-export default defineConfig(({ command, mode }) => {
+export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
-  // Refuse to ship the RSA private key — unless a demo build explicitly opts in.
-  //
-  // Every VITE_-prefixed variable is compiled into the JavaScript bundle in
-  // plaintext, and .env is loaded underneath .env.production — so a developer's
-  // local private key would ride into a production build unless it is blanked.
-  // That leak is silent and unrecoverable once published, so by default it stops
-  // the build.
-  //
-  // The one sanctioned exception is a throwaway DEMO build that sets
-  // VITE_ALLOW_PRIVATE_KEY_IN_BUILD=true, to show client-side decryption before
-  // the Cloudflare Worker decryption path exists. The flag keeps the leak
-  // deliberate and visible instead of accidental: anything shipped this way is
-  // readable by anyone and MUST be rotated before real use.
-  const shippingPrivateKey = Boolean(env.VITE_CREDENTIAL_PRIVATE_KEY?.trim())
-  const allowPrivateKeyInBuild = env.VITE_ALLOW_PRIVATE_KEY_IN_BUILD === 'true'
-  if (command === 'build' && mode === 'production' && shippingPrivateKey) {
-    if (!allowPrivateKeyInBuild) {
-      throw new Error(
-        'VITE_CREDENTIAL_PRIVATE_KEY is set for this production build. It would be readable by ' +
-          'anyone who opens the bundle. Blank it in .env.production (or unset it in the host ' +
-          'environment) — or, for a throwaway demo only, set VITE_ALLOW_PRIVATE_KEY_IN_BUILD=true ' +
-          'to opt in deliberately. Decryption belongs behind an authenticated service.',
-      )
-    }
-    console.warn(
-      '\n⚠  Shipping VITE_CREDENTIAL_PRIVATE_KEY in this production bundle ' +
-        '(VITE_ALLOW_PRIVATE_KEY_IN_BUILD=true).\n' +
-        '   The key is readable by anyone who opens the site. Demo use only — ' +
-        'rotate the key and remove the flag before real use.\n',
-    )
-  }
+  // Decryption no longer happens in the browser — the RSA private key lives in the
+  // Cloudflare Worker (see workers/decrypt), reached via VITE_DECRYPT_WORKER_URL —
+  // so there is no private key to keep out of the bundle here.
 
   // Dev proxy target: the Go stability service origin (derived from
   // VITE_API_BASE_URL). Serves both /api/* (REST) and /sse/status (stream), so

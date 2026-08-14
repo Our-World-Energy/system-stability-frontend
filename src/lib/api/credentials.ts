@@ -9,7 +9,7 @@
 */
 
 import { encryptSecret } from '@/lib/crypto/secret-crypto'
-import { decryptSecret } from '@/lib/crypto/secret-decrypt'
+import { decryptViaWorker } from '@/lib/crypto/decrypt-remote'
 import { SecretCryptoError } from '@/lib/crypto/keys'
 import { ApiError, stabilityCaller } from './caller'
 import { endpoints } from './endpoints'
@@ -555,25 +555,28 @@ export function extractSecretEnvelope(data: unknown): string | null {
 }
 
 /**
- * Fetch a credential's stored secret and decrypt it in the browser.
+ * Fetch a credential's stored secret and decrypt it via the decryption Worker.
  *
- * The plaintext is returned to the caller and never cached: the copy button is
- * expected to hand it straight to the clipboard and drop it.
- *
- * The one remaining precondition is the RSA private key: it must be present to
- * decrypt the envelope, which is the case in local development and deliberately
- * not in a production build. That failure surfaces as a plain sentence rather
- * than a silent no-op.
+ * The backend authorizes and audits this copy through `get-credential-secret`;
+ * the returned envelope is then decrypted by the Cloudflare Worker that holds the
+ * private key (see `lib/crypto/decrypt-remote`). The key never touches the
+ * browser. The plaintext is returned to the caller and never cached — the copy
+ * button hands it straight to the clipboard and drops it.
  */
 export async function revealCredentialSecret(id: string): Promise<string> {
   if (!id) throw new Error('No credential selected.')
 
-  const { data } = await stabilityCaller<unknown>(endpoints.credentialManager.secret, { id })
+  // `purpose` drives the backend audit action — this path is always a copy, so
+  // it is logged as ActionCopied (rather than defaulting) for an unambiguous trail.
+  const { data } = await stabilityCaller<unknown>(endpoints.credentialManager.secret, {
+    id,
+    purpose: 'copy',
+  })
   const envelope = extractSecretEnvelope(data)
   if (!envelope) {
     throw new Error('The service did not return a stored secret for this credential.')
   }
-  return decryptSecret(envelope)
+  return decryptViaWorker(envelope)
 }
 
 /** Non-secret fields returned by get-credential-details for the copy dialog. */

@@ -6,8 +6,8 @@ vi.mock('./caller', async (importOriginal) => {
   return { ...actual, stabilityCaller }
 })
 
-const decryptSecret = vi.hoisted(() => vi.fn(async () => 'plain-secret'))
-vi.mock('@/lib/crypto/secret-decrypt', () => ({ decryptSecret }))
+const decryptViaWorker = vi.hoisted(() => vi.fn(async () => 'plain-secret'))
+vi.mock('@/lib/crypto/decrypt-remote', () => ({ decryptViaWorker }))
 
 import { getCredentialDetails, revealCredentialSecret } from './credentials'
 import { endpoints } from './endpoints'
@@ -32,7 +32,7 @@ describe('credential details and secret routes', () => {
 
     await expect(getCredentialDetails(ID)).resolves.toEqual(data)
     expect(stabilityCaller).toHaveBeenCalledWith(endpoints.credentialManager.details, { id: ID })
-    expect(decryptSecret).not.toHaveBeenCalled()
+    expect(decryptViaWorker).not.toHaveBeenCalled()
   })
 
   it('keeps get-credential-secret as the separately invoked copy operation', async () => {
@@ -43,7 +43,10 @@ describe('credential details and secret routes', () => {
     })
 
     await expect(revealCredentialSecret(ID)).resolves.toBe('plain-secret')
-    expect(stabilityCaller).toHaveBeenCalledWith(endpoints.credentialManager.secret, { id: ID })
-    expect(decryptSecret).toHaveBeenCalledWith('encrypted-envelope')
+    expect(stabilityCaller).toHaveBeenCalledWith(endpoints.credentialManager.secret, {
+      id: ID,
+      purpose: 'copy',
+    })
+    expect(decryptViaWorker).toHaveBeenCalledWith('encrypted-envelope')
   })
 })

@@ -1,0 +1,13 @@
+name = "owe-credential-decrypt"
+main = "src/worker.js"
+compatibility_date = "2026-08-01"
+
+# CORS origin of the deployed app. "*" is acceptable because this Worker
+# authenticates with the Authorization header, not cookies — but pin it to the
+# real origin (e.g. "https://system-stability-frontend.vercel.app") if you can.
+[vars]
+ALLOWED_ORIGIN = "*"
+
+# Secrets are NOT set here — that would commit them. Set them out of band:
+#   wrangler secret put CREDENTIAL_PRIVATE_KEY   # base64 PKCS#8 RSA private key
+#   wrangler secret put JWT_SECRET               # HS256 secret used to sign app JWTs

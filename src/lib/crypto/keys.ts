@@ -3,9 +3,9 @@
 
   Keys live in the Vite env as base64 (PEM armour optional) and are imported into
   WebCrypto `CryptoKey`s exactly once per page load. Only the *public* half is
-  needed to create a credential; the private half exists solely for the local
-  round-trip helper in `secret-decrypt.ts` and disappears when decryption moves
-  server-side (see the warning there).
+  ever here — it wraps each secret on the way out. Decryption happens off the
+  browser in the Cloudflare Worker (see `lib/crypto/decrypt-remote`), so the
+  private key never ships in the bundle.
 
   Generate a pair with:  node scripts/gen-credential-keys.mjs
 */
@@ -57,17 +57,10 @@ export function getSubtle(): SubtleCrypto {
 
 /** Env var holding the SPKI public key used to wrap every secret. */
 export const PUBLIC_KEY_ENV = 'VITE_CREDENTIAL_PUBLIC_KEY'
-/** Env var holding the PKCS#8 private key. Development only — see `secret-decrypt.ts`. */
-export const PRIVATE_KEY_ENV = 'VITE_CREDENTIAL_PRIVATE_KEY'
 
 /** True when a public key is configured, i.e. credentials can be created at all. */
 export function isEncryptionConfigured(): boolean {
   return readKeyMaterial(PUBLIC_KEY_ENV) !== ''
-}
-
-/** True when the local decrypt helper can run. Expected to be false in production. */
-export function isDecryptionConfigured(): boolean {
-  return readKeyMaterial(PRIVATE_KEY_ENV) !== ''
 }
 
 function readKeyMaterial(name: string): string {
@@ -102,7 +95,6 @@ export function decodeKeyMaterial(material: string, envName: string): Uint8Array
 // keystroke-triggered encrypt. Failures are not cached, so fixing the env var and
 // hot-reloading retries cleanly.
 let publicKeyCache: Promise<CryptoKey> | null = null
-let privateKeyCache: Promise<CryptoKey> | null = null
 
 /** The configured RSA-OAEP public key, for wrapping per-secret AES keys. */
 export function getPublicKey(): Promise<CryptoKey> {
@@ -111,15 +103,6 @@ export function getPublicKey(): Promise<CryptoKey> {
     throw err
   })
   return publicKeyCache
-}
-
-/** The configured RSA-OAEP private key. Development only — see `secret-decrypt.ts`. */
-export function getPrivateKey(): Promise<CryptoKey> {
-  privateKeyCache ??= importKey('pkcs8', PRIVATE_KEY_ENV, ['decrypt']).catch((err) => {
-    privateKeyCache = null
-    throw err
-  })
-  return privateKeyCache
 }
 
 async function importKey(
@@ -153,5 +136,4 @@ export function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 /** Clear the import caches. Test-only seam; also lets a hot reload pick up new keys. */
 export function resetKeyCache(): void {
   publicKeyCache = null
-  privateKeyCache = null
 }

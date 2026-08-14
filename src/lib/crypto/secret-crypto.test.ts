@@ -1,13 +1,31 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { RSA_ALGORITHM, SecretCryptoError } from './keys'
+import { RSA_ALGORITHM, SecretCryptoError, toArrayBuffer } from './keys'
 import {
   ENVELOPE_PREFIX,
   ENVELOPE_VERSION,
+  aesParams,
   encryptSecretWith,
   isSecretEnvelope,
   parseSecretEnvelope,
 } from './secret-crypto'
-import { decryptSecretWith } from './secret-decrypt'
+
+// Local decrypt — mirrors what the decryption Worker now does — so the encrypt
+// round-trip can still be verified here. There is no app decrypt module to
+// import: the private key lives only on the Worker (workers/decrypt).
+async function decryptSecretWith(privateKey: CryptoKey, envelope: string): Promise<string> {
+  const { wrappedKey, iv, ciphertext } = parseSecretEnvelope(envelope)
+  try {
+    const rawAes = await crypto.subtle.decrypt(RSA_ALGORITHM, privateKey, toArrayBuffer(wrappedKey))
+    const aesKey = await crypto.subtle.importKey('raw', rawAes, { name: 'AES-GCM' }, false, [
+      'decrypt',
+    ])
+    const plaintext = await crypto.subtle.decrypt(aesParams(iv), aesKey, toArrayBuffer(ciphertext))
+    return new TextDecoder().decode(plaintext)
+  } catch (err) {
+    if (err instanceof SecretCryptoError) throw err
+    throw new SecretCryptoError('operation-failed', 'The secret could not be decrypted.')
+  }
+}
 
 let keys: CryptoKeyPair
 

@@ -5,13 +5,13 @@
     node scripts/gen-credential-keys.mjs          # print env lines
     node scripts/gen-credential-keys.mjs --pem    # also print PEM blocks
 
-  Paste the two printed VITE_ lines into .env. Keys are base64 DER on one line
-  each, because .env cannot hold the newlines a PEM block needs.
+  The PUBLIC line goes into .env as VITE_CREDENTIAL_PUBLIC_KEY. The PRIVATE key
+  goes to the decryption Worker (workers/decrypt), never into a Vite env — a
+  private key in a VITE_ var is compiled into the public bundle. Set it with:
 
-  The private key is only needed by src/lib/crypto/secret-decrypt.ts, the
-  temporary local round-trip helper. When decryption moves to a Cloudflare
-  Worker, give the Worker the PEM (`--pem`) and delete the VITE_ private key line
-  — a private key in a Vite env var is compiled into the public bundle.
+    wrangler secret put CREDENTIAL_PRIVATE_KEY   # paste the base64, or the --pem block
+
+  Keys are base64 DER on one line each, because .env cannot hold PEM newlines.
 */
 
 import { webcrypto } from 'node:crypto'
@@ -34,8 +34,11 @@ const spki = await exportBase64('spki', publicKey)
 const pkcs8 = await exportBase64('pkcs8', privateKey)
 
 console.log(`# RSA-OAEP ${MODULUS_BITS} / SHA-256 — generated ${new Date().toISOString()}`)
+console.log('\n# → app .env — the public half only:')
 console.log(`VITE_CREDENTIAL_PUBLIC_KEY=${spki}`)
-console.log(`VITE_CREDENTIAL_PRIVATE_KEY=${pkcs8}`)
+console.log('\n# → decryption Worker secret (NOT any .env):')
+console.log('#   wrangler secret put CREDENTIAL_PRIVATE_KEY')
+console.log(pkcs8)
 
 if (args.has('--pem')) {
   console.log(`\n${toPem('PUBLIC KEY', spki)}`)
@@ -43,8 +46,8 @@ if (args.has('--pem')) {
 }
 
 console.log(
-  '\n# Keep the private key out of git and out of any production build.' +
-    '\n# Rotating it makes every already-stored encrypted_secret unrecoverable.',
+  '\n# The private key belongs only on the Worker — never in git or a build.' +
+    '\n# Rotating the pair makes every already-stored encrypted_secret unrecoverable.',
 )
 
 async function exportBase64(format, key) {
