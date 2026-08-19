@@ -14,19 +14,31 @@
     a fresh AES-256-GCM key encrypts the secret; that key is RSA-OAEP-SHA256
     wrapped with the credential public key; the three parts are base64.
 
-  Configure (never commit these — set them out of band):
-    wrangler secret put CREDENTIAL_PRIVATE_KEY   # base64 PKCS#8 RSA private key
-    wrangler secret put JWT_SECRET               # HS256 secret the backend signs app JWTs with
-    ALLOWED_ORIGIN  (var)                        # exact app origin for CORS, or "*"
+  Configure:
+    wrangler secret put CREDENTIAL_PRIVATE_KEY   # base64 PKCS#8 RSA private key (secret)
+    wrangler secret put JWT_SECRET               # HS256 secret the backend signs app JWTs with (secret)
+    ALLOWED_ORIGINS  (var, per env in wrangler.toml)  # comma-separated exact browser origins
+  Secrets are set out of band per environment — never committed.
 */
 
 const RSA = { name: 'RSA-OAEP', hash: 'SHA-256' }
 
 export default {
   async fetch(request, env) {
-    const cors = corsHeaders(env)
+    const cors = corsHeaders(env, request)
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
+
+    // Refuse a browser request from a non-allowlisted origin before doing any
+    // work — JWT verification and decryption never run for it. `cors` carries an
+    // Access-Control-Allow-Origin only when the request's Origin is allowlisted,
+    // so its absence (with an Origin present) means "disallowed browser origin".
+    // A missing Origin header is a non-browser client and passes through to auth.
+    const origin = request.headers.get('Origin')
+    if (origin && !cors['Access-Control-Allow-Origin']) {
+      return json({ status: 403, message: 'origin not allowed' }, 403, cors)
+    }
+
     if (request.method !== 'POST') {
       return json({ status: 405, message: 'method not allowed' }, 405, cors)
     }
@@ -60,13 +72,29 @@ export default {
 
 /* ── HTTP helpers ─────────────────────────────────────────────────────────── */
 
-function corsHeaders(env) {
-  return {
-    'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN || '*',
+// Exact-match origin allowlist. The response echoes only an allowlisted request
+// origin (never "*", never a *.vercel.app suffix match) and always sends
+// `Vary: Origin` because the response depends on it. A disallowed browser origin
+// gets no Access-Control-Allow-Origin and is blocked client-side; the JWT check
+// remains the actual access boundary.
+function corsHeaders(env, request) {
+  const allowed = parseOrigins(env.ALLOWED_ORIGINS)
+  const origin = request.headers.get('Origin') || ''
+  const headers = {
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400',
+    Vary: 'Origin',
   }
+  if (origin && allowed.includes(origin)) headers['Access-Control-Allow-Origin'] = origin
+  return headers
+}
+
+function parseOrigins(value) {
+  return (value || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
 }
 
 function json(payload, status, headers) {

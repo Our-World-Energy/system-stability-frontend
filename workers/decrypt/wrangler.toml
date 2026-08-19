@@ -2,12 +2,25 @@ name = "owe-credential-decrypt"
 main = "src/worker.js"
 compatibility_date = "2026-08-01"
 
-# CORS origin of the deployed app. "*" is acceptable because this Worker
-# authenticates with the Authorization header, not cookies — but pin it to the
-# real origin (e.g. "https://system-stability-frontend.vercel.app") if you can.
-[vars]
-ALLOWED_ORIGIN = "*"
+# No top-level [vars]: always deploy WITH --env, so a Worker is never created
+# without its origin allowlist. Secrets are per-env and set out of band (never
+# here — that would commit them):
+#   npx wrangler secret put CREDENTIAL_PRIVATE_KEY --env <staging|production>
+#   npx wrangler secret put JWT_SECRET             --env <staging|production>
 
-# Secrets are NOT set here — that would commit them. Set them out of band:
-#   wrangler secret put CREDENTIAL_PRIVATE_KEY   # base64 PKCS#8 RSA private key
-#   wrangler secret put JWT_SECRET               # HS256 secret used to sign app JWTs
+[env.production]
+name = "owe-credential-decrypt-production"
+
+[env.production.vars]
+# Exact allowed browser origins, comma-separated. Not secret. Migration to a
+# custom domain: add the new origin here alongside the Vercel one, deploy, then
+# remove the Vercel origin once traffic has moved — config only, no code change.
+ALLOWED_ORIGINS = "https://system-stability-frontend.vercel.app"
+
+[env.staging]
+name = "owe-credential-decrypt-staging"
+
+[env.staging.vars]
+# Set to the staging origin(s) when that domain exists (exact, comma-separated).
+# Empty = fail-closed: no browser origin is allowed until configured.
+ALLOWED_ORIGINS = ""
