@@ -101,15 +101,26 @@ describe('CreateCredentialModal', () => {
     expect(controls).toHaveLength(labels.length)
   })
 
-  it('offers only None for 2FA when creating a credential', () => {
+  it('defaults 2FA to None while offering every supported type', () => {
     renderModal()
 
     const twoFactor = screen.getByLabelText('2FA Type') as HTMLSelectElement
     expect(twoFactor.value).toBe('none')
     expect(Array.from(twoFactor.options, (option) => [option.value, option.text])).toEqual([
       ['none', 'None'],
+      ['totp', 'Authenticator App (TOTP)'],
+      ['sms', 'SMS / Text Message'],
+      ['email', 'Email OTP'],
+      ['webauthn', 'Hardware Security Key (FIDO2/U2F)'],
+      ['push', 'Push Notification'],
+      ['biometric', 'Biometric'],
     ])
     expect(screen.getByLabelText('2FA Approver')).toHaveProperty('disabled', true)
+
+    fireEvent.change(twoFactor, { target: { value: 'totp' } })
+
+    expect(twoFactor.value).toBe('totp')
+    expect(screen.getByLabelText('2FA Approver')).toHaveProperty('disabled', false)
   })
 
   it('sends the encrypted secret and never the plaintext', async () => {

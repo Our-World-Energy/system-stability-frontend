@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { KeyRound, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatDuration, formatTimestamp } from '@/lib/format'
+import { formatDuration } from '@/lib/format'
 import { useCredentialDetails } from '@/hooks/useCredentials'
 import type { CredentialDetails } from '@/lib/api/credentials'
 import type { Credential } from '@/lib/api/types'
@@ -19,7 +19,7 @@ interface CredentialRecordTableProps {
   error?: string | null
 }
 
-const columns = ['Name & Tags', 'Status', 'Elevation', 'Last Rotated', 'Secret', 'Actions']
+const columns = ['Name & Tags', 'Notes', 'Elevation', 'Last Rotated By', 'Secret', 'Actions']
 
 /** Admin record list with per-row rotate/purge actions. */
 export function CredentialRecordTable({
@@ -52,59 +52,59 @@ export function CredentialRecordTable({
           </tr>
         </thead>
         <tbody>
-          {records.map((record) => {
-            const active = record.status === 'active'
-            return (
-              <tr
-                key={record.id}
-                className="border-line hover:bg-surface-2 border-b transition-colors last:border-0"
-              >
-                <td className="px-4 py-3.5">
-                  <p className="text-fg font-mono font-medium">{record.name}</p>
-                  <div className="mt-1 flex flex-wrap gap-1.5">
-                    {record.tags?.map((tag) => (
-                      <span
-                        key={tag}
-                        className="bg-surface-3 text-fg-muted rounded px-1.5 py-0.5 font-mono text-[10px]"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-                <td className="px-4 py-3.5">
-                  <span className="inline-flex items-center gap-1.5 text-sm">
+          {records.map((record) => (
+            <tr
+              key={record.id}
+              className="border-line hover:bg-surface-2 border-b transition-colors last:border-0"
+            >
+              <td className="px-4 py-3.5">
+                <p className="text-fg font-mono font-medium">{record.name}</p>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {record.tags?.map((tag) => (
                     <span
-                      className={cn(
-                        'size-1.5 rounded-full',
-                        active ? 'bg-healthy' : 'bg-fg-subtle',
-                      )}
-                    />
-                    <span className={active ? 'text-fg' : 'text-fg-muted'}>
-                      {active ? 'Active' : 'Archived'}
+                      key={tag}
+                      className="bg-surface-3 text-fg-muted rounded px-1.5 py-0.5 font-mono text-[10px]"
+                    >
+                      {tag}
                     </span>
-                  </span>
-                </td>
-                <td className="text-fg-muted px-4 py-3.5 font-mono">
-                  {formatDuration(record.elevation_duration_seconds)}
-                </td>
-                <td className="text-fg-muted px-4 py-3.5 font-mono">
-                  {record.last_rotated_at
-                    ? formatTimestamp(record.last_rotated_at)
-                    : 'Never rotated'}
-                </td>
-                <td className="px-4 py-3.5">
-                  <SecretCell record={record} />
-                </td>
-                <td className="px-4 py-3.5">
-                  <RowActions record={record} permissions={permissions} onAction={onAction} />
-                </td>
-              </tr>
-            )
-          })}
+                  ))}
+                </div>
+              </td>
+              <td className="px-4 py-3.5">
+                <NotesCell notes={record.notes} />
+              </td>
+              <td className="text-fg-muted px-4 py-3.5 font-mono">
+                {formatDuration(record.elevation_duration_seconds)}
+              </td>
+              <td className="text-fg-muted px-4 py-3.5 font-mono">
+                {record.last_rotated_by?.trim() || 'Not available'}
+              </td>
+              <td className="px-4 py-3.5">
+                <SecretCell record={record} />
+              </td>
+              <td className="px-4 py-3.5">
+                <RowActions record={record} permissions={permissions} onAction={onAction} />
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
+  )
+}
+
+/** Clamp long notes so one record cannot widen or dominate the table. */
+function NotesCell({ notes }: { notes?: string }) {
+  const note = notes?.trim()
+  if (!note) return <span className="text-fg-subtle">Not provided</span>
+
+  return (
+    <p
+      className="text-fg-muted line-clamp-2 w-64 max-w-64 break-all whitespace-normal"
+      title={note}
+    >
+      {note}
+    </p>
   )
 }
 

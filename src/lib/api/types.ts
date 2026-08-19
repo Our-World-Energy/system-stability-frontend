@@ -34,11 +34,14 @@ export interface Credential {
   elevation_duration_seconds: number
   auto_grant: boolean
   notes?: string
-  status: CredentialStatus
+  /** Omitted by slimmer search responses; absence must not be treated as archived. */
+  status?: CredentialStatus
   created_by: number
   updated_by: number
   /** RFC3339, or absent when the credential has never been rotated. */
   last_rotated_at?: string | null
+  /** Display name returned by search responses even when the rotation time is omitted. */
+  last_rotated_by?: string | null
   created_at: string
   updated_at: string
 
