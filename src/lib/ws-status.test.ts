@@ -23,7 +23,7 @@ describe('statusWord', () => {
     expect(statusWord('healthy')).toBe('Healthy')
     expect(statusWord('degraded')).toBe('Degraded')
     expect(statusWord('critical')).toBe('Critical')
-    expect(statusWord('vendor_silent')).toBe('No feed')
+    expect(statusWord('vendor_silent')).toBe('Down')
   })
 })
 

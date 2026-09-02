@@ -64,6 +64,7 @@ describe('ServiceCard per-DB indicators (OWE DB)', () => {
       />,
     )
     expect(screen.queryByText('Main DB UP')).toBeNull()
-    expect(screen.queryByText(/DOWN/)).toBeNull()
+    // The status pill itself reads DOWN on vendor_silent, so match the chip text only.
+    expect(screen.queryByText(/DB DOWN/)).toBeNull()
   })
 })

@@ -6,7 +6,7 @@ const strokeColor: Record<ServiceStatus, string> = {
   healthy: 'var(--color-healthy)',
   degraded: 'var(--color-degraded)',
   critical: 'var(--color-critical-bright)',
-  vendor_silent: 'var(--color-fg-subtle)',
+  vendor_silent: 'var(--color-critical-bright)',
 }
 
 interface SparklineProps {
@@ -24,7 +24,7 @@ const markerColor: Record<ServiceStatus, string> = {
   healthy: 'var(--color-healthy)',
   degraded: 'var(--color-degraded)',
   critical: 'var(--color-critical-bright)',
-  vendor_silent: 'var(--color-fg-subtle)',
+  vendor_silent: 'var(--color-critical-bright)',
 }
 
 const W = 100

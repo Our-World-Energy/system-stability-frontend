@@ -25,7 +25,7 @@ export function Navbar() {
     { value: summary.healthy, label: 'healthy', dot: 'bg-healthy' },
     { value: summary.degraded, label: 'degraded', dot: 'bg-degraded' },
     { value: summary.critical, label: 'critical', dot: 'bg-critical-bright' },
-    { value: summary.noFeed, label: 'no-feed', dot: 'bg-fg-subtle' },
+    { value: summary.noFeed, label: 'down', dot: 'bg-critical-bright' },
   ]
   return (
     <header className="border-line bg-canvas/80 sticky top-0 z-30 flex flex-col gap-4 border-b px-4 py-4 backdrop-blur sm:px-6 lg:flex-row lg:items-center lg:justify-between">

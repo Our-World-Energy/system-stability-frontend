@@ -86,6 +86,16 @@ export const tiers: Tier[] = [
         updated: '—',
         sparkline: [30, 33, 31, 35, 34, 38, 42, 39, 44, 47],
       },
+      {
+        name: 'One Portal',
+        systemId: 'one_portal',
+        vendor: '/health',
+        status: 'healthy',
+        metric: '—',
+        metricLabel: 'Response Time',
+        updated: '—',
+        sparkline: [20, 24, 21, 26, 30, 28, 32, 31, 36, 40],
+      },
     ],
   },
   {
@@ -132,16 +142,6 @@ export const tiers: Tier[] = [
         metricLabel: 'Response Time',
         updated: '—',
         sparkline: [24, 26, 23, 28, 25, 30, 27, 32, 29, 34],
-      },
-      {
-        name: 'One Portal',
-        systemId: 'one_portal',
-        vendor: '/health',
-        status: 'healthy',
-        metric: '—',
-        metricLabel: 'Response Time',
-        updated: '—',
-        sparkline: [20, 24, 21, 26, 30, 28, 32, 31, 36, 40],
       },
       {
         name: 'RingCentral',
