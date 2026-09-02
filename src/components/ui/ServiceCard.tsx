@@ -29,9 +29,10 @@ export function ServiceCard({ service, size = 'lg' }: ServiceCardProps) {
     dbIndicators,
     historicalDataReady,
   } = service
-  const isCritical = status === 'critical'
   const isDegraded = status === 'degraded'
   const isSilent = status === 'vendor_silent'
+  // A silent feed is shown as DOWN, so it gets the same red treatment as critical.
+  const isCritical = status === 'critical' || isSilent
 
   return (
     <div
@@ -191,10 +192,10 @@ export function ServiceCard({ service, size = 'lg' }: ServiceCardProps) {
             <p
               className={cn(
                 'min-w-0 flex-1 truncate font-mono text-xs',
-                isCritical
-                  ? 'text-critical-bright'
-                  : isSilent
-                    ? 'text-fg-subtle italic'
+                isSilent
+                  ? 'text-critical-bright italic'
+                  : isCritical
+                    ? 'text-critical-bright'
                     : 'text-fg-muted',
               )}
             >

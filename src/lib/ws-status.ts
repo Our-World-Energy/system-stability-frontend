@@ -244,6 +244,6 @@ export function statusWord(status: ServiceStatus): string {
     case 'critical':
       return 'Critical'
     default:
-      return 'No feed'
+      return 'Down'
   }
 }

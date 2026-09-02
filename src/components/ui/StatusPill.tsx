@@ -17,10 +17,12 @@ const map: Record<ServiceStatus, { label: string; cls: string; dot: string }> = 
     cls: 'text-critical-bright border-critical/40 bg-critical/15',
     dot: 'bg-critical-bright',
   },
+  // A silent vendor reads as an outage to the people watching this board, so it
+  // wears the same red as `critical` and says DOWN rather than "no feed".
   vendor_silent: {
-    label: 'NO FEED',
-    cls: 'text-fg-muted border-fg-subtle/40 bg-fg-subtle/10',
-    dot: 'bg-fg-subtle',
+    label: 'DOWN',
+    cls: 'text-critical-bright border-critical/40 bg-critical/15',
+    dot: 'bg-critical-bright',
   },
 }
 
